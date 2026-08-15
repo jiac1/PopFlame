@@ -255,6 +255,11 @@
         .product-tabs {
             margin-top: 48px;
         }
+
+        .product-tabs-top {
+            margin-top: 24px;
+            margin-bottom: 32px;
+        }
         
         .tabs-header {
             display: flex;
@@ -361,8 +366,17 @@
                     
                     <h1 class="product-page-title" id="productTitle"></h1>
                     <p class="product-page-price" id="productPrice"></p>
-                    <p class="product-page-description" id="productDescription"></p>
-                    
+
+                    <div class="product-tabs product-tabs-top">
+                        <div class="tabs-header">
+                            <button class="tab-btn active" data-tab="description">Descripción</button>
+                            <button class="tab-btn" data-tab="sizes">Guía de Talles</button>
+                        </div>
+                        <div class="tab-content" id="tabContent">
+                            <!-- Tab content loaded via JS -->
+                        </div>
+                    </div>
+
                     <div class="product-options">
                         <div class="option-group">
                             <label class="option-label">Talla: <span id="selectedSize">Seleccionar</span></label>
@@ -406,16 +420,6 @@
                                 <polyline points="9 22 9 12 15 12 15 22"></polyline>
                             </svg>
                             <span>Envío a regiones o dentro de la región sujeto a ubicación y prestador de preferencia; se coordina al finalizar el pedido</span>
-                        </div>
-                    </div>
-                    
-                    <div class="product-tabs">
-                        <div class="tabs-header">
-                            <button class="tab-btn active" data-tab="description">Descripción</button>
-                            <button class="tab-btn" data-tab="sizes">Guía de Talles</button>
-                        </div>
-                        <div class="tab-content" id="tabContent">
-                            <!-- Tab content loaded via JS -->
                         </div>
                     </div>
                 </div>
@@ -546,8 +550,7 @@
             // Set product info
             document.getElementById('productTitle').textContent = currentProduct.name;
             document.getElementById('productPrice').textContent = ProductsManager.formatPrice(currentProduct.price);
-            document.getElementById('productDescription').textContent = currentProduct.description;
-            
+
             // Render sizes
             const sizeOptions = document.getElementById('sizeOptions');
             sizeOptions.innerHTML = currentProduct.sizes.map(size => `
