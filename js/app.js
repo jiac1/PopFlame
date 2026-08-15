@@ -22,6 +22,29 @@ const App = {
 
         // Setup newsletter form
         this.setupNewsletter();
+
+        // Botón flotante al panel: solo aparece si hay una sesión de admin activa,
+        // los clientes (sin sesión) nunca lo ven.
+        this.setupAdminShortcut();
+    },
+
+    // Muestra un botón flotante "Ir al panel" cuando hay sesión activa (útil mientras
+    // subes imágenes/editas productos y quieres ver el resultado en la tienda al toque).
+    async setupAdminShortcut() {
+        if (typeof supabaseClient === 'undefined') return;
+        try {
+            const { data: { session } } = await supabaseClient.auth.getSession();
+            if (!session) return;
+
+            const adminBase = window.location.pathname.includes('/pages/') ? '../admin/' : 'admin/';
+            const link = document.createElement('a');
+            link.href = adminBase + 'panel.html';
+            link.className = 'admin-shortcut-btn';
+            link.textContent = '⚙ Ir al panel';
+            document.body.appendChild(link);
+        } catch (error) {
+            // sin sesión o sin conexión: no se muestra nada
+        }
     },
 
     // Reemplaza logo, banner y textos del hero con lo configurado en Supabase (si existe)

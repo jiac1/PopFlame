@@ -772,3 +772,26 @@ img {
 .empty-state p {
     margin-bottom: 24px;
 }
+
+/* ===== Acceso rápido al panel (solo visible con sesión de admin activa) ===== */
+.admin-shortcut-btn {
+    position: fixed;
+    bottom: 24px;
+    left: 24px;
+    z-index: 3000;
+    background: var(--primary);
+    color: #fff;
+    padding: 12px 20px;
+    border-radius: 30px;
+    font-size: 13px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    transition: var(--transition);
+}
+
+.admin-shortcut-btn:hover {
+    background: var(--primary-dark);
+    transform: translateY(-2px);
+}
