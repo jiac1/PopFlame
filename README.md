@@ -65,6 +65,13 @@ Desde ese momento: cualquiera que se suscriba en el sitio recibe el correo de bi
 instante, y cada producto nuevo que crees en **Productos → Nuevo producto** le llega por correo a
 todos los suscriptores activos (en copia oculta entre ellos).
 
+⚠️ **Límite de Resend mientras no verifiques un dominio propio**: con el remitente de pruebas
+(`onboarding@resend.dev`), Resend **solo permite enviar al correo con el que te registraste en
+Resend** — a cualquier otro destinatario le va a fallar el envío (aunque el sistema en sí
+funciona perfecto, ya probado de punta a punta). Para que le llegue a suscriptores reales,
+verifica un dominio en [resend.com/domains](https://resend.com/domains) y cambia `FROM_EMAIL`
+a una dirección de ese dominio (ej. `PopFlame <ventas@popflame.cl>`).
+
 ## 3. Panel de administración
 
 URL: `/admin/` (login) → `/admin/panel.html` (dashboard).

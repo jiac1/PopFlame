@@ -76,6 +76,7 @@ Deno.serve(async (req: Request) => {
         const emails: string[] = subscribers.map((s: { email: string }) => s.email);
         const chunkSize = 50;
         let sent = 0;
+        const resendErrors: unknown[] = [];
 
         for (let i = 0; i < emails.length; i += chunkSize) {
             const chunk = emails.slice(i, i + chunkSize);
@@ -93,10 +94,14 @@ Deno.serve(async (req: Request) => {
                     html
                 })
             });
-            if (res.ok) sent += chunk.length;
+            if (res.ok) {
+                sent += chunk.length;
+            } else {
+                resendErrors.push(await res.json());
+            }
         }
 
-        return new Response(JSON.stringify({ success: true, sent }), {
+        return new Response(JSON.stringify({ success: true, sent, resendErrors }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
     } catch (err) {
