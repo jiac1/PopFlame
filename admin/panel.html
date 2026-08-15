@@ -133,6 +133,15 @@
                     <input type="text" id="categoryDescription">
                 </div>
                 <div class="field">
+                    <label>Foto de portada (opcional, se ve en la grilla de categorías del inicio)</label>
+                    <img id="categoryImagePreview" style="display:none;max-height:120px;margin-bottom:8px;border-radius:6px;max-width:100%;object-fit:cover;">
+                    <input type="file" id="categoryImageFile" accept="image/*">
+                    <div style="display:flex;gap:8px;margin-top:8px;">
+                        <input type="text" id="categoryImageUrl" placeholder="o pega una URL" style="flex:1;">
+                        <button type="button" class="btn btn-secondary btn-sm" id="clearCategoryImageBtn">Quitar</button>
+                    </div>
+                </div>
+                <div class="field">
                     <label>Orden</label>
                     <input type="text" inputmode="numeric" pattern="[0-9]*" id="categorySortOrder">
                 </div>

@@ -619,10 +619,11 @@ const AdminPanel = {
             <div class="card">
                 <div class="table-wrap">
                     <table>
-                        <thead><tr><th>ID</th><th>Nombre</th><th>Descripción</th><th>Orden</th><th></th></tr></thead>
+                        <thead><tr><th></th><th>ID</th><th>Nombre</th><th>Descripción</th><th>Orden</th><th></th></tr></thead>
                         <tbody>
                             ${this.categories.map(c => `
                                 <tr>
+                                    <td>${c.image ? `<img src="${this.resolveImagePath(c.image)}" style="width:50px;height:34px;object-fit:cover;border-radius:4px;" onerror="this.style.opacity=0.3">` : '—'}</td>
                                     <td>${this.escapeHtml(c.id)}</td>
                                     <td>${this.escapeHtml(c.name)}</td>
                                     <td>${this.escapeHtml(c.description || '')}</td>
@@ -632,7 +633,7 @@ const AdminPanel = {
                                         <button class="btn btn-danger btn-sm delete-cat-btn" data-id="${c.id}">Eliminar</button>
                                     </td>
                                 </tr>
-                            `).join('') || '<tr><td colspan="5" class="empty-state">Sin categorías</td></tr>'}
+                            `).join('') || '<tr><td colspan="6" class="empty-state">Sin categorías</td></tr>'}
                         </tbody>
                     </table>
                 </div>
@@ -656,28 +657,60 @@ const AdminPanel = {
         document.getElementById('categoryName').value = category ? category.name : '';
         document.getElementById('categoryDescription').value = category ? (category.description || '') : '';
         document.getElementById('categorySortOrder').value = category ? category.sort_order : (this.categories.length + 1);
+        document.getElementById('categoryImageFile').value = '';
+        document.getElementById('categoryImageUrl').value = category ? (category.image || '') : '';
+        this.updateCategoryImagePreview(category ? category.image : '');
         document.getElementById('categoryModal').classList.add('active');
+    },
+
+    updateCategoryImagePreview(url) {
+        const preview = document.getElementById('categoryImagePreview');
+        if (url) {
+            preview.src = this.resolveImagePath(url);
+            preview.style.display = 'block';
+        } else {
+            preview.style.display = 'none';
+        }
     },
 
     async saveCategory(e) {
         e.preventDefault();
-        const originalId = document.getElementById('categoryIdOriginal').value;
-        const payload = {
-            id: document.getElementById('categoryId').value.trim().toLowerCase(),
-            name: document.getElementById('categoryName').value.trim(),
-            description: document.getElementById('categoryDescription').value.trim(),
-            sort_order: parseInt(document.getElementById('categorySortOrder').value, 10) || 0
-        };
+        const saveBtn = e.target.querySelector('button[type="submit"]');
+        saveBtn.disabled = true;
+        saveBtn.textContent = 'Guardando...';
 
-        const { error } = originalId
-            ? await supabaseClient.from('categories').update(payload).eq('id', originalId)
-            : await supabaseClient.from('categories').insert(payload);
+        try {
+            const originalId = document.getElementById('categoryIdOriginal').value;
 
-        if (error) { this.toast('Error guardando categoría: ' + error.message, 'error'); return; }
+            let imageUrl = document.getElementById('categoryImageUrl').value.trim();
+            const file = document.getElementById('categoryImageFile').files[0];
+            if (file) {
+                imageUrl = await this.uploadImage('site-assets', file);
+            }
 
-        this.toast('Categoría guardada');
-        document.getElementById('categoryModal').classList.remove('active');
-        await this.loadCategories();
+            const payload = {
+                id: document.getElementById('categoryId').value.trim().toLowerCase(),
+                name: document.getElementById('categoryName').value.trim(),
+                description: document.getElementById('categoryDescription').value.trim(),
+                image: imageUrl || null,
+                sort_order: parseInt(document.getElementById('categorySortOrder').value, 10) || 0
+            };
+
+            const { error } = originalId
+                ? await supabaseClient.from('categories').update(payload).eq('id', originalId)
+                : await supabaseClient.from('categories').insert(payload);
+
+            if (error) throw error;
+
+            this.toast('Categoría guardada');
+            document.getElementById('categoryModal').classList.remove('active');
+            await this.loadCategories();
+        } catch (error) {
+            this.toast('Error guardando categoría: ' + error.message, 'error');
+        } finally {
+            saveBtn.disabled = false;
+            saveBtn.textContent = 'Guardar';
+        }
     },
 
     async deleteCategory(id) {
@@ -1028,6 +1061,19 @@ const AdminPanel = {
     bindModals() {
         document.getElementById('productForm').addEventListener('submit', (e) => this.saveProduct(e));
         document.getElementById('categoryForm').addEventListener('submit', (e) => this.saveCategory(e));
+
+        document.getElementById('categoryImageFile').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            document.getElementById('categoryImageUrl').value = '';
+            this.updateCategoryImagePreview(URL.createObjectURL(file));
+        });
+
+        document.getElementById('clearCategoryImageBtn').addEventListener('click', () => {
+            document.getElementById('categoryImageFile').value = '';
+            document.getElementById('categoryImageUrl').value = '';
+            this.updateCategoryImagePreview('');
+        });
         document.getElementById('bulkEditForm').addEventListener('submit', (e) => this.applyBulkEdit(e));
         document.getElementById('bannerForm').addEventListener('submit', (e) => this.saveBanner(e));
 

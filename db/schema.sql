@@ -407,11 +407,18 @@ end $$;
 -- ---------------------------------------------------------
 
 insert into public.categories (id, name, description, image, sort_order) values
-    ('poleras',     'Poleras',     'Poleras exclusivas con estampados PopFlame', 'images/categories/poleras.jpg', 1),
-    ('polerones',   'Polerones',   'Polerones premium streetwear',               'images/categories/polerones.jpg', 2),
-    ('pantalones',  'Pantalones',  'Pantalones urbanos y cómodos',                'images/categories/pantalones.jpg', 3),
-    ('accesorios',  'Accesorios',  'Complementos para tu outfit',                 'images/categories/accesorios.jpg', 4)
+    ('poleras',     'Poleras',     'Poleras exclusivas con estampados PopFlame', null, 1),
+    ('polerones',   'Polerones',   'Polerones premium streetwear',               null, 2),
+    ('pantalones',  'Pantalones',  'Pantalones urbanos y cómodos',                null, 3),
+    ('accesorios',  'Accesorios',  'Complementos para tu outfit',                 null, 4)
 on conflict (id) do nothing;
+
+-- Limpia las rutas de ejemplo (images/categories/*.jpg) que dejó una versión anterior
+-- de este script y que nunca existieron como archivo real; ahora las fotos se suben
+-- de verdad desde el panel (Categorías > Foto de portada).
+update public.categories
+set image = null
+where image like 'images/categories/%';
 
 insert into public.products (name, category_id, price, sizes, colors, image, images, description, featured, stock, badge) values
     ('Polera PopFlame Básica', 'poleras', 29990, '{S,M,L,XL}', '{Negro,Blanco}', 'images/products/poleras/polera-1.jpg', '{polera-1.jpg}', 'Polera de algodón 100% con estampado PopFlame. Diseño exclusivo streetwear.', true, 50, 'Nuevo'),
