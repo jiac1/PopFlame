@@ -99,6 +99,25 @@ const ProductsManager = {
         return prefix + path;
     },
 
+    // Mapa de nombres de color (tal como se escriben en el panel) a un color real para
+    // pintar la bolita de selección. Si el color no está en la lista, se intenta usar el
+    // texto tal cual como color CSS (funciona para nombres en inglés, ej. "blue").
+    colorMap: {
+        'negro': '#000000', 'blanco': '#ffffff', 'gris': '#808080',
+        'rojo': '#E31837', 'azul': '#1E3A8A', 'celeste': '#38BDF8',
+        'verde': '#166534', 'verde militar': '#4B5320', 'amarillo': '#EAB308',
+        'naranjo': '#EA580C', 'naranja': '#EA580C', 'café': '#5C3A21', 'cafe': '#5C3A21',
+        'marrón': '#5C3A21', 'marron': '#5C3A21', 'beige': '#D2B48C',
+        'rosado': '#F472B6', 'rosa': '#F472B6', 'morado': '#7C3AED', 'púrpura': '#7C3AED',
+        'purpura': '#7C3AED', 'dorado': '#D4AF37', 'plateado': '#C0C0C0',
+        'turquesa': '#14B8A6', 'crema': '#F5F0DC', 'vino': '#722F37', 'única': '#555555'
+    },
+
+    resolveColorSwatch(name) {
+        const key = (name || '').trim().toLowerCase();
+        return this.colorMap[key] || name || '#555555';
+    },
+
     // Generate product card HTML (para index.html, en la raíz del sitio)
     createProductCard(product) {
         const badgeHTML = product.badge

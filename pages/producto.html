@@ -564,7 +564,7 @@
             // Render colors
             const colorOptions = document.getElementById('colorOptions');
             colorOptions.innerHTML = currentProduct.colors.map(color => `
-                <button class="color-btn" data-color="${color}" title="${color}"></button>
+                <button class="color-btn" data-color="${color}" title="${color}" style="background:${ProductsManager.resolveColorSwatch(color)};"></button>
             `).join('');
             
             // Set default tab content

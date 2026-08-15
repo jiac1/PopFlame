@@ -8,6 +8,13 @@ const App = {
         // Apply logo/banner/hero text configured from el panel de Super Admin
         this.applySiteConfig();
 
+        // Categorías dinámicas: nav, footer y grid de la portada según lo que
+        // exista realmente en Supabase (así una categoría nueva, ej. "chaquetas",
+        // aparece sola sin tocar código)
+        this.renderNav();
+        this.renderFooterCategoryLinks();
+        this.renderCategoriesGrid();
+
         // Initialize cart
         CartManager.init();
 
@@ -75,6 +82,58 @@ const App = {
                 });
             });
         }
+    },
+
+    escapeHtml(str) {
+        const div = document.createElement('div');
+        div.textContent = str ?? '';
+        return div.innerHTML;
+    },
+
+    // Dónde está la carpeta pages/ visto desde la página actual
+    pagesPrefix() {
+        return window.location.pathname.includes('/pages/') ? '' : 'pages/';
+    },
+
+    // Reconstruye el menú de navegación con las categorías reales de Supabase
+    // (en vez de los 4 links fijos que traía el sitio originalmente)
+    renderNav() {
+        if (!ProductsManager.categories || ProductsManager.categories.length === 0) return;
+        const prefix = this.pagesPrefix();
+        const linksHtml = ProductsManager.categories.map(c =>
+            `<a href="${prefix}categoria.html?cat=${encodeURIComponent(c.id)}" class="nav-link">${this.escapeHtml(c.name)}</a>`
+        ).join('');
+        document.querySelectorAll('.nav').forEach(nav => { nav.innerHTML = linksHtml; });
+    },
+
+    // Igual que renderNav() pero para la columna "TIENDA" del footer
+    renderFooterCategoryLinks() {
+        if (!ProductsManager.categories || ProductsManager.categories.length === 0) return;
+        const prefix = this.pagesPrefix();
+        const linksHtml = ProductsManager.categories.map(c =>
+            `<a href="${prefix}categoria.html?cat=${encodeURIComponent(c.id)}">${this.escapeHtml(c.name)}</a>`
+        ).join('');
+        document.querySelectorAll('.footer-col').forEach(col => {
+            const h4 = col.querySelector('h4');
+            if (h4 && h4.textContent.trim() === 'TIENDA') {
+                col.innerHTML = '<h4>TIENDA</h4>' + linksHtml;
+            }
+        });
+    },
+
+    // Grid de categorías de la portada (solo existe en index.html)
+    renderCategoriesGrid() {
+        const grid = document.getElementById('categoriesGrid');
+        if (!grid || !ProductsManager.categories || ProductsManager.categories.length === 0) return;
+
+        const genericIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M20.38 3.46L16 2a4 4 0 01-8 0L3.62 3.46a2 2 0 00-1.34 2.23l.58 3.47a1 1 0 00.99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 002-2V10h2.15a1 1 0 00.99-.84l.58-3.47a2 2 0 00-1.34-2.23z"></path></svg>`;
+
+        grid.innerHTML = ProductsManager.categories.map(c => `
+            <a href="pages/categoria.html?cat=${encodeURIComponent(c.id)}" class="category-card">
+                <div class="category-icon">${genericIcon}</div>
+                <h3>${this.escapeHtml(c.name)}</h3>
+            </a>
+        `).join('');
     },
 
     // Reemplaza un <img> por un <video> en loop si la URL configurada es un video
