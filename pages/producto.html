@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Producto | PopFlame</title>
+    <meta name="description" content="Detalle de producto PopFlame.">
+    <link rel="stylesheet" href="../css/style.css">
+    <link rel="stylesheet" href="../css/responsive.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        /* Product Page Styles */
+        .product-page {
+            padding: 120px 0 80px;
+        }
+        
+        .product-detail {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 48px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .product-gallery {
+            position: sticky;
+            top: 100px;
+        }
+        
+        .product-main-image {
+            aspect-ratio: 3/4;
+            background: var(--bg-card);
+            overflow: hidden;
+            margin-bottom: 16px;
+        }
+        
+        .product-main-image img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        
+        .product-thumbnails {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .product-thumbnail {
+            width: 80px;
+            height: 100px;
+            background: var(--bg-card);
+            border: 2px solid transparent;
+            cursor: pointer;
+            overflow: hidden;
+            transition: var(--transition);
+        }
+        
+        .product-thumbnail.active,
+        .product-thumbnail:hover {
+            border-color: var(--primary);
+        }
+        
+        .product-thumbnail img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        
+        .product-info-section {
+            padding: 24px 0;
+        }
+        
+        .product-breadcrumb {
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-bottom: 16px;
+        }
+        
+        .product-breadcrumb a {
+            color: var(--text-muted);
+            transition: var(--transition);
+        }
+        
+        .product-breadcrumb a:hover {
+            color: var(--primary);
+        }
+        
+        .product-page-title {
+            font-size: 32px;
+            font-weight: 800;
+            margin-bottom: 8px;
+        }
+        
+        .product-page-price {
+            font-size: 28px;
+            font-weight: 700;
+            color: var(--primary);
+            margin-bottom: 24px;
+        }
+        
+        .product-page-description {
+            color: var(--text-secondary);
+            margin-bottom: 32px;
+            line-height: 1.7;
+        }
+        
+        .product-options {
+            margin-bottom: 32px;
+        }
+        
+        .option-group {
+            margin-bottom: 24px;
+        }
+        
+        .option-label {
+            display: block;
+            font-size: 13px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 12px;
+        }
+        
+        .option-label span {
+            font-weight: 400;
+            color: var(--text-secondary);
+            text-transform: none;
+            letter-spacing: 0;
+        }
+        
+        .size-options {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        
+        .size-btn {
+            min-width: 48px;
+            height: 48px;
+            padding: 0 16px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+            font-size: 14px;
+            font-weight: 500;
+            transition: var(--transition);
+        }
+        
+        .size-btn:hover,
+        .size-btn.active {
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+        
+        .color-options {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .color-btn {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            border: 2px solid transparent;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+        
+        .color-btn:hover,
+        .color-btn.active {
+            border-color: var(--primary);
+            transform: scale(1.1);
+        }
+        
+        .color-btn[data-color="Negro"] { background: #000; }
+        .color-btn[data-color="Blanco"] { background: #fff; }
+        .color-btn[data-color="Gris"] { background: #808080; }
+        .color-btn[data-color="Rojo"] { background: #E31837; }
+        .color-btn[data-color="Verde Militar"] { background: #4B5320; }
+        
+        .quantity-selector {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+        
+        .qty-btn {
+            width: 40px;
+            height: 40px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+            font-size: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: var(--transition);
+        }
+        
+        .qty-btn:hover {
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+        
+        .qty-value {
+            font-size: 18px;
+            font-weight: 600;
+            min-width: 40px;
+            text-align: center;
+        }
+        
+        .add-to-cart-section {
+            margin-top: 32px;
+        }
+        
+        .add-to-cart-btn {
+            width: 100%;
+            padding: 18px;
+            background: var(--primary);
+            color: var(--text-primary);
+            font-size: 16px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            transition: var(--transition);
+        }
+        
+        .add-to-cart-btn:hover {
+            background: var(--primary-dark);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(227, 24, 55, 0.4);
+        }
+        
+        .product-meta {
+            margin-top: 32px;
+            padding-top: 32px;
+            border-top: 1px solid var(--border);
+        }
+        
+        .meta-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 12px;
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+        
+        .meta-icon {
+            width: 20px;
+            height: 20px;
+            color: var(--text-muted);
+        }
+        
+        .product-tabs {
+            margin-top: 48px;
+        }
+        
+        .tabs-header {
+            display: flex;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 24px;
+        }
+        
+        .tab-btn {
+            padding: 12px 24px;
+            font-size: 14px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-muted);
+            border-bottom: 2px solid transparent;
+            transition: var(--transition);
+        }
+        
+        .tab-btn:hover,
+        .tab-btn.active {
+            color: var(--text-primary);
+            border-bottom-color: var(--primary);
+        }
+        
+        .tab-content {
+            color: var(--text-secondary);
+            line-height: 1.7;
+        }
+        
+        @media (max-width: 992px) {
+            .product-detail {
+                grid-template-columns: 1fr;
+            }
+            
+            .product-gallery {
+                position: static;
+            }
+        }
+        
+        @media (max-width: 576px) {
+            .product-page-title {
+                font-size: 24px;
+            }
+            
+            .product-page-price {
+                font-size: 22px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="container">
+            <a href="../index.html" class="logo">
+                <img src="../images/logo.png" alt="PopFlame" class="logo-img">
+            </a>
+            
+            <nav class="nav">
+                <a href="poleras.html" class="nav-link">Poleras</a>
+                <a href="polerones.html" class="nav-link">Polerones</a>
+                <a href="pantalones.html" class="nav-link">Pantalones</a>
+                <a href="accesorios.html" class="nav-link">Accesorios</a>
+            </nav>
+
+            <div class="header-actions">
+                <button class="cart-btn" id="cartBtn">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="9" cy="21" r="1"></circle>
+                        <circle cx="20" cy="21" r="1"></circle>
+                        <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
+                    </svg>
+                    <span class="cart-count" id="cartCount">0</span>
+                </button>
+                
+                <button class="menu-btn" id="menuBtn">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Product Page -->
+    <section class="product-page">
+        <div class="container">
+            <div class="product-detail">
+                <div class="product-gallery">
+                    <div class="product-main-image">
+                        <img id="mainImage" src="" alt="">
+                    </div>
+                    <div class="product-thumbnails" id="thumbnails">
+                        <!-- Thumbnails loaded via JS -->
+                    </div>
+                </div>
+                
+                <div class="product-info-section">
+                    <div class="product-breadcrumb" id="breadcrumb">
+                        <a href="../index.html">Inicio</a> / 
+                        <a href="#" id="categoryLink">Categoría</a> / 
+                        <span id="productName">Producto</span>
+                    </div>
+                    
+                    <h1 class="product-page-title" id="productTitle"></h1>
+                    <p class="product-page-price" id="productPrice"></p>
+                    <p class="product-page-description" id="productDescription"></p>
+                    
+                    <div class="product-options">
+                        <div class="option-group">
+                            <label class="option-label">Talla: <span id="selectedSize">Seleccionar</span></label>
+                            <div class="size-options" id="sizeOptions">
+                                <!-- Sizes loaded via JS -->
+                            </div>
+                        </div>
+                        
+                        <div class="option-group">
+                            <label class="option-label">Color: <span id="selectedColor">Seleccionar</span></label>
+                            <div class="color-options" id="colorOptions">
+                                <!-- Colors loaded via JS -->
+                            </div>
+                        </div>
+                        
+                        <div class="option-group">
+                            <label class="option-label">Cantidad:</label>
+                            <div class="quantity-selector">
+                                <button class="qty-btn" id="qtyMinus">-</button>
+                                <span class="qty-value" id="qtyValue">1</span>
+                                <button class="qty-btn" id="qtyPlus">+</button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="add-to-cart-section">
+                        <button class="add-to-cart-btn" id="addToCartBtn">AGREGAR AL CARRITO</button>
+                    </div>
+                    
+                    <div class="product-meta">
+                        <div class="meta-item">
+                            <svg class="meta-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M5 12h14"></path>
+                                <path d="M12 5l7 7-7 7"></path>
+                            </svg>
+                            <span>Envío gratis en compras sobre $50.000</span>
+                        </div>
+                        <div class="meta-item">
+                            <svg class="meta-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                                <polyline points="9 22 9 12 15 12 15 22"></polyline>
+                            </svg>
+                            <span>Retiro en tienda disponible</span>
+                        </div>
+                        <div class="meta-item">
+                            <svg class="meta-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <polyline points="12 6 12 12 16 14"></polyline>
+                            </svg>
+                            <span>Despacho en 24-48 horas</span>
+                        </div>
+                    </div>
+                    
+                    <div class="product-tabs">
+                        <div class="tabs-header">
+                            <button class="tab-btn active" data-tab="description">Descripción</button>
+                            <button class="tab-btn" data-tab="sizes">Guía de Talles</button>
+                        </div>
+                        <div class="tab-content" id="tabContent">
+                            <!-- Tab content loaded via JS -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-grid">
+                <div class="footer-col">
+                    <img src="../images/logo.png" alt="PopFlame" class="footer-logo">
+                    <p>Streetwear que quema 🔥</p>
+                </div>
+                
+                <div class="footer-col">
+                    <h4>TIENDA</h4>
+                    <a href="poleras.html">Poleras</a>
+                    <a href="polerones.html">Polerones</a>
+                    <a href="pantalones.html">Pantalones</a>
+                    <a href="accesorios.html">Accesorios</a>
+                </div>
+                
+                <div class="footer-col">
+                    <h4>AYUDA</h4>
+                    <a href="#">Envíos</a>
+                    <a href="#">Devoluciones</a>
+                    <a href="#">Guía de Talles</a>
+                    <a href="#">Contacto</a>
+                </div>
+                
+                <div class="footer-col">
+                    <h4>REDES</h4>
+                    <a href="#">Instagram</a>
+                    <a href="#">TikTok</a>
+                    <a href="#">Twitter</a>
+                </div>
+            </div>
+            
+            <div class="footer-bottom">
+                <p>&copy; 2026 PopFlame. Todos los derechos reservados.</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Cart Drawer -->
+    <div class="cart-overlay" id="cartOverlay"></div>
+    <div class="cart-drawer" id="cartDrawer">
+        <div class="cart-header">
+            <h3>TU CARRITO</h3>
+            <button class="cart-close" id="cartClose">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+            </button>
+        </div>
+        
+        <div class="cart-items" id="cartItems">
+            <!-- Cart items loaded via JS -->
+        </div>
+        
+        <div class="cart-footer" id="cartFooter">
+            <div class="cart-total">
+                <span>TOTAL:</span>
+                <span id="cartTotal">$0</span>
+            </div>
+            <a href="checkout.html" class="btn btn-primary btn-full">FINALIZAR COMPRA</a>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="../js/supabaseClient.js"></script>
+    <script src="../js/products.js"></script>
+    <script src="../js/cart.js"></script>
+    <script src="../js/app.js"></script>
+    <script>
+        let currentProduct = null;
+        let selectedSize = null;
+        let selectedColor = null;
+        let quantity = 1;
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            await ProductsManager.loadProducts();
+            CartManager.init();
+            
+            const productId = App.getUrlParam('id');
+            if (productId) {
+                currentProduct = ProductsManager.getProductById(productId);
+                if (currentProduct) {
+                    renderProduct();
+                    setupEventListeners();
+                }
+            }
+        });
+
+        function renderProduct() {
+            // Set main image
+            document.getElementById('mainImage').src = '../' + currentProduct.image;
+            document.getElementById('mainImage').alt = currentProduct.name;
+            
+            // Set breadcrumb
+            document.getElementById('categoryLink').textContent = currentProduct.category.charAt(0).toUpperCase() + currentProduct.category.slice(1);
+            document.getElementById('categoryLink').href = currentProduct.category + '.html';
+            document.getElementById('productName').textContent = currentProduct.name;
+            
+            // Set product info
+            document.getElementById('productTitle').textContent = currentProduct.name;
+            document.getElementById('productPrice').textContent = ProductsManager.formatPrice(currentProduct.price);
+            document.getElementById('productDescription').textContent = currentProduct.description;
+            
+            // Render sizes
+            const sizeOptions = document.getElementById('sizeOptions');
+            sizeOptions.innerHTML = currentProduct.sizes.map(size => `
+                <button class="size-btn" data-size="${size}">${size}</button>
+            `).join('');
+            
+            // Render colors
+            const colorOptions = document.getElementById('colorOptions');
+            colorOptions.innerHTML = currentProduct.colors.map(color => `
+                <button class="color-btn" data-color="${color}" title="${color}"></button>
+            `).join('');
+            
+            // Set default tab content
+            document.getElementById('tabContent').innerHTML = `<p>${currentProduct.description}</p>`;
+            
+            // Update page title
+            document.title = currentProduct.name + ' | PopFlame';
+        }
+
+        function setupEventListeners() {
+            // Size selection
+            document.querySelectorAll('.size-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('.size-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    selectedSize = btn.dataset.size;
+                    document.getElementById('selectedSize').textContent = selectedSize;
+                });
+            });
+            
+            // Color selection
+            document.querySelectorAll('.color-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('.color-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    selectedColor = btn.dataset.color;
+                    document.getElementById('selectedColor').textContent = selectedColor;
+                });
+            });
+            
+            // Quantity controls
+            document.getElementById('qtyMinus').addEventListener('click', () => {
+                if (quantity > 1) {
+                    quantity--;
+                    document.getElementById('qtyValue').textContent = quantity;
+                }
+            });
+            
+            document.getElementById('qtyPlus').addEventListener('click', () => {
+                quantity++;
+                document.getElementById('qtyValue').textContent = quantity;
+            });
+            
+            // Add to cart
+            document.getElementById('addToCartBtn').addEventListener('click', () => {
+                if (!selectedSize) {
+                    alert('Por favor selecciona una talla');
+                    return;
+                }
+                if (!selectedColor) {
+                    alert('Por favor selecciona un color');
+                    return;
+                }
+                
+                CartManager.addToCart(currentProduct, selectedSize, selectedColor, quantity);
+            });
+            
+            // Tab switching
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    
+                    if (btn.dataset.tab === 'description') {
+                        document.getElementById('tabContent').innerHTML = `<p>${currentProduct.description}</p>`;
+                    } else {
+                        document.getElementById('tabContent').innerHTML = `
+                            <p><strong>Poleras:</strong> S (48cm), M (51cm), L (54cm), XL (57cm)</p>
+                            <p><strong>Polerones:</strong> S (54cm), M (57cm), L (60cm), XL (63cm)</p>
+                            <p><strong>Pantalones:</strong> 28 (71cm), 30 (76cm), 32 (81cm), 34 (86cm)</p>
+                            <p>* Medidas aproximadas del contorno del pecho/cintura</p>
+                        `;
+                    }
+                });
+            });
+        }
+    </script>
+</body>
+</html>

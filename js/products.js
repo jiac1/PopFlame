@@ -1,0 +1,196 @@
+// Products Manager
+const ProductsManager = {
+    products: [],
+    categories: [],
+    config: {},
+
+    // Load products, categories and config from Supabase
+    async loadProducts() {
+        try {
+            const [{ data: products, error: pErr }, { data: categories, error: cErr }, { data: cfg, error: cfgErr }] =
+                await Promise.all([
+                    supabaseClient.from('products').select('*').order('id'),
+                    supabaseClient.from('categories').select('*').order('sort_order'),
+                    supabaseClient.from('config').select('*').eq('id', 1).maybeSingle()
+                ]);
+
+            if (pErr) throw pErr;
+            if (cErr) throw cErr;
+            if (cfgErr) throw cfgErr;
+
+            this.products = (products || []).map(p => ({
+                id: p.id,
+                name: p.name,
+                category: p.category_id,
+                price: Number(p.price),
+                sizes: p.sizes || [],
+                colors: p.colors || [],
+                image: p.image,
+                images: (p.images && p.images.length) ? p.images : (p.image ? [p.image] : []),
+                description: p.description || '',
+                featured: p.featured,
+                stock: p.stock,
+                badge: p.badge || undefined
+            }));
+
+            this.categories = categories || [];
+
+            this.config = cfg ? {
+                currency: cfg.currency,
+                currencySymbol: '$',
+                whatsappNumber: cfg.whatsapp_number || '',
+                shippingCost: Number(cfg.shipping_cost),
+                freeShippingMin: Number(cfg.free_shipping_min),
+                storeName: cfg.store_name,
+                heroTitle: cfg.hero_title,
+                heroSubtitle: cfg.hero_subtitle,
+                socialLinks: {
+                    instagram: cfg.social_instagram || '',
+                    tiktok: cfg.social_tiktok || '',
+                    twitter: cfg.social_twitter || ''
+                }
+            } : {};
+
+            return { products: this.products, categories: this.categories, config: this.config };
+        } catch (error) {
+            console.error('Error loading products from Supabase:', error);
+            return null;
+        }
+    },
+
+    // Get all products
+    getAllProducts() {
+        return this.products;
+    },
+
+    // Get products by category
+    getProductsByCategory(category) {
+        return this.products.filter(p => p.category === category);
+    },
+
+    // Get product by ID
+    getProductById(id) {
+        return this.products.find(p => p.id === parseInt(id));
+    },
+
+    // Get featured products
+    getFeaturedProducts() {
+        return this.products.filter(p => p.featured);
+    },
+
+    // Get category by ID
+    getCategoryById(id) {
+        return this.categories.find(c => c.id === id);
+    },
+
+    // Format price in CLP
+    formatPrice(price) {
+        return '$' + price.toLocaleString('es-CL');
+    },
+
+    // Generate product card HTML
+    createProductCard(product) {
+        const badgeHTML = product.badge 
+            ? `<span class="product-badge">${product.badge}</span>` 
+            : '';
+        
+        return `
+            <a href="producto.html?id=${product.id}" class="product-card">
+                <div class="product-image">
+                    ${badgeHTML}
+                    <img src="../${product.image}" alt="${product.name}" loading="lazy">
+                </div>
+                <div class="product-info">
+                    <span class="product-category">${product.category}</span>
+                    <h3 class="product-name">${product.name}</h3>
+                    <p class="product-price">${this.formatPrice(product.price)}</p>
+                </div>
+            </a>
+        `;
+    },
+
+    // Generate product card HTML for category pages (without ../)
+    createProductCardCategory(product) {
+        const badgeHTML = product.badge 
+            ? `<span class="product-badge">${product.badge}</span>` 
+            : '';
+        
+        return `
+            <a href="producto.html?id=${product.id}" class="product-card">
+                <div class="product-image">
+                    ${badgeHTML}
+                    <img src="../${product.image}" alt="${product.name}" loading="lazy">
+                </div>
+                <div class="product-info">
+                    <span class="product-category">${product.category}</span>
+                    <h3 class="product-name">${product.name}</h3>
+                    <p class="product-price">${this.formatPrice(product.price)}</p>
+                </div>
+            </a>
+        `;
+    },
+
+    // Render products to container
+    renderProducts(containerId, products, isCategoryPage = false) {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+
+        const createCard = isCategoryPage 
+            ? this.createProductCardCategory.bind(this)
+            : this.createProductCard.bind(this);
+
+        container.innerHTML = products.map(createCard).join('');
+    },
+
+    // Search products
+    searchProducts(query) {
+        const lowerQuery = query.toLowerCase();
+        return this.products.filter(p => 
+            p.name.toLowerCase().includes(lowerQuery) ||
+            p.description.toLowerCase().includes(lowerQuery)
+        );
+    },
+
+    // Filter products by price range
+    filterByPrice(min, max) {
+        return this.products.filter(p => p.price >= min && p.price <= max);
+    },
+
+    // Filter products by size
+    filterBySize(size) {
+        return this.products.filter(p => p.sizes.includes(size));
+    },
+
+    // Filter products by color
+    filterByColor(color) {
+        return this.products.filter(p => p.colors.includes(color));
+    },
+
+    // Get all available sizes
+    getAllSizes() {
+        const sizes = new Set();
+        this.products.forEach(p => p.sizes.forEach(s => sizes.add(s)));
+        return Array.from(sizes);
+    },
+
+    // Get all available colors
+    getAllColors() {
+        const colors = new Set();
+        this.products.forEach(p => p.colors.forEach(c => colors.add(c)));
+        return Array.from(colors);
+    },
+
+    // Get price range
+    getPriceRange() {
+        const prices = this.products.map(p => p.price);
+        return {
+            min: Math.min(...prices),
+            max: Math.max(...prices)
+        };
+    }
+};
+
+// Export for use in other files
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = ProductsManager;
+}

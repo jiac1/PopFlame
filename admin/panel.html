@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel Admin | PopFlame</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/admin.css">
+</head>
+<body>
+    <div class="admin-layout">
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="brand">POPFLAME</div>
+                <span class="role-badge" id="roleBadge">...</span>
+            </div>
+
+            <nav class="sidebar-nav">
+                <div class="sidebar-link active" data-tab="dashboard">📊 Dashboard</div>
+                <div class="sidebar-link" data-tab="pedidos">🧾 Pedidos</div>
+                <div class="sidebar-link" data-tab="inventario">📦 Inventario</div>
+
+                <div id="superAdminLinks" style="display:none;">
+                    <div class="sidebar-section-title">Super Admin</div>
+                    <div class="sidebar-link" data-tab="productos">👕 Productos</div>
+                    <div class="sidebar-link" data-tab="categorias">🗂️ Categorías</div>
+                    <div class="sidebar-link" data-tab="config">⚙️ Configuración</div>
+                    <div class="sidebar-link" data-tab="usuarios">👤 Usuarios</div>
+                </div>
+            </nav>
+
+            <div class="sidebar-footer">
+                <div class="user-name" id="userName">...</div>
+                <button class="btn btn-secondary btn-full" id="logoutBtn">Cerrar sesión</button>
+            </div>
+        </aside>
+
+        <main class="main">
+            <div class="tab-panel active" id="tab-dashboard"></div>
+            <div class="tab-panel" id="tab-pedidos"></div>
+            <div class="tab-panel" id="tab-inventario"></div>
+            <div class="tab-panel" id="tab-productos"></div>
+            <div class="tab-panel" id="tab-categorias"></div>
+            <div class="tab-panel" id="tab-config"></div>
+            <div class="tab-panel" id="tab-usuarios"></div>
+        </main>
+    </div>
+
+    <!-- Modal: Producto -->
+    <div class="modal-overlay" id="productModal">
+        <div class="modal">
+            <h3 id="productModalTitle">Nuevo producto</h3>
+            <form id="productForm">
+                <input type="hidden" id="productId">
+                <div class="field">
+                    <label>Nombre</label>
+                    <input type="text" id="productName" required>
+                </div>
+                <div class="form-row-2">
+                    <div class="field">
+                        <label>Categoría</label>
+                        <select id="productCategory" required></select>
+                    </div>
+                    <div class="field">
+                        <label>Precio (CLP)</label>
+                        <input type="number" id="productPrice" min="0" required>
+                    </div>
+                </div>
+                <div class="form-row-2">
+                    <div class="field">
+                        <label>Stock</label>
+                        <input type="number" id="productStock" min="0" required>
+                    </div>
+                    <div class="field">
+                        <label>Badge (opcional)</label>
+                        <input type="text" id="productBadge" placeholder="Nuevo, Oferta...">
+                    </div>
+                </div>
+                <div class="form-row-2">
+                    <div class="field">
+                        <label>Tallas (separadas por coma)</label>
+                        <input type="text" id="productSizes" placeholder="S, M, L, XL">
+                    </div>
+                    <div class="field">
+                        <label>Colores (separados por coma)</label>
+                        <input type="text" id="productColors" placeholder="Negro, Blanco">
+                    </div>
+                </div>
+                <div class="field">
+                    <label>Ruta de imagen</label>
+                    <input type="text" id="productImage" placeholder="images/products/poleras/polera-1.jpg">
+                </div>
+                <div class="field">
+                    <label>Descripción</label>
+                    <textarea id="productDescription" rows="3"></textarea>
+                </div>
+                <div class="field">
+                    <label><input type="checkbox" id="productFeatured" style="width:auto;margin-right:8px;">Producto destacado</label>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" data-close-modal="productModal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Guardar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Categoría -->
+    <div class="modal-overlay" id="categoryModal">
+        <div class="modal">
+            <h3 id="categoryModalTitle">Nueva categoría</h3>
+            <form id="categoryForm">
+                <input type="hidden" id="categoryIdOriginal">
+                <div class="field">
+                    <label>ID (slug, ej: poleras)</label>
+                    <input type="text" id="categoryId" required>
+                </div>
+                <div class="field">
+                    <label>Nombre</label>
+                    <input type="text" id="categoryName" required>
+                </div>
+                <div class="field">
+                    <label>Descripción</label>
+                    <input type="text" id="categoryDescription">
+                </div>
+                <div class="field">
+                    <label>Orden</label>
+                    <input type="number" id="categorySortOrder" min="0">
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" data-close-modal="categoryModal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Guardar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="../js/supabaseClient.js"></script>
+    <script src="js/admin.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            const profile = await AdminAuth.requireAuth();
+            if (profile) await AdminPanel.init(profile);
+        });
+    </script>
+</body>
+</html>
