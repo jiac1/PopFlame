@@ -271,6 +271,41 @@ create trigger trg_orders_auto_processing
     before update on public.orders
     for each row execute procedure public.orders_auto_processing();
 
+-- Avisa a la Edge Function "notify-new-product" cada vez que se crea un producto,
+-- para que le mande el correo a los suscriptores. Se hace con un trigger + pg_net en
+-- vez de la interfaz "Database Webhooks" del dashboard porque en algunos proyectos
+-- esa función del dashboard falla por un schema interno que no se crea solo
+-- (error "schema supabase_functions does not exist").
+create extension if not exists pg_net with schema extensions;
+
+create or replace function public.notify_new_product()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+    perform net.http_post(
+        url := 'https://ysxinhpymvhdnfbdanvn.supabase.co/functions/v1/notify-new-product',
+        headers := jsonb_build_object(
+            'Content-Type', 'application/json',
+            'Authorization', 'Bearer sb_publishable_WHh5SfBgWKa7_XhFQRxGqQ_SrWk_u9H'
+        ),
+        body := jsonb_build_object(
+            'type', 'INSERT',
+            'table', 'products',
+            'record', row_to_json(new)::jsonb
+        )
+    );
+    return new;
+end;
+$$;
+
+drop trigger if exists trg_notify_new_product on public.products;
+create trigger trg_notify_new_product
+    after insert on public.products
+    for each row execute procedure public.notify_new_product();
+
 -- ---------------------------------------------------------
 -- 5. ROW LEVEL SECURITY
 -- ---------------------------------------------------------
