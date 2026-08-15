@@ -44,6 +44,9 @@ const ProductsManager = {
                 storeName: cfg.store_name,
                 heroTitle: cfg.hero_title,
                 heroSubtitle: cfg.hero_subtitle,
+                logoUrl: cfg.logo_url || '',
+                logoWhiteUrl: cfg.logo_white_url || '',
+                heroBannerUrl: cfg.hero_banner_url || '',
                 socialLinks: {
                     instagram: cfg.social_instagram || '',
                     tiktok: cfg.social_tiktok || '',
@@ -88,17 +91,25 @@ const ProductsManager = {
         return '$' + price.toLocaleString('es-CL');
     },
 
-    // Generate product card HTML
+    // Resuelve la ruta de una imagen: si ya es una URL absoluta (ej. Supabase Storage),
+    // se usa tal cual; si es una ruta relativa local, se le antepone el prefijo del nivel de carpeta.
+    resolveImagePath(path, prefix = '') {
+        if (!path) return prefix + 'images/products/poleras/placeholder.svg';
+        if (/^https?:\/\//i.test(path)) return path;
+        return prefix + path;
+    },
+
+    // Generate product card HTML (para index.html, en la raíz del sitio)
     createProductCard(product) {
-        const badgeHTML = product.badge 
-            ? `<span class="product-badge">${product.badge}</span>` 
+        const badgeHTML = product.badge
+            ? `<span class="product-badge">${product.badge}</span>`
             : '';
-        
+
         return `
-            <a href="producto.html?id=${product.id}" class="product-card">
+            <a href="pages/producto.html?id=${product.id}" class="product-card">
                 <div class="product-image">
                     ${badgeHTML}
-                    <img src="../${product.image}" alt="${product.name}" loading="lazy">
+                    <img src="${this.resolveImagePath(product.image)}" alt="${product.name}" loading="lazy">
                 </div>
                 <div class="product-info">
                     <span class="product-category">${product.category}</span>
@@ -109,17 +120,17 @@ const ProductsManager = {
         `;
     },
 
-    // Generate product card HTML for category pages (without ../)
+    // Generate product card HTML for category pages (dentro de /pages/)
     createProductCardCategory(product) {
-        const badgeHTML = product.badge 
-            ? `<span class="product-badge">${product.badge}</span>` 
+        const badgeHTML = product.badge
+            ? `<span class="product-badge">${product.badge}</span>`
             : '';
-        
+
         return `
             <a href="producto.html?id=${product.id}" class="product-card">
                 <div class="product-image">
                     ${badgeHTML}
-                    <img src="../${product.image}" alt="${product.name}" loading="lazy">
+                    <img src="${this.resolveImagePath(product.image, '../')}" alt="${product.name}" loading="lazy">
                 </div>
                 <div class="product-info">
                     <span class="product-category">${product.category}</span>

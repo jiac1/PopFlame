@@ -512,7 +512,7 @@
             container.innerHTML = items.map(item => `
                 <div class="summary-item">
                     <div class="summary-item-image">
-                        <img src="../${item.image}" alt="${item.name}">
+                        <img src="${ProductsManager.resolveImagePath(item.image, '../')}" alt="${item.name}">
                     </div>
                     <div class="summary-item-details">
                         <h4 class="summary-item-name">${item.name}</h4>

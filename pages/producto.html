@@ -522,7 +522,7 @@
 
         function renderProduct() {
             // Set main image
-            document.getElementById('mainImage').src = '../' + currentProduct.image;
+            document.getElementById('mainImage').src = ProductsManager.resolveImagePath(currentProduct.image, '../');
             document.getElementById('mainImage').alt = currentProduct.name;
             
             // Set breadcrumb

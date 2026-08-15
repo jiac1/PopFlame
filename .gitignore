@@ -23,3 +23,7 @@ desktop.ini
 wetransfer_*/
 # Claude Code local tooling
 .claude/
+
+# Local preview helper (not part of the project)
+.tmp-static-server.ps1
+.claude/launch.json

@@ -76,6 +76,9 @@ create table if not exists public.config (
     social_instagram    text,
     social_tiktok       text,
     social_twitter      text,
+    logo_url            text,
+    logo_white_url      text,
+    hero_banner_url     text,
     updated_at          timestamptz not null default now()
 );
 
@@ -283,6 +286,53 @@ create policy "config_select_public" on public.config
 drop policy if exists "config_write_super_admin" on public.config;
 create policy "config_write_super_admin" on public.config
     for all using (public.is_super_admin()) with check (public.is_super_admin());
+
+-- ---------------------------------------------------------
+-- 5.5 STORAGE: buckets públicos para imágenes subidas desde el panel
+--    - "product-images": fotos de prendas
+--    - "site-assets": logo, logo blanco, banner del hero
+--    Lectura pública, escritura solo super_admin.
+-- ---------------------------------------------------------
+
+insert into storage.buckets (id, name, public)
+values ('product-images', 'product-images', true)
+on conflict (id) do nothing;
+
+insert into storage.buckets (id, name, public)
+values ('site-assets', 'site-assets', true)
+on conflict (id) do nothing;
+
+drop policy if exists "product_images_public_read" on storage.objects;
+create policy "product_images_public_read" on storage.objects
+    for select using (bucket_id = 'product-images');
+
+drop policy if exists "product_images_super_admin_write" on storage.objects;
+create policy "product_images_super_admin_write" on storage.objects
+    for insert with check (bucket_id = 'product-images' and public.is_super_admin());
+
+drop policy if exists "product_images_super_admin_update" on storage.objects;
+create policy "product_images_super_admin_update" on storage.objects
+    for update using (bucket_id = 'product-images' and public.is_super_admin());
+
+drop policy if exists "product_images_super_admin_delete" on storage.objects;
+create policy "product_images_super_admin_delete" on storage.objects
+    for delete using (bucket_id = 'product-images' and public.is_super_admin());
+
+drop policy if exists "site_assets_public_read" on storage.objects;
+create policy "site_assets_public_read" on storage.objects
+    for select using (bucket_id = 'site-assets');
+
+drop policy if exists "site_assets_super_admin_write" on storage.objects;
+create policy "site_assets_super_admin_write" on storage.objects
+    for insert with check (bucket_id = 'site-assets' and public.is_super_admin());
+
+drop policy if exists "site_assets_super_admin_update" on storage.objects;
+create policy "site_assets_super_admin_update" on storage.objects
+    for update using (bucket_id = 'site-assets' and public.is_super_admin());
+
+drop policy if exists "site_assets_super_admin_delete" on storage.objects;
+create policy "site_assets_super_admin_delete" on storage.objects
+    for delete using (bucket_id = 'site-assets' and public.is_super_admin());
 
 -- ---------------------------------------------------------
 -- 6. DATOS INICIALES (categorías, productos, configuración)

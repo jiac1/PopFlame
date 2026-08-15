@@ -4,21 +4,57 @@ const App = {
     async init() {
         // Load products
         await ProductsManager.loadProducts();
-        
+
+        // Apply logo/banner/hero text configured from el panel de Super Admin
+        this.applySiteConfig();
+
         // Initialize cart
         CartManager.init();
-        
+
         // Setup mobile menu
         this.setupMobileMenu();
-        
+
         // Render featured products on homepage
         this.renderFeaturedProducts();
-        
+
         // Setup scroll animations
         this.setupScrollAnimations();
-        
+
         // Setup newsletter form
         this.setupNewsletter();
+    },
+
+    // Reemplaza logo, banner y textos del hero con lo configurado en Supabase (si existe)
+    applySiteConfig() {
+        const config = ProductsManager.config;
+        if (!config) return;
+
+        if (config.logoUrl) {
+            document.querySelectorAll('.logo-img').forEach(img => { img.src = config.logoUrl; });
+        }
+        if (config.logoWhiteUrl) {
+            document.querySelectorAll('.footer-logo').forEach(img => { img.src = config.logoWhiteUrl; });
+        }
+        if (config.heroBannerUrl) {
+            document.querySelectorAll('.hero-img').forEach(img => { img.src = config.heroBannerUrl; });
+        }
+
+        const heroTitle = document.querySelector('.hero-title');
+        if (heroTitle && config.heroTitle) heroTitle.textContent = config.heroTitle;
+
+        const heroSubtitle = document.querySelector('.hero-subtitle');
+        if (heroSubtitle && config.heroSubtitle) heroSubtitle.textContent = config.heroSubtitle;
+
+        if (config.socialLinks) {
+            const map = { instagram: 'Instagram', tiktok: 'TikTok', twitter: 'Twitter' };
+            Object.entries(map).forEach(([key, label]) => {
+                const url = config.socialLinks[key];
+                if (!url) return;
+                document.querySelectorAll('.footer-col a').forEach(a => {
+                    if (a.textContent.trim() === label) a.href = url;
+                });
+            });
+        }
     },
 
     // Setup mobile menu

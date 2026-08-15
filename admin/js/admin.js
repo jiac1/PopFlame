@@ -109,6 +109,17 @@ const AdminPanel = {
         return div.innerHTML;
     },
 
+    // Sube un archivo a un bucket público de Supabase Storage y devuelve la URL pública.
+    async uploadImage(bucket, file) {
+        if (!file) return null;
+        const ext = file.name.split('.').pop();
+        const path = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+        const { error } = await supabaseClient.storage.from(bucket).upload(path, file, { upsert: false });
+        if (error) throw error;
+        const { data } = supabaseClient.storage.from(bucket).getPublicUrl(path);
+        return data.publicUrl;
+    },
+
     // ---------------- Dashboard ----------------
 
     async loadDashboard() {
@@ -335,6 +346,9 @@ const AdminPanel = {
         const catSelect = document.getElementById('productCategory');
         catSelect.innerHTML = this.categories.map(c => `<option value="${c.id}">${this.escapeHtml(c.name)}</option>`).join('');
 
+        const preview = document.getElementById('productImagePreview');
+        document.getElementById('productImageFile').value = '';
+
         if (product) {
             document.getElementById('productName').value = product.name;
             document.getElementById('productCategory').value = product.category_id;
@@ -346,6 +360,10 @@ const AdminPanel = {
             document.getElementById('productBadge').value = product.badge || '';
             document.getElementById('productDescription').value = product.description || '';
             document.getElementById('productFeatured').checked = !!product.featured;
+            preview.src = ProductsManager.resolveImagePath(product.image, '../');
+            preview.style.display = product.image ? 'block' : 'none';
+        } else {
+            preview.style.display = 'none';
         }
         modal.classList.add('active');
     },
@@ -353,29 +371,46 @@ const AdminPanel = {
     async saveProduct(e) {
         e.preventDefault();
         const id = document.getElementById('productId').value;
-        const payload = {
-            name: document.getElementById('productName').value.trim(),
-            category_id: document.getElementById('productCategory').value,
-            price: Number(document.getElementById('productPrice').value),
-            stock: parseInt(document.getElementById('productStock').value, 10),
-            sizes: document.getElementById('productSizes').value.split(',').map(s => s.trim()).filter(Boolean),
-            colors: document.getElementById('productColors').value.split(',').map(s => s.trim()).filter(Boolean),
-            image: document.getElementById('productImage').value.trim(),
-            images: document.getElementById('productImage').value.trim() ? [document.getElementById('productImage').value.trim()] : [],
-            badge: document.getElementById('productBadge').value.trim() || null,
-            description: document.getElementById('productDescription').value.trim(),
-            featured: document.getElementById('productFeatured').checked
-        };
+        const saveBtn = e.target.querySelector('button[type="submit"]');
+        saveBtn.disabled = true;
+        saveBtn.textContent = 'Guardando...';
 
-        const { error } = id
-            ? await supabaseClient.from('products').update(payload).eq('id', id)
-            : await supabaseClient.from('products').insert(payload);
+        try {
+            let imagePath = document.getElementById('productImage').value.trim();
+            const file = document.getElementById('productImageFile').files[0];
+            if (file) {
+                imagePath = await this.uploadImage('product-images', file);
+            }
 
-        if (error) { this.toast('Error guardando producto: ' + error.message, 'error'); return; }
+            const payload = {
+                name: document.getElementById('productName').value.trim(),
+                category_id: document.getElementById('productCategory').value,
+                price: Number(document.getElementById('productPrice').value),
+                stock: parseInt(document.getElementById('productStock').value, 10),
+                sizes: document.getElementById('productSizes').value.split(',').map(s => s.trim()).filter(Boolean),
+                colors: document.getElementById('productColors').value.split(',').map(s => s.trim()).filter(Boolean),
+                image: imagePath,
+                images: imagePath ? [imagePath] : [],
+                badge: document.getElementById('productBadge').value.trim() || null,
+                description: document.getElementById('productDescription').value.trim(),
+                featured: document.getElementById('productFeatured').checked
+            };
 
-        this.toast('Producto guardado');
-        document.getElementById('productModal').classList.remove('active');
-        await this.loadProducts();
+            const { error } = id
+                ? await supabaseClient.from('products').update(payload).eq('id', id)
+                : await supabaseClient.from('products').insert(payload);
+
+            if (error) throw error;
+
+            this.toast('Producto guardado');
+            document.getElementById('productModal').classList.remove('active');
+            await this.loadProducts();
+        } catch (error) {
+            this.toast('Error guardando producto: ' + error.message, 'error');
+        } finally {
+            saveBtn.disabled = false;
+            saveBtn.textContent = 'Guardar';
+        }
     },
 
     async deleteProduct(id) {
@@ -484,6 +519,31 @@ const AdminPanel = {
 
         container.innerHTML = `
             <div class="page-header"><h1>Configuración</h1></div>
+
+            <div class="card">
+                <h3>Imágenes de marca</h3>
+                <div class="form-row-2" style="grid-template-columns: repeat(3, 1fr);">
+                    <div class="field">
+                        <label>Logo</label>
+                        <img id="previewLogo" src="${cfg?.logo_url ? this.escapeHtml(cfg.logo_url) : ''}" style="display:${cfg?.logo_url ? 'block' : 'none'};max-height:60px;margin-bottom:8px;">
+                        <input type="file" id="fileLogo" accept="image/*">
+                        <button type="button" class="btn btn-secondary btn-sm" style="margin-top:8px;" data-asset-upload="logo_url" data-asset-input="fileLogo" data-asset-preview="previewLogo">Subir logo</button>
+                    </div>
+                    <div class="field">
+                        <label>Logo blanco (footer)</label>
+                        <img id="previewLogoWhite" src="${cfg?.logo_white_url ? this.escapeHtml(cfg.logo_white_url) : ''}" style="display:${cfg?.logo_white_url ? 'block' : 'none'};max-height:60px;margin-bottom:8px;background:#222;padding:4px;">
+                        <input type="file" id="fileLogoWhite" accept="image/*">
+                        <button type="button" class="btn btn-secondary btn-sm" style="margin-top:8px;" data-asset-upload="logo_white_url" data-asset-input="fileLogoWhite" data-asset-preview="previewLogoWhite">Subir logo blanco</button>
+                    </div>
+                    <div class="field">
+                        <label>Banner del hero</label>
+                        <img id="previewHero" src="${cfg?.hero_banner_url ? this.escapeHtml(cfg.hero_banner_url) : ''}" style="display:${cfg?.hero_banner_url ? 'block' : 'none'};max-height:60px;margin-bottom:8px;">
+                        <input type="file" id="fileHero" accept="image/*">
+                        <button type="button" class="btn btn-secondary btn-sm" style="margin-top:8px;" data-asset-upload="hero_banner_url" data-asset-input="fileHero" data-asset-preview="previewHero">Subir banner</button>
+                    </div>
+                </div>
+            </div>
+
             <div class="card">
                 <form id="configForm">
                     <div class="form-row-2">
@@ -534,6 +594,33 @@ const AdminPanel = {
                 </form>
             </div>
         `;
+
+        container.querySelectorAll('[data-asset-upload]').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const column = btn.dataset.assetUpload;
+                const input = document.getElementById(btn.dataset.assetInput);
+                const preview = document.getElementById(btn.dataset.assetPreview);
+                const file = input.files[0];
+                if (!file) { this.toast('Elige un archivo primero', 'error'); return; }
+
+                btn.disabled = true;
+                btn.textContent = 'Subiendo...';
+                try {
+                    const url = await this.uploadImage('site-assets', file);
+                    const { error } = await supabaseClient.from('config').update({ [column]: url }).eq('id', 1);
+                    if (error) throw error;
+                    preview.src = url;
+                    preview.style.display = 'block';
+                    this.toast('Imagen actualizada');
+                } catch (error) {
+                    this.toast('Error subiendo imagen: ' + error.message, 'error');
+                } finally {
+                    btn.disabled = false;
+                    btn.textContent = btn.dataset.assetUpload === 'logo_url' ? 'Subir logo'
+                        : btn.dataset.assetUpload === 'logo_white_url' ? 'Subir logo blanco' : 'Subir banner';
+                }
+            });
+        });
 
         document.getElementById('configForm').addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -614,6 +701,14 @@ const AdminPanel = {
     bindModals() {
         document.getElementById('productForm').addEventListener('submit', (e) => this.saveProduct(e));
         document.getElementById('categoryForm').addEventListener('submit', (e) => this.saveCategory(e));
+
+        document.getElementById('productImageFile').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            const preview = document.getElementById('productImagePreview');
+            if (!file) return;
+            preview.src = URL.createObjectURL(file);
+            preview.style.display = 'block';
+        });
 
         document.querySelectorAll('[data-close-modal]').forEach(btn => {
             btn.addEventListener('click', () => {

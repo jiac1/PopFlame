@@ -110,6 +110,11 @@ const CartManager = {
         return '$' + price.toLocaleString('es-CL');
     },
 
+    // El carrito se renderiza tanto en index.html (raíz) como en pages/*.html
+    getImagePrefix() {
+        return window.location.pathname.includes('/pages/') ? '../' : '';
+    },
+
     // Save cart to localStorage
     saveCart() {
         localStorage.setItem(this.storageKey, JSON.stringify(this.cart));
@@ -158,9 +163,10 @@ const CartManager = {
 
         if (footer) footer.style.display = 'block';
 
+        const imgPrefix = this.getImagePrefix();
         container.innerHTML = this.cart.map((item, index) => `
             <div class="cart-item">
-                <img src="../${item.image}" alt="${item.name}" class="cart-item-image">
+                <img src="${ProductsManager.resolveImagePath(item.image, imgPrefix)}" alt="${item.name}" class="cart-item-image">
                 <div class="cart-item-details">
                     <h4 class="cart-item-name">${item.name}</h4>
                     <p class="cart-item-variant">Talla: ${item.size} | Color: ${item.color}</p>
