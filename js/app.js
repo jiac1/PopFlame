@@ -126,12 +126,14 @@ const App = {
         const grid = document.getElementById('categoriesGrid');
         if (!grid || !ProductsManager.categories || ProductsManager.categories.length === 0) return;
 
-        const genericIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M20.38 3.46L16 2a4 4 0 01-8 0L3.62 3.46a2 2 0 00-1.34 2.23l.58 3.47a1 1 0 00.99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 002-2V10h2.15a1 1 0 00.99-.84l.58-3.47a2 2 0 00-1.34-2.23z"></path></svg>`;
+        const genericIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M20.38 3.46L16 2a4 4 0 01-8 0L3.62 3.46a2 2 0 00-1.34 2.23l.58 3.47a1 1 0 00.99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 002-2V10h2.15a1 1 0 00.99-.84l.58-3.47a2 2 0 00-1.34-2.23z"></path></svg>`;
 
-        grid.innerHTML = ProductsManager.categories.map(c => `
+        grid.innerHTML = ProductsManager.categories.map((c, i) => `
             <a href="pages/categoria.html?cat=${encodeURIComponent(c.id)}" class="category-card">
+                <span class="category-index">${String(i + 1).padStart(2, '0')}</span>
                 <div class="category-icon">${genericIcon}</div>
                 <h3>${this.escapeHtml(c.name)}</h3>
+                <span class="category-arrow">VER COLECCIÓN →</span>
             </a>
         `).join('');
     },

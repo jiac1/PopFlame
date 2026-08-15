@@ -1,25 +1,35 @@
-/* ===== CSS Variables ===== */
+/* ===== CSS Variables =====
+   Base blanca, con negro y rojo como acentos (identidad PopFlame).
+   Header, hero, footer y el drawer del carrito usan --ink (negro) a propósito,
+   como "bloques" de marca dentro de un sitio mayormente blanco. */
 :root {
     --primary: #E31837;
     --primary-dark: #B8142D;
     --primary-light: #FF3D5A;
     --secondary: #000000;
     --accent: #FFD700;
-    --bg-dark: #0A0A0A;
-    --bg-darker: #050505;
-    --bg-card: #141414;
-    --bg-card-hover: #1A1A1A;
-    --text-primary: #FFFFFF;
-    --text-secondary: #A0A0A0;
-    --text-muted: #666666;
-    --border: #222222;
-    --border-light: #333333;
+    --bg-dark: #FFFFFF;
+    --bg-darker: #F5F4F2;
+    --bg-card: #FFFFFF;
+    --bg-card-hover: #FAFAF9;
+    --text-primary: #0A0A0A;
+    --text-secondary: #555555;
+    --text-muted: #8A8A8A;
+    --border: #E5E3E0;
+    --border-light: #0A0A0A;
     --success: #00C853;
     --error: #FF5252;
-    --shadow: 0 4px 24px rgba(0, 0, 0, 0.5);
-    --shadow-lg: 0 8px 48px rgba(0, 0, 0, 0.6);
+    --shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+    --shadow-lg: 0 8px 48px rgba(0, 0, 0, 0.12);
     --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     --font-main: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+
+    /* Bloques oscuros de marca (header/hero/footer/cart drawer) */
+    --ink: #0A0A0A;
+    --ink-darker: #000000;
+    --on-ink: #FFFFFF;
+    --on-ink-secondary: #ABABAB;
+    --on-ink-border: #262626;
 }
 
 /* ===== Reset ===== */
@@ -85,7 +95,7 @@ img {
 
 .btn-primary {
     background: var(--primary);
-    color: var(--text-primary);
+    color: #fff;
 }
 
 .btn-primary:hover {
@@ -118,7 +128,8 @@ img {
     z-index: 1000;
     background: rgba(10, 10, 10, 0.95);
     backdrop-filter: blur(10px);
-    border-bottom: 1px solid var(--border);
+    border-bottom: 1px solid var(--on-ink-border);
+    color: var(--on-ink);
 }
 
 .header .container {
@@ -148,7 +159,7 @@ img {
     font-weight: 500;
     text-transform: uppercase;
     letter-spacing: 1px;
-    color: var(--text-secondary);
+    color: var(--on-ink-secondary);
     transition: var(--transition);
     position: relative;
 }
@@ -165,7 +176,15 @@ img {
 }
 
 .nav-link:hover {
-    color: var(--text-primary);
+    color: var(--on-ink);
+}
+
+.nav-link.active {
+    color: var(--primary);
+}
+
+.nav-link.active::after {
+    width: 100%;
 }
 
 .nav-link:hover::after {
@@ -180,7 +199,7 @@ img {
 
 .cart-btn {
     position: relative;
-    color: var(--text-primary);
+    color: var(--on-ink);
     padding: 8px;
     transition: var(--transition);
 }
@@ -194,7 +213,7 @@ img {
     top: 0;
     right: 0;
     background: var(--primary);
-    color: var(--text-primary);
+    color: #fff;
     font-size: 10px;
     font-weight: 700;
     width: 18px;
@@ -215,7 +234,7 @@ img {
 .menu-btn span {
     width: 24px;
     height: 2px;
-    background: var(--text-primary);
+    background: var(--on-ink);
     transition: var(--transition);
 }
 
@@ -258,6 +277,7 @@ img {
     z-index: 1;
     text-align: center;
     padding: 0 24px;
+    color: var(--on-ink);
 }
 
 .hero-title {
@@ -266,11 +286,12 @@ img {
     letter-spacing: -2px;
     margin-bottom: 16px;
     text-shadow: 0 4px 24px rgba(0, 0, 0, 0.5);
+    color: var(--on-ink);
 }
 
 .hero-subtitle {
     font-size: clamp(18px, 3vw, 24px);
-    color: var(--text-secondary);
+    color: var(--on-ink-secondary);
     margin-bottom: 32px;
     text-transform: uppercase;
     letter-spacing: 4px;
@@ -369,39 +390,67 @@ img {
     letter-spacing: 2px;
 }
 
-/* ===== Categories ===== */
+/* ===== Categories =====
+   Grid editorial estilo streetwear: tarjetas blancas con líneas negras finas
+   entre ellas (efecto "hoja de contacto"), que se llenan de negro al hover. */
 .categories {
-    padding: 80px 0;
-    background: var(--bg-darker);
+    padding: 96px 0;
+    background: var(--bg-dark);
 }
 
 .categories-grid {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
-    gap: 24px;
+    gap: 1px;
+    background: var(--ink);
+    border: 1px solid var(--ink);
 }
 
 .category-card {
+    position: relative;
     display: flex;
     flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: 48px 24px;
+    align-items: flex-start;
+    justify-content: flex-end;
+    aspect-ratio: 4 / 5;
+    padding: 28px;
     background: var(--bg-card);
-    border: 1px solid var(--border);
+    color: var(--text-primary);
+    overflow: hidden;
     transition: var(--transition);
 }
 
-.category-card:hover {
-    background: var(--bg-card-hover);
-    border-color: var(--primary);
-    transform: translateY(-8px);
+.category-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: var(--ink);
+    transform: translateY(101%);
+    transition: transform 0.45s cubic-bezier(0.4, 0, 0.2, 1);
+    z-index: 0;
+}
+
+.category-card:hover::before {
+    transform: translateY(0);
+}
+
+.category-index {
+    position: absolute;
+    top: 20px;
+    right: 24px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    color: var(--primary);
+    z-index: 1;
 }
 
 .category-icon {
-    margin-bottom: 16px;
-    color: var(--text-secondary);
+    margin-bottom: auto;
+    color: var(--text-muted);
     transition: var(--transition);
+    position: relative;
+    z-index: 1;
 }
 
 .category-card:hover .category-icon {
@@ -409,10 +458,39 @@ img {
 }
 
 .category-card h3 {
-    font-size: 16px;
-    font-weight: 600;
+    font-size: 22px;
+    font-weight: 900;
     text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-top: 20px;
+    position: relative;
+    z-index: 1;
+    transition: color 0.3s ease;
+}
+
+.category-card:hover h3 {
+    color: #fff;
+}
+
+.category-arrow {
+    position: relative;
+    z-index: 1;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 10px;
+    font-size: 11px;
+    font-weight: 700;
     letter-spacing: 1px;
+    color: var(--primary);
+    opacity: 0;
+    transform: translateX(-6px);
+    transition: var(--transition);
+}
+
+.category-card:hover .category-arrow {
+    opacity: 1;
+    transform: translateX(0);
 }
 
 /* ===== Products Grid ===== */
@@ -462,7 +540,7 @@ img {
     top: 12px;
     left: 12px;
     background: var(--primary);
-    color: var(--text-primary);
+    color: #fff;
     font-size: 11px;
     font-weight: 700;
     padding: 4px 10px;
@@ -546,10 +624,11 @@ img {
     color: var(--text-muted);
 }
 
-/* ===== Footer ===== */
+/* ===== Footer (bloque negro, como el header) ===== */
 .footer {
     padding: 64px 0 32px;
-    border-top: 1px solid var(--border);
+    background: var(--ink);
+    color: var(--on-ink);
 }
 
 .footer-grid {
@@ -570,13 +649,13 @@ img {
     text-transform: uppercase;
     letter-spacing: 1px;
     margin-bottom: 20px;
-    color: var(--text-primary);
+    color: var(--on-ink);
 }
 
 .footer-col a {
     display: block;
     font-size: 14px;
-    color: var(--text-secondary);
+    color: var(--on-ink-secondary);
     margin-bottom: 12px;
     transition: var(--transition);
 }
@@ -588,12 +667,12 @@ img {
 .footer-bottom {
     text-align: center;
     padding-top: 32px;
-    border-top: 1px solid var(--border);
+    border-top: 1px solid var(--on-ink-border);
 }
 
 .footer-bottom p {
     font-size: 13px;
-    color: var(--text-muted);
+    color: var(--on-ink-secondary);
 }
 
 /* ===== Cart Drawer ===== */
