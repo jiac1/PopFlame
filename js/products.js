@@ -3,20 +3,26 @@ const ProductsManager = {
     products: [],
     categories: [],
     config: {},
+    sizeGuide: [],
 
-    // Load products, categories and config from Supabase
+    // Load products, categories, config and size guide from Supabase
     async loadProducts() {
         try {
-            const [{ data: products, error: pErr }, { data: categories, error: cErr }, { data: cfg, error: cfgErr }] =
+            const [{ data: products, error: pErr }, { data: categories, error: cErr }, { data: cfg, error: cfgErr }, { data: sizeGuide, error: sgErr }] =
                 await Promise.all([
                     supabaseClient.from('products').select('*').order('id'),
                     supabaseClient.from('categories').select('*').order('sort_order'),
-                    supabaseClient.from('config').select('*').eq('id', 1).maybeSingle()
+                    supabaseClient.from('config').select('*').eq('id', 1).maybeSingle(),
+                    supabaseClient.from('size_guide').select('*')
                 ]);
 
             if (pErr) throw pErr;
             if (cErr) throw cErr;
             if (cfgErr) throw cfgErr;
+            // size_guide es opcional: si la tabla todavía no existe (falta correr el schema.sql
+            // nuevo), no rompe el resto del sitio, solo no muestra medidas junto a la talla.
+            if (sgErr) console.warn('No se pudo cargar size_guide:', sgErr.message);
+            this.sizeGuide = sizeGuide || [];
 
             this.products = (products || []).map(p => ({
                 id: p.id,
@@ -116,6 +122,13 @@ const ProductsManager = {
     resolveColorSwatch(name) {
         const key = (name || '').trim().toLowerCase();
         return this.colorMap[key] || name || '#555555';
+    },
+
+    // Medida real de una talla para una categoría (ej. "48cm"), editable desde
+    // el panel (Super Admin > Tallas). Devuelve '' si no hay medida cargada.
+    getSizeMeasurement(categoryId, size) {
+        const entry = this.sizeGuide.find(s => s.category_id === categoryId && s.size === size);
+        return entry ? entry.measurement : '';
     },
 
     // Generate product card HTML (para index.html, en la raíz del sitio)

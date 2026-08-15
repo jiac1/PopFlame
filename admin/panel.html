@@ -25,6 +25,7 @@
                     <div class="sidebar-link" data-tab="productos">👕 Productos</div>
                     <div class="sidebar-link" data-tab="categorias">🗂️ Categorías</div>
                     <div class="sidebar-link" data-tab="banners">🖼️ Banners</div>
+                    <div class="sidebar-link" data-tab="tallas">📏 Tallas</div>
                     <div class="sidebar-link" data-tab="paginas">📄 Páginas</div>
                     <div class="sidebar-link" data-tab="config">⚙️ Configuración</div>
                     <div class="sidebar-link" data-tab="usuarios">👤 Usuarios</div>
@@ -45,6 +46,7 @@
             <div class="tab-panel" id="tab-productos"></div>
             <div class="tab-panel" id="tab-categorias"></div>
             <div class="tab-panel" id="tab-banners"></div>
+            <div class="tab-panel" id="tab-tallas"></div>
             <div class="tab-panel" id="tab-paginas"></div>
             <div class="tab-panel" id="tab-config"></div>
             <div class="tab-panel" id="tab-usuarios"></div>
@@ -149,6 +151,38 @@
                 </div>
                 <div class="modal-actions">
                     <button type="button" class="btn btn-secondary" data-close-modal="categoryModal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Guardar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Medida de talla -->
+    <div class="modal-overlay" id="sizeGuideModal">
+        <div class="modal">
+            <h3 id="sizeGuideModalTitle">Nueva medida</h3>
+            <form id="sizeGuideForm">
+                <input type="hidden" id="sizeGuideId">
+                <div class="field">
+                    <label>Categoría</label>
+                    <select id="sizeGuideCategory" required></select>
+                </div>
+                <div class="form-row-2">
+                    <div class="field">
+                        <label>Talla</label>
+                        <input type="text" id="sizeGuideSize" placeholder="S, M, L, XL, 30..." required>
+                    </div>
+                    <div class="field">
+                        <label>Medida</label>
+                        <input type="text" id="sizeGuideMeasurement" placeholder="48cm" required>
+                    </div>
+                </div>
+                <div class="field">
+                    <label>Orden</label>
+                    <input type="text" inputmode="numeric" pattern="[0-9]*" id="sizeGuideSortOrder" placeholder="1">
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" data-close-modal="sizeGuideModal">Cancelar</button>
                     <button type="submit" class="btn btn-primary">Guardar</button>
                 </div>
             </form>

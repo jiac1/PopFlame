@@ -50,6 +50,7 @@ const AdminPanel = {
     productImagesExisting: [],
     productImagesNewFiles: [],
     banners: [],
+    sizeGuideRows: [],
 
     async init(profile) {
         this.profile = profile;
@@ -89,6 +90,7 @@ const AdminPanel = {
             productos: () => this.loadProducts(),
             categorias: () => this.loadCategories(),
             banners: () => this.loadBanners(),
+            tallas: () => this.loadSizeGuide(),
             paginas: () => this.loadPages(),
             config: () => this.loadConfig(),
             usuarios: () => this.loadUsers()
@@ -900,6 +902,124 @@ const AdminPanel = {
         await this.loadBanners();
     },
 
+    // ---------------- Guía de tallas (solo super_admin) ----------------
+
+    async loadSizeGuide() {
+        if (!this.isSuperAdmin()) return;
+        const container = document.getElementById('tab-tallas');
+        container.innerHTML = '<div class="loading">Cargando tallas...</div>';
+
+        const [{ data: sizeGuide, error }, { data: categories }] = await Promise.all([
+            supabaseClient.from('size_guide').select('*').order('category_id').order('sort_order'),
+            supabaseClient.from('categories').select('*').order('sort_order')
+        ]);
+        if (error) { container.innerHTML = `<div class="empty-state">Error: ${error.message}</div>`; return; }
+
+        this.sizeGuideRows = sizeGuide || [];
+        this.categories = categories || [];
+
+        container.innerHTML = `
+            <div class="page-header">
+                <h1>Guía de Tallas</h1>
+                <button class="btn btn-primary" id="newSizeGuideBtn">+ Nueva medida</button>
+            </div>
+            <p style="font-size:12px;color:var(--admin-text-secondary);margin-bottom:16px;">
+                Estas medidas se muestran junto a la talla seleccionada en la ficha de producto (ej. "TALLA: S (48cm)").
+            </p>
+            <div class="card">
+                <div class="table-wrap">
+                    <table>
+                        <thead><tr><th>Categoría</th><th>Talla</th><th>Medida</th><th>Orden</th><th></th></tr></thead>
+                        <tbody>
+                            ${this.sizeGuideRows.map(s => `
+                                <tr>
+                                    <td>${this.escapeHtml(s.category_id)}</td>
+                                    <td>${this.escapeHtml(s.size)}</td>
+                                    <td>${this.escapeHtml(s.measurement)}</td>
+                                    <td>${s.sort_order}</td>
+                                    <td>
+                                        <button class="btn btn-secondary btn-sm edit-size-guide-btn" data-id="${s.id}">Editar</button>
+                                        <button class="btn btn-danger btn-sm delete-size-guide-btn" data-id="${s.id}">Eliminar</button>
+                                    </td>
+                                </tr>
+                            `).join('') || '<tr><td colspan="5" class="empty-state">Sin medidas todavía</td></tr>'}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        `;
+
+        document.getElementById('newSizeGuideBtn').addEventListener('click', () => this.openSizeGuideModal());
+        container.querySelectorAll('.edit-size-guide-btn').forEach(btn =>
+            btn.addEventListener('click', () => this.openSizeGuideModal(btn.dataset.id)));
+        container.querySelectorAll('.delete-size-guide-btn').forEach(btn =>
+            btn.addEventListener('click', () => this.deleteSizeGuide(btn.dataset.id)));
+    },
+
+    openSizeGuideModal(id) {
+        const row = id ? this.sizeGuideRows.find(s => String(s.id) === String(id)) : null;
+        document.getElementById('sizeGuideForm').reset();
+        document.getElementById('sizeGuideModalTitle').textContent = row ? 'Editar medida' : 'Nueva medida';
+        document.getElementById('sizeGuideId').value = row ? row.id : '';
+
+        const catSelect = document.getElementById('sizeGuideCategory');
+        catSelect.innerHTML = this.categories.map(c => `<option value="${c.id}">${this.escapeHtml(c.name)}</option>`).join('');
+
+        if (row) {
+            document.getElementById('sizeGuideCategory').value = row.category_id;
+            document.getElementById('sizeGuideSize').value = row.size;
+            document.getElementById('sizeGuideMeasurement').value = row.measurement;
+            document.getElementById('sizeGuideSortOrder').value = row.sort_order;
+        } else {
+            document.getElementById('sizeGuideSortOrder').value = 1;
+        }
+        document.getElementById('sizeGuideModal').classList.add('active');
+    },
+
+    async saveSizeGuide(e) {
+        e.preventDefault();
+        const id = document.getElementById('sizeGuideId').value;
+        const saveBtn = e.target.querySelector('button[type="submit"]');
+        saveBtn.disabled = true;
+        saveBtn.textContent = 'Guardando...';
+
+        try {
+            const sortOrderRaw = document.getElementById('sizeGuideSortOrder').value.trim();
+            const sortOrder = sortOrderRaw ? parseInt(sortOrderRaw, 10) : 0;
+            if (isNaN(sortOrder)) throw new Error('El orden debe ser un número');
+
+            const payload = {
+                category_id: document.getElementById('sizeGuideCategory').value,
+                size: document.getElementById('sizeGuideSize').value.trim(),
+                measurement: document.getElementById('sizeGuideMeasurement').value.trim(),
+                sort_order: sortOrder
+            };
+
+            const { error } = id
+                ? await supabaseClient.from('size_guide').update(payload).eq('id', id)
+                : await supabaseClient.from('size_guide').insert(payload);
+
+            if (error) throw error;
+
+            this.toast('Medida guardada');
+            document.getElementById('sizeGuideModal').classList.remove('active');
+            await this.loadSizeGuide();
+        } catch (error) {
+            this.toast('Error guardando: ' + error.message, 'error');
+        } finally {
+            saveBtn.disabled = false;
+            saveBtn.textContent = 'Guardar';
+        }
+    },
+
+    async deleteSizeGuide(id) {
+        if (!confirm('¿Eliminar esta medida?')) return;
+        const { error } = await supabaseClient.from('size_guide').delete().eq('id', id);
+        if (error) { this.toast('No se pudo eliminar: ' + error.message, 'error'); return; }
+        this.toast('Medida eliminada');
+        await this.loadSizeGuide();
+    },
+
     // ---------------- Páginas de contenido (solo super_admin) ----------------
 
     async loadPages() {
@@ -1173,6 +1293,7 @@ const AdminPanel = {
         });
         document.getElementById('bulkEditForm').addEventListener('submit', (e) => this.applyBulkEdit(e));
         document.getElementById('bannerForm').addEventListener('submit', (e) => this.saveBanner(e));
+        document.getElementById('sizeGuideForm').addEventListener('submit', (e) => this.saveSizeGuide(e));
         document.getElementById('bannerLinkType').addEventListener('change', () => this.toggleBannerCustomLink());
 
         document.getElementById('bannerFile').addEventListener('change', (e) => {

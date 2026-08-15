@@ -395,24 +395,17 @@
                     <div class="product-meta">
                         <div class="meta-item">
                             <svg class="meta-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M5 12h14"></path>
-                                <path d="M12 5l7 7-7 7"></path>
+                                <path d="M12 2a8 8 0 0 0-8 8c0 5.5 8 12 8 12s8-6.5 8-12a8 8 0 0 0-8-8z"></path>
+                                <circle cx="12" cy="10" r="3"></circle>
                             </svg>
-                            <span>Envío gratis en compras sobre $50.000</span>
+                            <span>Entrega disponible en estaciones de Metro</span>
                         </div>
                         <div class="meta-item">
                             <svg class="meta-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
                                 <polyline points="9 22 9 12 15 12 15 22"></polyline>
                             </svg>
-                            <span>Retiro en tienda disponible</span>
-                        </div>
-                        <div class="meta-item">
-                            <svg class="meta-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <circle cx="12" cy="12" r="10"></circle>
-                                <polyline points="12 6 12 12 16 14"></polyline>
-                            </svg>
-                            <span>Despacho en 24-48 horas</span>
+                            <span>Envío a regiones o dentro de la región sujeto a ubicación y prestador de preferencia; se coordina al finalizar el pedido</span>
                         </div>
                     </div>
                     
@@ -581,7 +574,8 @@
                     document.querySelectorAll('.size-btn').forEach(b => b.classList.remove('active'));
                     btn.classList.add('active');
                     selectedSize = btn.dataset.size;
-                    document.getElementById('selectedSize').textContent = selectedSize;
+                    const measurement = ProductsManager.getSizeMeasurement(currentProduct.category, selectedSize);
+                    document.getElementById('selectedSize').textContent = measurement ? `${selectedSize} (${measurement})` : selectedSize;
                 });
             });
             

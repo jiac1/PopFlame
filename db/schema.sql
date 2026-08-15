@@ -116,6 +116,17 @@ create table if not exists public.subscribers (
     subscribed_at  timestamptz not null default now()
 );
 
+-- Medida real de cada talla por categoría (ej. poleras/S = "48cm"). Se muestra junto a la
+-- talla seleccionada en la ficha de producto, para no obligar a mirar la guía de talles aparte.
+create table if not exists public.size_guide (
+    id           bigint generated always as identity primary key,
+    category_id  text not null references public.categories(id) on delete cascade,
+    size         text not null,
+    measurement  text not null,
+    sort_order   int not null default 0,
+    unique (category_id, size)
+);
+
 -- ---------------------------------------------------------
 -- 2. FUNCIONES AUXILIARES DE ROL
 -- ---------------------------------------------------------
@@ -318,6 +329,7 @@ alter table public.config    enable row level security;
 alter table public.banners   enable row level security;
 alter table public.pages     enable row level security;
 alter table public.subscribers enable row level security;
+alter table public.size_guide enable row level security;
 
 -- profiles
 drop policy if exists "profiles_select_own_or_super" on public.profiles;
@@ -418,6 +430,15 @@ create policy "subscribers_update_super_admin" on public.subscribers
 drop policy if exists "subscribers_delete_super_admin" on public.subscribers;
 create policy "subscribers_delete_super_admin" on public.subscribers
     for delete using (public.is_super_admin());
+
+-- size_guide: lectura pública, escritura solo super_admin
+drop policy if exists "size_guide_select_public" on public.size_guide;
+create policy "size_guide_select_public" on public.size_guide
+    for select using (true);
+
+drop policy if exists "size_guide_write_super_admin" on public.size_guide;
+create policy "size_guide_write_super_admin" on public.size_guide
+    for all using (public.is_super_admin()) with check (public.is_super_admin());
 
 -- ---------------------------------------------------------
 -- 5.5 STORAGE: buckets públicos para imágenes subidas desde el panel
@@ -540,6 +561,21 @@ on conflict (name) do nothing;
 insert into public.config (id, store_name, whatsapp_number, shipping_cost, free_shipping_min, currency, hero_title, hero_subtitle)
 values (1, 'PopFlame', null, 5990, 50000, 'CLP', 'NUEVA COLECCIÓN', 'Streetwear que quema')
 on conflict (id) do nothing;
+
+insert into public.size_guide (category_id, size, measurement, sort_order) values
+    ('poleras', 'S', '48cm', 1),
+    ('poleras', 'M', '51cm', 2),
+    ('poleras', 'L', '54cm', 3),
+    ('poleras', 'XL', '57cm', 4),
+    ('polerones', 'S', '54cm', 1),
+    ('polerones', 'M', '57cm', 2),
+    ('polerones', 'L', '60cm', 3),
+    ('polerones', 'XL', '63cm', 4),
+    ('pantalones', '28', '71cm', 1),
+    ('pantalones', '30', '76cm', 2),
+    ('pantalones', '32', '81cm', 3),
+    ('pantalones', '34', '86cm', 4)
+on conflict (category_id, size) do nothing;
 
 insert into public.pages (slug, title, content) values
     ('envios', 'Envíos',
