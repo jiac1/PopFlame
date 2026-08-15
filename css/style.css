@@ -1005,3 +1005,57 @@ img {
     background: var(--primary-dark);
     transform: translateY(-2px);
 }
+
+/* ===== Guía de talles (diagrama + tabla) ===== */
+.size-guide-wrap {
+    display: flex;
+    gap: 24px;
+    align-items: flex-start;
+    flex-wrap: wrap;
+}
+
+.size-guide-diagram {
+    color: var(--text-secondary);
+    flex-shrink: 0;
+}
+
+.size-guide-table-wrap {
+    flex: 1;
+    min-width: 240px;
+    overflow-x: auto;
+}
+
+.size-guide-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+
+.size-guide-table th,
+.size-guide-table td {
+    padding: 8px 12px;
+    text-align: center;
+    border: 1px solid var(--border);
+    white-space: nowrap;
+}
+
+.size-guide-table th {
+    background: var(--bg-darker);
+    text-transform: uppercase;
+    font-size: 11px;
+    letter-spacing: 0.5px;
+}
+
+.size-guide-note {
+    margin-top: 10px;
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+.size-guide-category-heading {
+    font-size: 16px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin: 32px 0 16px;
+}

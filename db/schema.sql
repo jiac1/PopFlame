@@ -123,9 +123,15 @@ create table if not exists public.size_guide (
     category_id  text not null references public.categories(id) on delete cascade,
     size         text not null,
     measurement  text not null,
+    -- Tabla de medidas detallada (Largo, Ancho pecho, Largo manga, Ancho hombro, etc.),
+    -- guardada como { "Nombre de la medida": "valor" }. Las columnas de la tabla son
+    -- las que el super_admin defina en el panel, no están fijas en el código.
+    measurements jsonb not null default '{}'::jsonb,
     sort_order   int not null default 0,
     unique (category_id, size)
 );
+
+alter table public.size_guide add column if not exists measurements jsonb not null default '{}'::jsonb;
 
 -- ---------------------------------------------------------
 -- 2. FUNCIONES AUXILIARES DE ROL
@@ -585,14 +591,18 @@ insert into public.pages (slug, title, content) values
      '<p>Si tu producto llega con algún problema de fabricación, escríbenos por WhatsApp dentro de las 48 horas después de recibirlo y lo solucionamos.</p>' ||
      '<p>Los cambios de talla están sujetos a disponibilidad de stock.</p>'),
     ('guia-de-talles', 'Guía de Talles',
-     '<p><strong>Poleras:</strong> S (48cm), M (51cm), L (54cm), XL (57cm)</p>' ||
-     '<p><strong>Polerones:</strong> S (54cm), M (57cm), L (60cm), XL (63cm)</p>' ||
-     '<p><strong>Chaquetas:</strong> S (55cm), M (58cm), L (61cm), XL (64cm)</p>' ||
-     '<p><strong>Pantalones:</strong> 28 (71cm), 30 (76cm), 32 (81cm), 34 (86cm)</p>' ||
-     '<p>* Medidas aproximadas del contorno del pecho/cintura.</p>'),
+     '<p>Debajo de este texto vas a encontrar la tabla de medidas real de cada categoría.</p>'),
     ('contacto', 'Contacto',
      '<p>Escríbenos por WhatsApp o Instagram y te respondemos a la brevedad.</p>')
 on conflict (slug) do nothing;
+
+-- Si ya tenías la página "guia-de-talles" con el texto viejo (números fijos que ahora
+-- duplicaban la tabla dinámica), la reemplaza. No toca la fila si ya la editaste a mano
+-- con otro contenido distinto al default original.
+update public.pages
+set content = '<p>Debajo de este texto vas a encontrar la tabla de medidas real de cada categoría.</p>'
+where slug = 'guia-de-talles'
+  and content like '%Poleras:%S (48cm)%';
 
 -- =========================================================
 -- Fin del schema. Siguiente paso: crear los usuarios de acceso en

@@ -131,6 +131,84 @@ const ProductsManager = {
         return entry ? entry.measurement : '';
     },
 
+    escapeHtml(str) {
+        const div = document.createElement('div');
+        div.textContent = str ?? '';
+        return div.innerHTML;
+    },
+
+    // Filas + nombres de columna (las que haya cargado el super_admin) de la tabla de
+    // medidas detallada de una categoría.
+    getSizeGuideTable(categoryId) {
+        const rows = this.sizeGuide
+            .filter(s => s.category_id === categoryId)
+            .sort((a, b) => a.sort_order - b.sort_order);
+
+        const labels = [];
+        rows.forEach(r => {
+            Object.keys(r.measurements || {}).forEach(k => {
+                if (!labels.includes(k)) labels.push(k);
+            });
+        });
+
+        return { rows, labels };
+    },
+
+    // Diagrama genérico de referencia (ilustración propia, no depende de ninguna imagen externa)
+    // con los puntos de medida A/B/C/D marcados, para acompañar la tabla de talles.
+    sizeGuideDiagramSvg() {
+        return `
+            <svg viewBox="0 0 200 220" width="120" height="132" style="flex-shrink:0;">
+                <path d="M60 25 L85 12 Q100 4 115 12 L140 25 L168 48 L150 70 L136 60 L136 205 L64 205 L64 60 L50 70 L32 48 Z"
+                      fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+                <line x1="20" y1="25" x2="20" y2="205" stroke="#E31837" stroke-width="1.5"/>
+                <text x="10" y="118" fill="#E31837" font-size="13" font-weight="700">A</text>
+                <line x1="64" y1="110" x2="136" y2="110" stroke="#E31837" stroke-width="1.5"/>
+                <text x="94" y="104" fill="#E31837" font-size="13" font-weight="700">B</text>
+                <line x1="168" y1="48" x2="136" y2="60" stroke="#E31837" stroke-width="1.5"/>
+                <text x="172" y="55" fill="#E31837" font-size="13" font-weight="700">C</text>
+                <line x1="85" y1="16" x2="115" y2="16" stroke="#E31837" stroke-width="1.5"/>
+                <text x="95" y="11" fill="#E31837" font-size="13" font-weight="700">D</text>
+            </svg>
+        `;
+    },
+
+    // Diagrama + tabla de talles de una categoría. Si no hay medidas cargadas todavía,
+    // avisa en vez de mostrar una tabla vacía.
+    renderSizeGuideHtml(categoryId) {
+        const { rows, labels } = this.getSizeGuideTable(categoryId);
+
+        if (rows.length === 0) {
+            return '<p>Guía de talles no disponible todavía para esta categoría.</p>';
+        }
+
+        const hasDetailedLabels = labels.length > 0;
+
+        const headerCells = hasDetailedLabels
+            ? labels.map(l => `<th>${this.escapeHtml(l)}</th>`).join('')
+            : '<th>Medida</th>';
+
+        const bodyRows = rows.map(r => {
+            const cells = hasDetailedLabels
+                ? labels.map(l => `<td>${this.escapeHtml((r.measurements || {})[l] ?? '—')}</td>`).join('')
+                : `<td>${this.escapeHtml(r.measurement)}</td>`;
+            return `<tr><td><strong>${this.escapeHtml(r.size)}</strong></td>${cells}</tr>`;
+        }).join('');
+
+        return `
+            <div class="size-guide-wrap">
+                <div class="size-guide-diagram">${this.sizeGuideDiagramSvg()}</div>
+                <div class="size-guide-table-wrap">
+                    <table class="size-guide-table">
+                        <thead><tr><th>Talla</th>${headerCells}</tr></thead>
+                        <tbody>${bodyRows}</tbody>
+                    </table>
+                    <p class="size-guide-note">* Medidas aproximadas, en centímetros.</p>
+                </div>
+            </div>
+        `;
+    },
+
     // Generate product card HTML (para index.html, en la raíz del sitio)
     createProductCard(product) {
         const badgeHTML = product.badge

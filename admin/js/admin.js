@@ -51,6 +51,7 @@ const AdminPanel = {
     productImagesNewFiles: [],
     banners: [],
     sizeGuideRows: [],
+    currentMeasurementRows: [],
 
     async init(profile) {
         this.profile = profile;
@@ -970,10 +971,41 @@ const AdminPanel = {
             document.getElementById('sizeGuideSize').value = row.size;
             document.getElementById('sizeGuideMeasurement').value = row.measurement;
             document.getElementById('sizeGuideSortOrder').value = row.sort_order;
+            this.currentMeasurementRows = Object.entries(row.measurements || {}).map(([label, value]) => ({ label, value }));
         } else {
             document.getElementById('sizeGuideSortOrder').value = 1;
+            this.currentMeasurementRows = [];
         }
+        this.renderMeasurementRows();
         document.getElementById('sizeGuideModal').classList.add('active');
+    },
+
+    renderMeasurementRows() {
+        const container = document.getElementById('sizeGuideMeasurementsList');
+        container.innerHTML = this.currentMeasurementRows.map((row, i) => `
+            <div style="display:flex;gap:8px;margin-bottom:8px;">
+                <input type="text" class="measurement-label" data-index="${i}" placeholder="Largo" value="${this.escapeHtml(row.label)}" style="flex:1;padding:10px;border:1px solid var(--admin-border);border-radius:6px;">
+                <input type="text" class="measurement-value" data-index="${i}" placeholder="67cm" value="${this.escapeHtml(row.value)}" style="flex:1;padding:10px;border:1px solid var(--admin-border);border-radius:6px;">
+                <button type="button" class="btn btn-danger btn-sm remove-measurement-btn" data-index="${i}">×</button>
+            </div>
+        `).join('') || '<p style="font-size:12px;color:var(--admin-text-secondary);">Sin medidas detalladas todavía</p>';
+
+        container.querySelectorAll('.measurement-label').forEach(input => {
+            input.addEventListener('input', (e) => {
+                this.currentMeasurementRows[e.target.dataset.index].label = e.target.value;
+            });
+        });
+        container.querySelectorAll('.measurement-value').forEach(input => {
+            input.addEventListener('input', (e) => {
+                this.currentMeasurementRows[e.target.dataset.index].value = e.target.value;
+            });
+        });
+        container.querySelectorAll('.remove-measurement-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                this.currentMeasurementRows.splice(parseInt(btn.dataset.index, 10), 1);
+                this.renderMeasurementRows();
+            });
+        });
     },
 
     async saveSizeGuide(e) {
@@ -988,10 +1020,18 @@ const AdminPanel = {
             const sortOrder = sortOrderRaw ? parseInt(sortOrderRaw, 10) : 0;
             if (isNaN(sortOrder)) throw new Error('El orden debe ser un número');
 
+            const measurements = {};
+            this.currentMeasurementRows.forEach(row => {
+                const label = row.label.trim();
+                const value = row.value.trim();
+                if (label && value) measurements[label] = value;
+            });
+
             const payload = {
                 category_id: document.getElementById('sizeGuideCategory').value,
                 size: document.getElementById('sizeGuideSize').value.trim(),
                 measurement: document.getElementById('sizeGuideMeasurement').value.trim(),
+                measurements,
                 sort_order: sortOrder
             };
 
@@ -1294,6 +1334,10 @@ const AdminPanel = {
         document.getElementById('bulkEditForm').addEventListener('submit', (e) => this.applyBulkEdit(e));
         document.getElementById('bannerForm').addEventListener('submit', (e) => this.saveBanner(e));
         document.getElementById('sizeGuideForm').addEventListener('submit', (e) => this.saveSizeGuide(e));
+        document.getElementById('addMeasurementRowBtn').addEventListener('click', () => {
+            this.currentMeasurementRows.push({ label: '', value: '' });
+            this.renderMeasurementRows();
+        });
         document.getElementById('bannerLinkType').addEventListener('change', () => this.toggleBannerCustomLink());
 
         document.getElementById('bannerFile').addEventListener('change', (e) => {

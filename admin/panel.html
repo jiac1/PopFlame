@@ -173,13 +173,21 @@
                         <input type="text" id="sizeGuideSize" placeholder="S, M, L, XL, 30..." required>
                     </div>
                     <div class="field">
-                        <label>Medida</label>
+                        <label>Medida corta (se muestra junto a la talla)</label>
                         <input type="text" id="sizeGuideMeasurement" placeholder="48cm" required>
                     </div>
                 </div>
                 <div class="field">
                     <label>Orden</label>
                     <input type="text" inputmode="numeric" pattern="[0-9]*" id="sizeGuideSortOrder" placeholder="1">
+                </div>
+                <div class="field">
+                    <label>Tabla de medidas detallada (opcional)</label>
+                    <p style="font-size:11px;color:var(--admin-text-secondary);margin-bottom:8px;">
+                        Ej. Largo, Ancho pecho, Largo manga, Ancho hombro. Estas columnas se comparten con todas las tallas de la misma categoría.
+                    </p>
+                    <div id="sizeGuideMeasurementsList"></div>
+                    <button type="button" class="btn btn-secondary btn-sm" id="addMeasurementRowBtn" style="margin-top:8px;">+ Agregar medida</button>
                 </div>
                 <div class="modal-actions">
                     <button type="button" class="btn btn-secondary" data-close-modal="sizeGuideModal">Cancelar</button>

@@ -150,6 +150,16 @@
             titleEl.textContent = page.title;
             contentEl.innerHTML = page.content;
             document.title = page.title + ' | PopFlame';
+
+            // En la Guía de Talles se agrega, además del texto editable de arriba,
+            // la tabla de medidas real de cada categoría.
+            if (slug === 'guia-de-talles') {
+                const tablesHtml = ProductsManager.categories.map(c => `
+                    <h2 class="size-guide-category-heading">${App.escapeHtml(c.name)}</h2>
+                    ${ProductsManager.renderSizeGuideHtml(c.id)}
+                `).join('');
+                contentEl.insertAdjacentHTML('beforeend', tablesHtml);
+            }
         });
     </script>
 </body>

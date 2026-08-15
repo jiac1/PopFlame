@@ -628,13 +628,7 @@
                     if (btn.dataset.tab === 'description') {
                         document.getElementById('tabContent').innerHTML = `<p>${currentProduct.description}</p>`;
                     } else {
-                        document.getElementById('tabContent').innerHTML = `
-                            <p><strong>Poleras:</strong> S (48cm), M (51cm), L (54cm), XL (57cm)</p>
-                            <p><strong>Polerones:</strong> S (54cm), M (57cm), L (60cm), XL (63cm)</p>
-                            <p><strong>Chaquetas:</strong> S (55cm), M (58cm), L (61cm), XL (64cm)</p>
-                            <p><strong>Pantalones:</strong> 28 (71cm), 30 (76cm), 32 (81cm), 34 (86cm)</p>
-                            <p>* Medidas aproximadas del contorno del pecho/cintura</p>
-                        `;
+                        document.getElementById('tabContent').innerHTML = ProductsManager.renderSizeGuideHtml(currentProduct.category);
                     }
                 });
             });
