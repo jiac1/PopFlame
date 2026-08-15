@@ -236,13 +236,15 @@ const AdminPanel = {
         if (error) { container.innerHTML = `<div class="empty-state">Error cargando pedidos: ${error.message}</div>`; return; }
 
         const statuses = ['pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled'];
+        const canDelete = this.isSuperAdmin();
 
         container.innerHTML = `
             <div class="page-header"><h1>Pedidos</h1></div>
+            ${this.isSuperAdmin() ? '<p style="font-size:12px;color:var(--admin-text-secondary);margin-bottom:16px;">Al marcar un pedido como "confirmed" pasa solo a "processing" (se considera ya en preparación). Despachado/entregado/cancelado siguen siendo manuales.</p>' : ''}
             <div class="card">
                 <div class="table-wrap">
                     <table>
-                        <thead><tr><th>Pedido</th><th>Cliente</th><th>Contacto</th><th>Total</th><th>Estado</th><th>Fecha</th></tr></thead>
+                        <thead><tr><th>Pedido</th><th>Cliente</th><th>Contacto</th><th>Total</th><th>Estado</th><th>Fecha</th>${canDelete ? '<th></th>' : ''}</tr></thead>
                         <tbody>
                             ${(orders || []).map(o => `
                                 <tr>
@@ -256,8 +258,9 @@ const AdminPanel = {
                                         </select>
                                     </td>
                                     <td>${new Date(o.created_at).toLocaleString('es-CL')}</td>
+                                    ${canDelete ? `<td><button class="btn btn-danger btn-sm delete-order-btn" data-id="${o.id}">Eliminar</button></td>` : ''}
                                 </tr>
-                            `).join('') || '<tr><td colspan="6" class="empty-state">Sin pedidos todavía</td></tr>'}
+                            `).join('') || `<tr><td colspan="${canDelete ? 7 : 6}" class="empty-state">Sin pedidos todavía</td></tr>`}
                         </tbody>
                     </table>
                 </div>
@@ -268,10 +271,23 @@ const AdminPanel = {
             sel.addEventListener('change', async () => {
                 const { error } = await supabaseClient.from('orders')
                     .update({ status: sel.value }).eq('id', sel.dataset.orderId);
-                if (error) { this.toast('No se pudo actualizar el estado: ' + error.message, 'error'); }
-                else { this.toast('Estado actualizado'); }
+                if (error) { this.toast('No se pudo actualizar el estado: ' + error.message, 'error'); return; }
+                this.toast('Estado actualizado');
+                await this.loadOrders(); // refleja el estado real (el trigger puede haberlo movido a "processing")
             });
         });
+
+        container.querySelectorAll('.delete-order-btn').forEach(btn => {
+            btn.addEventListener('click', () => this.deleteOrder(btn.dataset.id));
+        });
+    },
+
+    async deleteOrder(id) {
+        if (!confirm('¿Eliminar este pedido? Esta acción no se puede deshacer.')) return;
+        const { error } = await supabaseClient.from('orders').delete().eq('id', id);
+        if (error) { this.toast('No se pudo eliminar: ' + error.message, 'error'); return; }
+        this.toast('Pedido eliminado');
+        await this.loadOrders();
     },
 
     // ---------------- Inventario (admin y super_admin) ----------------

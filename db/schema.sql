@@ -213,6 +213,25 @@ create trigger trg_config_updated_at
     before update on public.config
     for each row execute procedure public.set_updated_at();
 
+-- Cuando un pedido se marca "confirmed" (pagado/confirmado), pasa automáticamente
+-- a "processing" (en preparación). No toca shipped/delivered/cancelled: esos
+-- siguen siendo 100% manuales porque dependen de una acción real (despachar, etc.).
+create or replace function public.orders_auto_processing()
+returns trigger
+language plpgsql as $$
+begin
+    if new.status = 'confirmed' and old.status is distinct from 'confirmed' then
+        new.status := 'processing';
+    end if;
+    return new;
+end;
+$$;
+
+drop trigger if exists trg_orders_auto_processing on public.orders;
+create trigger trg_orders_auto_processing
+    before update on public.orders
+    for each row execute procedure public.orders_auto_processing();
+
 -- ---------------------------------------------------------
 -- 5. ROW LEVEL SECURITY
 -- ---------------------------------------------------------
