@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PopFlame</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link rel="stylesheet" href="../css/responsive.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        .info-page {
+            padding: 160px 0 100px;
+            max-width: 720px;
+            margin: 0 auto;
+        }
+        .info-page h1 {
+            font-size: 32px;
+            font-weight: 900;
+            margin-bottom: 32px;
+            letter-spacing: 1px;
+        }
+        .info-content {
+            font-size: 15px;
+            line-height: 1.8;
+            color: var(--text-secondary);
+        }
+        .info-content p { margin-bottom: 16px; }
+        .info-content strong { color: var(--text-primary); }
+        .info-content ul { margin: 0 0 16px 20px; }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="container">
+            <a href="../index.html" class="logo">
+                <img src="../images/logo.png" alt="PopFlame" class="logo-img">
+            </a>
+            <nav class="nav">
+                <!-- Se llena solo con las categorías reales (js/app.js -> renderNav) -->
+            </nav>
+            <div class="header-actions">
+                <button class="cart-btn" id="cartBtn">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="9" cy="21" r="1"></circle>
+                        <circle cx="20" cy="21" r="1"></circle>
+                        <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
+                    </svg>
+                    <span class="cart-count" id="cartCount">0</span>
+                </button>
+                <button class="menu-btn" id="menuBtn">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <section class="info-page container">
+        <h1 id="infoTitle">Cargando...</h1>
+        <div class="info-content" id="infoContent"></div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-grid">
+                <div class="footer-col">
+                    <img src="../images/logo.png" alt="PopFlame" class="footer-logo">
+                    <p>Streetwear que quema 🔥</p>
+                </div>
+                <div class="footer-col">
+                    <h4>TIENDA</h4>
+                    <!-- Se llena solo (js/app.js -> renderFooterCategoryLinks) -->
+                </div>
+                <div class="footer-col">
+                    <h4>AYUDA</h4>
+                    <a href="info.html?slug=envios">Envíos</a>
+                    <a href="info.html?slug=devoluciones">Devoluciones</a>
+                    <a href="info.html?slug=guia-de-talles">Guía de Talles</a>
+                    <a href="info.html?slug=contacto">Contacto</a>
+                </div>
+                <div class="footer-col">
+                    <h4>REDES</h4>
+                    <a href="#">Instagram</a>
+                    <a href="#">TikTok</a>
+                    <a href="#">Twitter</a>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2026 PopFlame. Todos los derechos reservados.</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Cart Drawer -->
+    <div class="cart-overlay" id="cartOverlay"></div>
+    <div class="cart-drawer" id="cartDrawer">
+        <div class="cart-header">
+            <h3>TU CARRITO</h3>
+            <button class="cart-close" id="cartClose">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+            </button>
+        </div>
+        <div class="cart-items" id="cartItems"></div>
+        <div class="cart-footer" id="cartFooter">
+            <div class="cart-total">
+                <span>TOTAL:</span>
+                <span id="cartTotal">$0</span>
+            </div>
+            <a href="checkout.html" class="btn btn-primary btn-full">FINALIZAR COMPRA</a>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="../js/supabaseClient.js"></script>
+    <script src="../js/products.js"></script>
+    <script src="../js/cart.js"></script>
+    <script src="../js/app.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            await ProductsManager.loadProducts();
+            CartManager.init();
+            App.applySiteConfig();
+            App.renderNav();
+            App.renderFooterCategoryLinks();
+
+            const slug = App.getUrlParam('slug');
+            const titleEl = document.getElementById('infoTitle');
+            const contentEl = document.getElementById('infoContent');
+
+            if (!slug) {
+                titleEl.textContent = 'Página no encontrada';
+                contentEl.innerHTML = '<p>Vuelve al <a href="../index.html">inicio</a>.</p>';
+                return;
+            }
+
+            const { data: page, error } = await supabaseClient.from('pages').select('*').eq('slug', slug).maybeSingle();
+
+            if (error || !page) {
+                titleEl.textContent = 'Página no encontrada';
+                contentEl.innerHTML = '<p>Esta página todavía no tiene contenido. Vuelve al <a href="../index.html">inicio</a>.</p>';
+                return;
+            }
+
+            titleEl.textContent = page.title;
+            contentEl.innerHTML = page.content;
+            document.title = page.title + ' | PopFlame';
+        });
+    </script>
+</body>
+</html>

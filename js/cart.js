@@ -248,10 +248,8 @@ ${items}
 - Nombre: ${customerData.name}
 - Email: ${customerData.email}
 - Teléfono: ${customerData.phone}
-- Dirección: ${customerData.address}
-- Ciudad: ${customerData.city}
-- Región: ${customerData.region}
-
+${customerData.meetingPoint ? `- Estación de Metro preferida: ${customerData.meetingPoint}\n` : ''}${customerData.note ? `- Nota: ${customerData.note}\n` : ''}
+📍 *Entrega:* presencial en Metro de Santiago (a coordinar). Si es fuera de Santiago o zona alejada, lo coordinamos por acá.
 📝 *Nota:* Pago por transferencia bancaria`;
 
         return encodeURIComponent(message);

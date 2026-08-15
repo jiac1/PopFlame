@@ -218,6 +218,17 @@
             background: var(--bg-dark);
             border: 1px solid var(--border);
         }
+
+        .delivery-note {
+            padding: 14px 16px;
+            margin-bottom: 20px;
+            background: var(--bg-darker);
+            border: 1px solid var(--border);
+            border-left: 3px solid var(--primary);
+            font-size: 13px;
+            line-height: 1.6;
+            color: var(--text-secondary);
+        }
         
         .payment-info h4 {
             font-size: 13px;
@@ -364,47 +375,23 @@
                         </div>
                         
                         <div class="form-section">
-                            <h3 class="form-section-title">Dirección de Envío</h3>
-                            <div class="form-group">
-                                <label class="form-label">Dirección *</label>
-                                <input type="text" class="form-input" id="address" name="address" placeholder="Av. Principal 123" required>
+                            <h3 class="form-section-title">Entrega</h3>
+                            <div class="delivery-note">
+                                📍 Las entregas se coordinan de forma presencial en estaciones de <strong>Metro de Santiago</strong>.
+                                Si necesitas envío a otra región o a una zona alejada de Santiago, lo coordinamos directamente por WhatsApp después de tu pedido.
                             </div>
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label class="form-label">Ciudad *</label>
-                                    <input type="text" class="form-input" id="city" name="city" required>
-                                </div>
-                                <div class="form-group">
-                                    <label class="form-label">Región *</label>
-                                    <select class="form-select" id="region" name="region" required>
-                                        <option value="">Seleccionar región</option>
-                                        <option value="Arica y Parinacota">Arica y Parinacota</option>
-                                        <option value="Tarapacá">Tarapacá</option>
-                                        <option value="Antofagasta">Antofagasta</option>
-                                        <option value="Atacama">Atacama</option>
-                                        <option value="Coquimbo">Coquimbo</option>
-                                        <option value="Valparaíso">Valparaíso</option>
-                                        <option value="Metropolitana de Santiago">Metropolitana de Santiago</option>
-                                        <option value="O'Higgins">O'Higgins</option>
-                                        <option value="Maule">Maule</option>
-                                        <option value="Ñuble">Ñuble</option>
-                                        <option value="Biobío">Biobío</option>
-                                        <option value="La Araucanía">La Araucanía</option>
-                                        <option value="Los Ríos">Los Ríos</option>
-                                        <option value="Los Lagos">Los Lagos</option>
-                                        <option value="Aysén">Aysén</option>
-                                        <option value="Magallanes y la Antártica Chilena">Magallanes y la Antártica Chilena</option>
-                                    </select>
-                                </div>
+                            <div class="form-group">
+                                <label class="form-label">Estación de Metro preferida (opcional)</label>
+                                <input type="text" class="form-input" id="meetingPoint" name="meetingPoint" placeholder="Ej: Los Dominicos, Línea 1">
                             </div>
                             <div class="form-group">
                                 <label class="form-label">Nota adicional (opcional)</label>
-                                <input type="text" class="form-input" id="note" name="note" placeholder="Instrucciones de entrega">
+                                <input type="text" class="form-input" id="note" name="note" placeholder="Horario preferido, otra región, etc.">
                             </div>
                         </div>
                     </form>
                 </div>
-                
+
                 <div class="order-summary">
                     <h3 class="summary-title">RESUMEN DEL PEDIDO</h3>
                     
@@ -547,9 +534,7 @@
                     name: `${formData.get('name')} ${formData.get('lastName')}`,
                     email: formData.get('email'),
                     phone: formData.get('phone'),
-                    address: formData.get('address'),
-                    city: formData.get('city'),
-                    region: formData.get('region'),
+                    meetingPoint: formData.get('meetingPoint') || '',
                     note: formData.get('note') || ''
                 };
 
@@ -562,9 +547,7 @@
                         customer_name: customerData.name,
                         customer_email: customerData.email,
                         customer_phone: customerData.phone,
-                        customer_address: customerData.address,
-                        customer_city: customerData.city,
-                        customer_region: customerData.region,
+                        customer_address: customerData.meetingPoint || null,
                         note: customerData.note,
                         items: CartManager.getItems(),
                         subtotal: CartManager.getSubtotal(),

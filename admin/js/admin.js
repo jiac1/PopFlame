@@ -89,6 +89,7 @@ const AdminPanel = {
             productos: () => this.loadProducts(),
             categorias: () => this.loadCategories(),
             banners: () => this.loadBanners(),
+            paginas: () => this.loadPages(),
             config: () => this.loadConfig(),
             usuarios: () => this.loadUsers()
         };
@@ -251,7 +252,7 @@ const AdminPanel = {
                             ${(orders || []).map(o => `
                                 <tr>
                                     <td><strong>${o.order_number}</strong></td>
-                                    <td>${this.escapeHtml(o.customer_name)}<br><span style="color:var(--admin-text-secondary)">${this.escapeHtml(o.customer_address)}, ${this.escapeHtml(o.customer_city)}</span></td>
+                                    <td>${this.escapeHtml(o.customer_name)}${o.customer_address ? `<br><span style="color:var(--admin-text-secondary)">📍 ${this.escapeHtml(o.customer_address)}</span>` : ''}${o.note ? `<br><span style="color:var(--admin-text-secondary)">📝 ${this.escapeHtml(o.note)}</span>` : ''}</td>
                                     <td>${this.escapeHtml(o.customer_email)}<br>${this.escapeHtml(o.customer_phone)}</td>
                                     <td>${this.formatPrice(o.total)}</td>
                                     <td>
@@ -897,6 +898,63 @@ const AdminPanel = {
         if (error) { this.toast('No se pudo eliminar: ' + error.message, 'error'); return; }
         this.toast('Banner eliminado');
         await this.loadBanners();
+    },
+
+    // ---------------- Páginas de contenido (solo super_admin) ----------------
+
+    async loadPages() {
+        if (!this.isSuperAdmin()) return;
+        const container = document.getElementById('tab-paginas');
+        container.innerHTML = '<div class="loading">Cargando páginas...</div>';
+
+        const { data: pages, error } = await supabaseClient.from('pages').select('*').order('slug');
+        if (error) { container.innerHTML = `<div class="empty-state">Error: ${error.message}</div>`; return; }
+
+        container.innerHTML = `
+            <div class="page-header"><h1>Páginas</h1></div>
+            <p style="font-size:12px;color:var(--admin-text-secondary);margin-bottom:16px;">
+                Se ven desde el footer del sitio (Envíos, Devoluciones, Guía de Talles, Contacto).
+                Podés escribir HTML simple: &lt;p&gt;texto&lt;/p&gt;, &lt;strong&gt;negrita&lt;/strong&gt;, &lt;ul&gt;&lt;li&gt;item&lt;/li&gt;&lt;/ul&gt;.
+            </p>
+            ${(pages || []).map(p => `
+                <div class="card">
+                    <h3>${this.escapeHtml(p.title)} <span style="font-weight:400;font-size:12px;color:var(--admin-text-secondary);">(/${this.escapeHtml(p.slug)})</span></h3>
+                    <form class="page-edit-form" data-slug="${this.escapeHtml(p.slug)}">
+                        <div class="field">
+                            <label>Título</label>
+                            <input type="text" class="page-title-input" value="${this.escapeHtml(p.title)}" required>
+                        </div>
+                        <div class="field">
+                            <label>Contenido</label>
+                            <textarea class="page-content-input" rows="6" style="font-family:monospace;">${this.escapeHtml(p.content)}</textarea>
+                        </div>
+                        <button type="submit" class="btn btn-primary btn-sm">Guardar</button>
+                    </form>
+                </div>
+            `).join('') || '<div class="empty-state">Sin páginas todavía</div>'}
+        `;
+
+        container.querySelectorAll('.page-edit-form').forEach(form => {
+            form.addEventListener('submit', (e) => this.savePage(e));
+        });
+    },
+
+    async savePage(e) {
+        e.preventDefault();
+        const form = e.target;
+        const slug = form.dataset.slug;
+        const title = form.querySelector('.page-title-input').value.trim();
+        const content = form.querySelector('.page-content-input').value;
+        const btn = form.querySelector('button[type="submit"]');
+        btn.disabled = true;
+        btn.textContent = 'Guardando...';
+
+        const { error } = await supabaseClient.from('pages').update({ title, content }).eq('slug', slug);
+        if (error) { this.toast('Error guardando: ' + error.message, 'error'); }
+        else { this.toast('Página guardada'); }
+
+        btn.disabled = false;
+        btn.textContent = 'Guardar';
     },
 
     // ---------------- Configuración (solo super_admin) ----------------

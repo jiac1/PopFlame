@@ -51,9 +51,11 @@ create table if not exists public.orders (
     customer_name   text not null,
     customer_email  text not null,
     customer_phone  text not null,
-    customer_address text not null,
-    customer_city   text not null,
-    customer_region text not null,
+    -- Las entregas son presenciales en estaciones de Metro de Santiago; estos campos
+    -- quedan opcionales (se coordina el punto exacto y los envíos a otras zonas por WhatsApp).
+    customer_address text,
+    customer_city   text,
+    customer_region text,
     note            text,
     items           jsonb not null,
     subtotal        numeric not null,
@@ -93,6 +95,16 @@ create table if not exists public.banners (
     sort_order   int not null default 0,
     active       boolean not null default true,
     created_at   timestamptz not null default now()
+);
+
+-- Páginas de contenido editable (Envíos, Devoluciones, Guía de Talles, Contacto...),
+-- enlazadas desde el footer. El contenido admite HTML simple (negritas, párrafos,
+-- listas) porque solo lo escribe el super_admin.
+create table if not exists public.pages (
+    slug         text primary key,
+    title        text not null,
+    content      text not null default '',
+    updated_at   timestamptz not null default now()
 );
 
 -- ---------------------------------------------------------
@@ -226,6 +238,11 @@ create trigger trg_config_updated_at
     before update on public.config
     for each row execute procedure public.set_updated_at();
 
+drop trigger if exists trg_pages_updated_at on public.pages;
+create trigger trg_pages_updated_at
+    before update on public.pages
+    for each row execute procedure public.set_updated_at();
+
 -- Cuando un pedido se marca "confirmed" (pagado/confirmado), pasa automáticamente
 -- a "processing" (en preparación). No toca shipped/delivered/cancelled: esos
 -- siguen siendo 100% manuales porque dependen de una acción real (despachar, etc.).
@@ -255,6 +272,7 @@ alter table public.products  enable row level security;
 alter table public.orders    enable row level security;
 alter table public.config    enable row level security;
 alter table public.banners   enable row level security;
+alter table public.pages     enable row level security;
 
 -- profiles
 drop policy if exists "profiles_select_own_or_super" on public.profiles;
@@ -329,6 +347,15 @@ drop policy if exists "banners_write_super_admin" on public.banners;
 create policy "banners_write_super_admin" on public.banners
     for all using (public.is_super_admin()) with check (public.is_super_admin());
 
+-- pages: lectura pública, escritura solo super_admin
+drop policy if exists "pages_select_public" on public.pages;
+create policy "pages_select_public" on public.pages
+    for select using (true);
+
+drop policy if exists "pages_write_super_admin" on public.pages;
+create policy "pages_write_super_admin" on public.pages
+    for all using (public.is_super_admin()) with check (public.is_super_admin());
+
 -- ---------------------------------------------------------
 -- 5.5 STORAGE: buckets públicos para imágenes subidas desde el panel
 --    - "product-images": fotos de prendas
@@ -382,6 +409,15 @@ create policy "site_assets_super_admin_update" on storage.objects
 drop policy if exists "site_assets_super_admin_delete" on storage.objects;
 create policy "site_assets_super_admin_delete" on storage.objects
     for delete using (bucket_id = 'site-assets' and public.is_super_admin());
+
+-- ---------------------------------------------------------
+-- 5.55 Entregas presenciales en Metro: si la tabla orders ya existía con estas
+--    columnas obligatorias (versión anterior de este schema), las vuelve opcionales.
+-- ---------------------------------------------------------
+
+alter table public.orders alter column customer_address drop not null;
+alter table public.orders alter column customer_city drop not null;
+alter table public.orders alter column customer_region drop not null;
 
 -- ---------------------------------------------------------
 -- 5.6 Si la tabla products ya existía sin la restricción "unique (name)"
@@ -441,6 +477,23 @@ on conflict (name) do nothing;
 insert into public.config (id, store_name, whatsapp_number, shipping_cost, free_shipping_min, currency, hero_title, hero_subtitle)
 values (1, 'PopFlame', null, 5990, 50000, 'CLP', 'NUEVA COLECCIÓN', 'Streetwear que quema')
 on conflict (id) do nothing;
+
+insert into public.pages (slug, title, content) values
+    ('envios', 'Envíos',
+     '<p>Las entregas se coordinan de forma <strong>presencial en estaciones de Metro de Santiago</strong>, sin costo de envío.</p>' ||
+     '<p>Si necesitas despacho a otra región o a una zona alejada de Santiago, lo coordinamos directamente por WhatsApp una vez confirmado tu pedido, y puede tener un costo adicional según la zona.</p>'),
+    ('devoluciones', 'Devoluciones',
+     '<p>Si tu producto llega con algún problema de fabricación, escríbenos por WhatsApp dentro de las 48 horas después de recibirlo y lo solucionamos.</p>' ||
+     '<p>Los cambios de talla están sujetos a disponibilidad de stock.</p>'),
+    ('guia-de-talles', 'Guía de Talles',
+     '<p><strong>Poleras:</strong> S (48cm), M (51cm), L (54cm), XL (57cm)</p>' ||
+     '<p><strong>Polerones:</strong> S (54cm), M (57cm), L (60cm), XL (63cm)</p>' ||
+     '<p><strong>Chaquetas:</strong> S (55cm), M (58cm), L (61cm), XL (64cm)</p>' ||
+     '<p><strong>Pantalones:</strong> 28 (71cm), 30 (76cm), 32 (81cm), 34 (86cm)</p>' ||
+     '<p>* Medidas aproximadas del contorno del pecho/cintura.</p>'),
+    ('contacto', 'Contacto',
+     '<p>Escríbenos por WhatsApp o Instagram y te respondemos a la brevedad.</p>')
+on conflict (slug) do nothing;
 
 -- =========================================================
 -- Fin del schema. Siguiente paso: crear los usuarios de acceso en
