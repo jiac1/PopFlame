@@ -107,6 +107,15 @@ create table if not exists public.pages (
     updated_at   timestamptz not null default now()
 );
 
+-- Suscriptores del newsletter (footer "ÚNETE AL CLUB POPFLAME"). Reciben el correo de
+-- bienvenida al suscribirse y el aviso de "producto nuevo" (ver supabase/functions/).
+create table if not exists public.subscribers (
+    id             bigint generated always as identity primary key,
+    email          text not null unique,
+    active         boolean not null default true,
+    subscribed_at  timestamptz not null default now()
+);
+
 -- ---------------------------------------------------------
 -- 2. FUNCIONES AUXILIARES DE ROL
 -- ---------------------------------------------------------
@@ -273,6 +282,7 @@ alter table public.orders    enable row level security;
 alter table public.config    enable row level security;
 alter table public.banners   enable row level security;
 alter table public.pages     enable row level security;
+alter table public.subscribers enable row level security;
 
 -- profiles
 drop policy if exists "profiles_select_own_or_super" on public.profiles;
@@ -355,6 +365,24 @@ create policy "pages_select_public" on public.pages
 drop policy if exists "pages_write_super_admin" on public.pages;
 create policy "pages_write_super_admin" on public.pages
     for all using (public.is_super_admin()) with check (public.is_super_admin());
+
+-- subscribers: cualquiera (incluso anónimo) puede suscribirse; solo super_admin puede
+-- ver/editar/borrar la lista. Las Edge Functions usan la service_role key (no RLS).
+drop policy if exists "subscribers_insert_public" on public.subscribers;
+create policy "subscribers_insert_public" on public.subscribers
+    for insert with check (true);
+
+drop policy if exists "subscribers_manage_super_admin" on public.subscribers;
+create policy "subscribers_manage_super_admin" on public.subscribers
+    for select using (public.is_super_admin());
+
+drop policy if exists "subscribers_update_super_admin" on public.subscribers;
+create policy "subscribers_update_super_admin" on public.subscribers
+    for update using (public.is_super_admin()) with check (public.is_super_admin());
+
+drop policy if exists "subscribers_delete_super_admin" on public.subscribers;
+create policy "subscribers_delete_super_admin" on public.subscribers
+    for delete using (public.is_super_admin());
 
 -- ---------------------------------------------------------
 -- 5.5 STORAGE: buckets públicos para imágenes subidas desde el panel

@@ -215,15 +215,35 @@ const App = {
     // Setup newsletter
     setupNewsletter() {
         const form = document.querySelector('.newsletter-form');
-        if (form) {
-            form.addEventListener('submit', (e) => {
-                e.preventDefault();
-                const email = form.querySelector('input').value;
-                // Here you would typically send to your backend
-                alert('¡Gracias por suscribirte! Te enviaremos las novedades a: ' + email);
+        if (!form) return;
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const input = form.querySelector('input');
+            const email = input.value.trim();
+            const btn = form.querySelector('button[type="submit"]');
+            const originalText = btn.textContent;
+            btn.disabled = true;
+            btn.textContent = '...';
+
+            try {
+                const { error } = await supabaseClient.from('subscribers').insert({ email });
+                // Si el email ya estaba suscrito (unique violation), lo tratamos igual como éxito.
+                if (error && error.code !== '23505') throw error;
+
+                // Dispara el correo de bienvenida (si la Edge Function ya está desplegada;
+                // si no existe todavía, falla en silencio y la suscripción queda guardada igual).
+                supabaseClient.functions.invoke('welcome-email', { body: { email } }).catch(() => {});
+
+                alert('¡Gracias por suscribirte! Te avisaremos de drops exclusivos y ofertas.');
                 form.reset();
-            });
-        }
+            } catch (error) {
+                alert('No pudimos guardar tu suscripción. Intenta de nuevo en unos segundos.');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = originalText;
+            }
+        });
     },
 
     // Get URL parameters

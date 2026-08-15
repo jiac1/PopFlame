@@ -38,6 +38,33 @@ Todavía no está definido. Cuando lo tengas:
 Mientras no esté configurado, el checkout sigue funcionando: los pedidos quedan guardados en la
 base de datos igual, solo que no se abre WhatsApp automáticamente.
 
+## 2.5 Correos automáticos (bienvenida + producto nuevo)
+
+El formulario de newsletter ya guarda los emails en la tabla `subscribers`, pero **para que
+efectivamente les llegue un correo** hay que conectar [Resend](https://resend.com) (gratis hasta
+3.000 emails/mes) y desplegar dos Edge Functions. No requiere instalar nada en tu computador,
+todo se hace desde el navegador:
+
+1. **Crea tu cuenta en [resend.com](https://resend.com)** y saca tu API key (Dashboard → API Keys →
+   Create API Key).
+2. En tu proyecto de Supabase, ve a **Edge Functions → Deploy a new function**:
+   - Crea una llamada `welcome-email` y pega el contenido de
+     [`supabase/functions/welcome-email/index.ts`](supabase/functions/welcome-email/index.ts).
+   - Crea otra llamada `notify-new-product` y pega el contenido de
+     [`supabase/functions/notify-new-product/index.ts`](supabase/functions/notify-new-product/index.ts).
+3. Ve a **Project Settings → Edge Functions → Secrets** y agrega:
+   - `RESEND_API_KEY` = tu API key de Resend
+   - `FROM_EMAIL` (opcional) = un remitente verificado en Resend, ej. `PopFlame <ventas@tudominio.cl>`.
+     Si lo dejas vacío, se manda desde el remitente de pruebas de Resend (`onboarding@resend.dev`),
+     que funciona pero se ve menos profesional.
+4. Para el aviso de "producto nuevo", ve a **Database → Webhooks → Create a new hook**:
+   - Tabla: `products` — Evento: solo **Insert** — Tipo: **Supabase Edge Functions** —
+     Función: `notify-new-product`.
+
+Desde ese momento: cualquiera que se suscriba en el sitio recibe el correo de bienvenida al
+instante, y cada producto nuevo que crees en **Productos → Nuevo producto** le llega por correo a
+todos los suscriptores activos (en copia oculta entre ellos).
+
 ## 3. Panel de administración
 
 URL: `/admin/` (login) → `/admin/panel.html` (dashboard).
