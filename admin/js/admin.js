@@ -346,10 +346,9 @@ const AdminPanel = {
         });
     },
 
-    // ---------------- Productos (solo super_admin) ----------------
+    // ---------------- Productos (admin y super_admin) ----------------
 
     async loadProducts() {
-        if (!this.isSuperAdmin()) return;
         const container = document.getElementById('tab-productos');
         container.innerHTML = '<div class="loading">Cargando productos...</div>';
 
@@ -725,10 +724,9 @@ const AdminPanel = {
         await this.loadCategories();
     },
 
-    // ---------------- Banners del hero (solo super_admin) ----------------
+    // ---------------- Banners del hero (admin y super_admin) ----------------
 
     async loadBanners() {
-        if (!this.isSuperAdmin()) return;
         const container = document.getElementById('tab-banners');
         container.innerHTML = '<div class="loading">Cargando banners...</div>';
 
@@ -903,10 +901,9 @@ const AdminPanel = {
         await this.loadBanners();
     },
 
-    // ---------------- Guía de tallas (solo super_admin) ----------------
+    // ---------------- Guía de tallas (admin y super_admin) ----------------
 
     async loadSizeGuide() {
-        if (!this.isSuperAdmin()) return;
         const container = document.getElementById('tab-tallas');
         container.innerHTML = '<div class="loading">Cargando tallas...</div>';
 

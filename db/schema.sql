@@ -207,43 +207,13 @@ create trigger on_auth_user_created
     for each row execute procedure public.handle_new_user();
 
 -- ---------------------------------------------------------
--- 4. TRIGGER: un admin (dueño) solo puede tocar el stock de products.
---    Un super_admin puede editar cualquier campo.
+-- 4. (Histórico) el trigger que limitaba al admin (dueño) a solo tocar el stock de
+--    products ya no aplica: admin y super_admin tienen los mismos permisos sobre
+--    productos, banners y tallas. Se elimina si existía de una instalación anterior.
 -- ---------------------------------------------------------
 
-create or replace function public.products_restrict_admin_update()
-returns trigger
-language plpgsql security definer set search_path = public as $$
-begin
-    if public.is_super_admin() then
-        return new;
-    end if;
-
-    if public.is_admin() then
-        if new.name is distinct from old.name
-           or new.category_id is distinct from old.category_id
-           or new.price is distinct from old.price
-           or new.sizes is distinct from old.sizes
-           or new.colors is distinct from old.colors
-           or new.image is distinct from old.image
-           or new.images is distinct from old.images
-           or new.description is distinct from old.description
-           or new.featured is distinct from old.featured
-           or new.badge is distinct from old.badge then
-            raise exception 'Como admin solo puedes actualizar el stock del producto';
-        end if;
-        new.updated_at := now();
-        return new;
-    end if;
-
-    raise exception 'No autorizado';
-end;
-$$;
-
 drop trigger if exists trg_products_restrict_admin_update on public.products;
-create trigger trg_products_restrict_admin_update
-    before update on public.products
-    for each row execute procedure public.products_restrict_admin_update();
+drop function if exists public.products_restrict_admin_update();
 
 -- updated_at genérico para orders/config
 create or replace function public.set_updated_at()
@@ -267,6 +237,11 @@ create trigger trg_config_updated_at
 drop trigger if exists trg_pages_updated_at on public.pages;
 create trigger trg_pages_updated_at
     before update on public.pages
+    for each row execute procedure public.set_updated_at();
+
+drop trigger if exists trg_products_updated_at on public.products;
+create trigger trg_products_updated_at
+    before update on public.products
     for each row execute procedure public.set_updated_at();
 
 -- Cuando un pedido se marca "confirmed" (pagado/confirmado), pasa automáticamente
@@ -357,18 +332,21 @@ create policy "categories_write_super_admin" on public.categories
     for all using (public.is_super_admin()) with check (public.is_super_admin());
 
 -- products: lectura pública, insert/delete solo super_admin,
--- update permitido a admin y super_admin (el trigger restringe qué columnas puede tocar admin)
+-- Productos: lectura pública. Insert/update/delete permitido a admin y super_admin
+-- por igual (el dueño puede gestionar el catálogo completo, no solo el stock).
 drop policy if exists "products_select_public" on public.products;
 create policy "products_select_public" on public.products
     for select using (true);
 
 drop policy if exists "products_insert_super_admin" on public.products;
-create policy "products_insert_super_admin" on public.products
-    for insert with check (public.is_super_admin());
+drop policy if exists "products_insert_admins" on public.products;
+create policy "products_insert_admins" on public.products
+    for insert with check (public.is_admin());
 
 drop policy if exists "products_delete_super_admin" on public.products;
-create policy "products_delete_super_admin" on public.products
-    for delete using (public.is_super_admin());
+drop policy if exists "products_delete_admins" on public.products;
+create policy "products_delete_admins" on public.products
+    for delete using (public.is_admin());
 
 drop policy if exists "products_update_admins" on public.products;
 create policy "products_update_admins" on public.products
@@ -406,9 +384,11 @@ drop policy if exists "banners_select_public" on public.banners;
 create policy "banners_select_public" on public.banners
     for select using (true);
 
+-- banners: escritura permitida a admin y super_admin por igual
 drop policy if exists "banners_write_super_admin" on public.banners;
-create policy "banners_write_super_admin" on public.banners
-    for all using (public.is_super_admin()) with check (public.is_super_admin());
+drop policy if exists "banners_write_admins" on public.banners;
+create policy "banners_write_admins" on public.banners
+    for all using (public.is_admin()) with check (public.is_admin());
 
 -- pages: lectura pública, escritura solo super_admin
 drop policy if exists "pages_select_public" on public.pages;
@@ -442,9 +422,11 @@ drop policy if exists "size_guide_select_public" on public.size_guide;
 create policy "size_guide_select_public" on public.size_guide
     for select using (true);
 
+-- size_guide: escritura permitida a admin y super_admin por igual
 drop policy if exists "size_guide_write_super_admin" on public.size_guide;
-create policy "size_guide_write_super_admin" on public.size_guide
-    for all using (public.is_super_admin()) with check (public.is_super_admin());
+drop policy if exists "size_guide_write_admins" on public.size_guide;
+create policy "size_guide_write_admins" on public.size_guide
+    for all using (public.is_admin()) with check (public.is_admin());
 
 -- ---------------------------------------------------------
 -- 5.5 STORAGE: buckets públicos para imágenes subidas desde el panel
