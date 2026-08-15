@@ -8,9 +8,6 @@ const App = {
         // Apply logo/banner/hero text configured from el panel de Super Admin
         this.applySiteConfig();
 
-        // Muestra "Iniciar sesión" o "Panel" según si hay una sesión de admin activa
-        this.applyAuthLink();
-
         // Initialize cart
         CartManager.init();
 
@@ -78,21 +75,6 @@ const App = {
             video.setAttribute('aria-label', el.alt || '');
             el.replaceWith(video);
         });
-    },
-
-    // Link de cuenta en el header: "Iniciar sesión" si no hay sesión, "Panel" si ya hay una activa
-    async applyAuthLink() {
-        const link = document.getElementById('accountLink');
-        if (!link || typeof supabaseClient === 'undefined') return;
-
-        const adminBase = window.location.pathname.includes('/pages/') ? '../admin/' : 'admin/';
-        try {
-            const { data: { session } } = await supabaseClient.auth.getSession();
-            link.href = adminBase + (session ? 'panel.html' : 'index.html');
-            link.title = session ? 'Panel de administración' : 'Iniciar sesión';
-        } catch (error) {
-            link.href = adminBase + 'index.html';
-        }
     },
 
     // Setup mobile menu
