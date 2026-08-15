@@ -159,16 +159,16 @@ const ProductsManager = {
     sizeGuideDiagramSvg() {
         return `
             <svg viewBox="0 0 200 220" width="120" height="132" style="flex-shrink:0;">
-                <path d="M60 25 L85 12 Q100 4 115 12 L140 25 L168 48 L150 70 L136 60 L136 205 L64 205 L64 60 L50 70 L32 48 Z"
-                      fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
-                <line x1="20" y1="25" x2="20" y2="205" stroke="#E31837" stroke-width="1.5"/>
-                <text x="10" y="118" fill="#E31837" font-size="13" font-weight="700">A</text>
-                <line x1="64" y1="110" x2="136" y2="110" stroke="#E31837" stroke-width="1.5"/>
-                <text x="94" y="104" fill="#E31837" font-size="13" font-weight="700">B</text>
-                <line x1="168" y1="48" x2="136" y2="60" stroke="#E31837" stroke-width="1.5"/>
-                <text x="172" y="55" fill="#E31837" font-size="13" font-weight="700">C</text>
-                <line x1="85" y1="16" x2="115" y2="16" stroke="#E31837" stroke-width="1.5"/>
-                <text x="95" y="11" fill="#E31837" font-size="13" font-weight="700">D</text>
+                <path d="M85 20 Q100 8 115 20 L130 30 L165 50 L140 78 L130 88 L130 190 L70 190 L70 88 L60 78 L35 50 L70 30 Z"
+                      fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+                <line x1="15" y1="20" x2="15" y2="190" stroke="#E31837" stroke-width="1.5"/>
+                <text x="5" y="109" fill="#E31837" font-size="13" font-weight="700">A</text>
+                <line x1="70" y1="140" x2="130" y2="140" stroke="#E31837" stroke-width="1.5"/>
+                <text x="94" y="134" fill="#E31837" font-size="13" font-weight="700">B</text>
+                <line x1="130" y1="30" x2="165" y2="50" stroke="#E31837" stroke-width="1.5"/>
+                <text x="170" y="48" fill="#E31837" font-size="13" font-weight="700">C</text>
+                <line x1="85" y1="12" x2="115" y2="12" stroke="#E31837" stroke-width="1.5"/>
+                <text x="95" y="8" fill="#E31837" font-size="13" font-weight="700">D</text>
             </svg>
         `;
     },
@@ -178,14 +178,14 @@ const ProductsManager = {
     sizeGuideDiagramSvgPants() {
         return `
             <svg viewBox="0 0 200 220" width="120" height="132" style="flex-shrink:0;">
-                <path d="M62 15 H138 V52 L120 205 H98 L92 85 L86 205 H64 L62 52 Z"
-                      fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
-                <line x1="20" y1="15" x2="20" y2="205" stroke="#E31837" stroke-width="1.5"/>
-                <text x="10" y="113" fill="#E31837" font-size="13" font-weight="700">A</text>
-                <line x1="62" y1="10" x2="138" y2="10" stroke="#E31837" stroke-width="1.5"/>
+                <path d="M65 20 L135 20 L135 55 L120 190 L103 190 L100 95 L97 190 L80 190 L65 55 Z"
+                      fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+                <line x1="20" y1="20" x2="20" y2="190" stroke="#E31837" stroke-width="1.5"/>
+                <text x="10" y="109" fill="#E31837" font-size="13" font-weight="700">A</text>
+                <line x1="65" y1="12" x2="135" y2="12" stroke="#E31837" stroke-width="1.5"/>
                 <text x="95" y="8" fill="#E31837" font-size="13" font-weight="700">B</text>
-                <line x1="66" y1="85" x2="118" y2="85" stroke="#E31837" stroke-width="1.5"/>
-                <text x="88" y="79" fill="#E31837" font-size="13" font-weight="700">C</text>
+                <line x1="75" y1="95" x2="125" y2="95" stroke="#E31837" stroke-width="1.5"/>
+                <text x="128" y="99" fill="#E31837" font-size="13" font-weight="700">C</text>
             </svg>
         `;
     },
