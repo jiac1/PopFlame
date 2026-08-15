@@ -8,6 +8,9 @@ const App = {
         // Apply logo/banner/hero text configured from el panel de Super Admin
         this.applySiteConfig();
 
+        // Muestra "Iniciar sesión" o "Panel" según si hay una sesión de admin activa
+        this.applyAuthLink();
+
         // Initialize cart
         CartManager.init();
 
@@ -29,15 +32,9 @@ const App = {
         const config = ProductsManager.config;
         if (!config) return;
 
-        if (config.logoUrl) {
-            document.querySelectorAll('.logo-img').forEach(img => { img.src = config.logoUrl; });
-        }
-        if (config.logoWhiteUrl) {
-            document.querySelectorAll('.footer-logo').forEach(img => { img.src = config.logoWhiteUrl; });
-        }
-        if (config.heroBannerUrl) {
-            document.querySelectorAll('.hero-img').forEach(img => { img.src = config.heroBannerUrl; });
-        }
+        this.applyMedia('.logo-img', config.logoUrl);
+        this.applyMedia('.footer-logo', config.logoWhiteUrl);
+        this.applyMedia('.hero-img', config.heroBannerUrl);
 
         const heroTitle = document.querySelector('.hero-title');
         if (heroTitle && config.heroTitle) heroTitle.textContent = config.heroTitle;
@@ -54,6 +51,47 @@ const App = {
                     if (a.textContent.trim() === label) a.href = url;
                 });
             });
+        }
+    },
+
+    // Reemplaza un <img> por un <video> en loop si la URL configurada es un video
+    // (mismo <img>/<video> según lo que se haya subido en Configuración: logo, logo blanco o banner).
+    applyMedia(selector, url) {
+        if (!url) return;
+        const isVideo = /\.(mp4|webm|mov)(\?.*)?$/i.test(url);
+
+        document.querySelectorAll(selector).forEach(el => {
+            if (!isVideo) {
+                if (el.tagName === 'VIDEO') return; // ya es video, no hay imagen que poner
+                el.src = url;
+                return;
+            }
+            if (el.tagName === 'VIDEO') { el.src = url; return; }
+
+            const video = document.createElement('video');
+            video.className = el.className;
+            video.src = url;
+            video.autoplay = true;
+            video.loop = true;
+            video.muted = true;
+            video.playsInline = true;
+            video.setAttribute('aria-label', el.alt || '');
+            el.replaceWith(video);
+        });
+    },
+
+    // Link de cuenta en el header: "Iniciar sesión" si no hay sesión, "Panel" si ya hay una activa
+    async applyAuthLink() {
+        const link = document.getElementById('accountLink');
+        if (!link || typeof supabaseClient === 'undefined') return;
+
+        const adminBase = window.location.pathname.includes('/pages/') ? '../admin/' : 'admin/';
+        try {
+            const { data: { session } } = await supabaseClient.auth.getSession();
+            link.href = adminBase + (session ? 'panel.html' : 'index.html');
+            link.title = session ? 'Panel de administración' : 'Iniciar sesión';
+        } catch (error) {
+            link.href = adminBase + 'index.html';
         }
     },
 

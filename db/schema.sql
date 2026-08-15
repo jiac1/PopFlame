@@ -294,13 +294,20 @@ create policy "config_write_super_admin" on public.config
 --    Lectura pública, escritura solo super_admin.
 -- ---------------------------------------------------------
 
-insert into storage.buckets (id, name, public)
-values ('product-images', 'product-images', true)
-on conflict (id) do nothing;
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('product-images', 'product-images', true, 10485760,
+        array['image/png','image/jpeg','image/webp','image/svg+xml','image/gif'])
+on conflict (id) do update set
+    file_size_limit = excluded.file_size_limit,
+    allowed_mime_types = excluded.allowed_mime_types;
 
-insert into storage.buckets (id, name, public)
-values ('site-assets', 'site-assets', true)
-on conflict (id) do nothing;
+-- site-assets acepta imágenes Y video/gif (logo o banner animado/en movimiento), hasta 50MB.
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('site-assets', 'site-assets', true, 52428800,
+        array['image/png','image/jpeg','image/webp','image/svg+xml','image/gif','video/mp4','video/webm','video/quicktime'])
+on conflict (id) do update set
+    file_size_limit = excluded.file_size_limit,
+    allowed_mime_types = excluded.allowed_mime_types;
 
 drop policy if exists "product_images_public_read" on storage.objects;
 create policy "product_images_public_read" on storage.objects

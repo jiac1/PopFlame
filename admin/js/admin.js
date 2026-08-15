@@ -109,6 +109,35 @@ const AdminPanel = {
         return div.innerHTML;
     },
 
+    // Muestra la preview de logo/banner como <img> o <video> (loop, muteado) según el tipo de archivo
+    setPreviewMedia(elId, url) {
+        const el = document.getElementById(elId);
+        if (!el) return;
+        if (!url) { el.style.display = 'none'; return; }
+
+        const isVideo = /\.(mp4|webm|mov)(\?.*)?$/i.test(url);
+        const wantsTag = isVideo ? 'VIDEO' : 'IMG';
+
+        if (el.tagName !== wantsTag) {
+            const replacement = document.createElement(isVideo ? 'video' : 'img');
+            replacement.id = el.id;
+            replacement.className = el.className;
+            replacement.style.cssText = el.style.cssText;
+            if (isVideo) {
+                replacement.autoplay = true;
+                replacement.loop = true;
+                replacement.muted = true;
+                replacement.playsInline = true;
+            }
+            el.replaceWith(replacement);
+            replacement.src = url;
+            replacement.style.display = 'block';
+        } else {
+            el.src = url;
+            el.style.display = 'block';
+        }
+    },
+
     // Sube un archivo a un bucket público de Supabase Storage y devuelve la URL pública.
     async uploadImage(bucket, file) {
         if (!file) return null;
@@ -526,19 +555,19 @@ const AdminPanel = {
                     <div class="field">
                         <label>Logo</label>
                         <img id="previewLogo" src="${cfg?.logo_url ? this.escapeHtml(cfg.logo_url) : ''}" style="display:${cfg?.logo_url ? 'block' : 'none'};max-height:60px;margin-bottom:8px;">
-                        <input type="file" id="fileLogo" accept="image/*">
+                        <input type="file" id="fileLogo" accept="image/*,video/mp4,video/webm,video/quicktime">
                         <button type="button" class="btn btn-secondary btn-sm" style="margin-top:8px;" data-asset-upload="logo_url" data-asset-input="fileLogo" data-asset-preview="previewLogo">Subir logo</button>
                     </div>
                     <div class="field">
                         <label>Logo blanco (footer)</label>
                         <img id="previewLogoWhite" src="${cfg?.logo_white_url ? this.escapeHtml(cfg.logo_white_url) : ''}" style="display:${cfg?.logo_white_url ? 'block' : 'none'};max-height:60px;margin-bottom:8px;background:#222;padding:4px;">
-                        <input type="file" id="fileLogoWhite" accept="image/*">
+                        <input type="file" id="fileLogoWhite" accept="image/*,video/mp4,video/webm,video/quicktime">
                         <button type="button" class="btn btn-secondary btn-sm" style="margin-top:8px;" data-asset-upload="logo_white_url" data-asset-input="fileLogoWhite" data-asset-preview="previewLogoWhite">Subir logo blanco</button>
                     </div>
                     <div class="field">
                         <label>Banner del hero</label>
                         <img id="previewHero" src="${cfg?.hero_banner_url ? this.escapeHtml(cfg.hero_banner_url) : ''}" style="display:${cfg?.hero_banner_url ? 'block' : 'none'};max-height:60px;margin-bottom:8px;">
-                        <input type="file" id="fileHero" accept="image/*">
+                        <input type="file" id="fileHero" accept="image/*,video/mp4,video/webm,video/quicktime">
                         <button type="button" class="btn btn-secondary btn-sm" style="margin-top:8px;" data-asset-upload="hero_banner_url" data-asset-input="fileHero" data-asset-preview="previewHero">Subir banner</button>
                     </div>
                 </div>
@@ -595,11 +624,14 @@ const AdminPanel = {
             </div>
         `;
 
+        this.setPreviewMedia('previewLogo', cfg?.logo_url);
+        this.setPreviewMedia('previewLogoWhite', cfg?.logo_white_url);
+        this.setPreviewMedia('previewHero', cfg?.hero_banner_url);
+
         container.querySelectorAll('[data-asset-upload]').forEach(btn => {
             btn.addEventListener('click', async () => {
                 const column = btn.dataset.assetUpload;
                 const input = document.getElementById(btn.dataset.assetInput);
-                const preview = document.getElementById(btn.dataset.assetPreview);
                 const file = input.files[0];
                 if (!file) { this.toast('Elige un archivo primero', 'error'); return; }
 
@@ -609,9 +641,8 @@ const AdminPanel = {
                     const url = await this.uploadImage('site-assets', file);
                     const { error } = await supabaseClient.from('config').update({ [column]: url }).eq('id', 1);
                     if (error) throw error;
-                    preview.src = url;
-                    preview.style.display = 'block';
-                    this.toast('Imagen actualizada');
+                    this.setPreviewMedia(btn.dataset.assetPreview, url);
+                    this.toast('Imagen/video actualizado. Recarga el sitio para verlo aplicado.');
                 } catch (error) {
                     this.toast('Error subiendo imagen: ' + error.message, 'error');
                 } finally {
