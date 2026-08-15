@@ -82,6 +82,19 @@ create table if not exists public.config (
     updated_at          timestamptz not null default now()
 );
 
+-- Slides del carrusel del hero (portada del sitio). Si esta tabla está vacía,
+-- el sitio sigue mostrando el hero único de config (hero_banner_url/hero_title/...).
+create table if not exists public.banners (
+    id           bigint generated always as identity primary key,
+    title        text,
+    subtitle     text,
+    media_url    text not null,
+    link_url     text,
+    sort_order   int not null default 0,
+    active       boolean not null default true,
+    created_at   timestamptz not null default now()
+);
+
 -- ---------------------------------------------------------
 -- 2. FUNCIONES AUXILIARES DE ROL
 -- ---------------------------------------------------------
@@ -241,6 +254,7 @@ alter table public.categories enable row level security;
 alter table public.products  enable row level security;
 alter table public.orders    enable row level security;
 alter table public.config    enable row level security;
+alter table public.banners   enable row level security;
 
 -- profiles
 drop policy if exists "profiles_select_own_or_super" on public.profiles;
@@ -304,6 +318,15 @@ create policy "config_select_public" on public.config
 
 drop policy if exists "config_write_super_admin" on public.config;
 create policy "config_write_super_admin" on public.config
+    for all using (public.is_super_admin()) with check (public.is_super_admin());
+
+-- banners: lectura pública, escritura solo super_admin
+drop policy if exists "banners_select_public" on public.banners;
+create policy "banners_select_public" on public.banners
+    for select using (true);
+
+drop policy if exists "banners_write_super_admin" on public.banners;
+create policy "banners_write_super_admin" on public.banners
     for all using (public.is_super_admin()) with check (public.is_super_admin());
 
 -- ---------------------------------------------------------

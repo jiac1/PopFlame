@@ -24,6 +24,7 @@
                     <div class="sidebar-section-title">Super Admin</div>
                     <div class="sidebar-link" data-tab="productos">👕 Productos</div>
                     <div class="sidebar-link" data-tab="categorias">🗂️ Categorías</div>
+                    <div class="sidebar-link" data-tab="banners">🖼️ Banners</div>
                     <div class="sidebar-link" data-tab="config">⚙️ Configuración</div>
                     <div class="sidebar-link" data-tab="usuarios">👤 Usuarios</div>
                 </div>
@@ -42,6 +43,7 @@
             <div class="tab-panel" id="tab-inventario"></div>
             <div class="tab-panel" id="tab-productos"></div>
             <div class="tab-panel" id="tab-categorias"></div>
+            <div class="tab-panel" id="tab-banners"></div>
             <div class="tab-panel" id="tab-config"></div>
             <div class="tab-panel" id="tab-usuarios"></div>
         </main>
@@ -136,6 +138,49 @@
                 </div>
                 <div class="modal-actions">
                     <button type="button" class="btn btn-secondary" data-close-modal="categoryModal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Guardar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Banner -->
+    <div class="modal-overlay" id="bannerModal">
+        <div class="modal">
+            <h3 id="bannerModalTitle">Nuevo banner</h3>
+            <form id="bannerForm">
+                <input type="hidden" id="bannerId">
+                <div class="field">
+                    <label>Imagen o video</label>
+                    <img id="bannerImagePreview" style="display:none;max-height:120px;margin-bottom:8px;border-radius:6px;max-width:100%;object-fit:cover;">
+                    <video id="bannerVideoPreview" style="display:none;max-height:120px;margin-bottom:8px;border-radius:6px;max-width:100%;" muted loop autoplay playsinline></video>
+                    <input type="file" id="bannerFile" accept="image/*,video/mp4,video/webm,video/quicktime">
+                    <p style="font-size:11px;color:var(--admin-text-secondary);margin:6px 0;">o pega una URL manualmente:</p>
+                    <input type="text" id="bannerMediaUrl" placeholder="https://...">
+                </div>
+                <div class="field">
+                    <label>Título (opcional)</label>
+                    <input type="text" id="bannerTitle" placeholder="NUEVA COLECCIÓN">
+                </div>
+                <div class="field">
+                    <label>Subtítulo (opcional)</label>
+                    <input type="text" id="bannerSubtitle" placeholder="Streetwear que quema">
+                </div>
+                <div class="form-row-2">
+                    <div class="field">
+                        <label>Link del botón (opcional)</label>
+                        <input type="text" id="bannerLink" placeholder="pages/poleras.html">
+                    </div>
+                    <div class="field">
+                        <label>Orden</label>
+                        <input type="text" inputmode="numeric" pattern="[0-9]*" id="bannerSortOrder" placeholder="1">
+                    </div>
+                </div>
+                <div class="field">
+                    <label><input type="checkbox" id="bannerActive" checked style="width:auto;margin-right:8px;">Activo (visible en el sitio)</label>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" data-close-modal="bannerModal">Cancelar</button>
                     <button type="submit" class="btn btn-primary">Guardar</button>
                 </div>
             </form>

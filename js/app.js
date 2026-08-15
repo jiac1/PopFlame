@@ -26,6 +26,9 @@ const App = {
         // Botón flotante al panel: solo aparece si hay una sesión de admin activa,
         // los clientes (sin sesión) nunca lo ven.
         this.setupAdminShortcut();
+
+        // Carrusel del hero (solo en portada, y solo si hay banners cargados)
+        HeroSlider.init();
     },
 
     // Muestra un botón flotante "Ir al panel" cuando hay sesión activa (útil mientras
@@ -155,6 +158,95 @@ const App = {
     getUrlParam(param) {
         const urlParams = new URLSearchParams(window.location.search);
         return urlParams.get(param);
+    }
+};
+
+// Carrusel de banners del hero (portada). Si no hay banners cargados en el panel
+// (Banners), no hace nada y queda el hero único de config tal como lo dejó applySiteConfig().
+const HeroSlider = {
+    slides: [],
+    current: 0,
+    timer: null,
+    intervalMs: 6000,
+
+    async init() {
+        const container = document.getElementById('heroSlides');
+        if (!container || typeof supabaseClient === 'undefined') return;
+
+        try {
+            const { data, error } = await supabaseClient
+                .from('banners').select('*').eq('active', true).order('sort_order');
+            if (error || !data || data.length === 0) return;
+
+            this.slides = data;
+            this.render(container);
+            if (this.slides.length > 1) this.start();
+        } catch (error) {
+            // sin conexión: se queda con el hero por defecto
+        }
+    },
+
+    escapeHtml(str) {
+        const div = document.createElement('div');
+        div.textContent = str ?? '';
+        return div.innerHTML;
+    },
+
+    render(container) {
+        container.innerHTML = this.slides.map((s, i) => {
+            const isVideo = /\.(mp4|webm|mov)(\?.*)?$/i.test(s.media_url || '');
+            const media = isVideo
+                ? `<video class="hero-img" src="${s.media_url}" autoplay loop muted playsinline></video>`
+                : `<img class="hero-img" src="${s.media_url}" alt="${this.escapeHtml(s.title || 'PopFlame')}">`;
+
+            return `
+                <div class="hero-slide ${i === 0 ? 'active' : ''}" data-index="${i}">
+                    <div class="hero-bg">
+                        ${media}
+                        <div class="hero-overlay"></div>
+                    </div>
+                    <div class="hero-content">
+                        ${s.title ? `<h1 class="hero-title">${this.escapeHtml(s.title)}</h1>` : ''}
+                        ${s.subtitle ? `<p class="hero-subtitle">${this.escapeHtml(s.subtitle)}</p>` : ''}
+                        <a href="${s.link_url || '#products'}" class="btn btn-primary">VER PRODUCTOS</a>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        const dots = document.getElementById('heroDots');
+        const prevBtn = document.getElementById('heroPrev');
+        const nextBtn = document.getElementById('heroNext');
+
+        if (this.slides.length > 1) {
+            dots.innerHTML = this.slides.map((_, i) => `<button class="hero-dot ${i === 0 ? 'active' : ''}" data-index="${i}" aria-label="Ir al banner ${i + 1}"></button>`).join('');
+            dots.style.display = 'flex';
+            prevBtn.style.display = 'flex';
+            nextBtn.style.display = 'flex';
+
+            prevBtn.addEventListener('click', () => this.goTo(this.current - 1));
+            nextBtn.addEventListener('click', () => this.goTo(this.current + 1));
+            dots.addEventListener('click', (e) => {
+                const btn = e.target.closest('.hero-dot');
+                if (btn) this.goTo(parseInt(btn.dataset.index, 10));
+            });
+        }
+    },
+
+    goTo(index) {
+        this.current = (index + this.slides.length) % this.slides.length;
+        document.querySelectorAll('.hero-slide').forEach((el, i) => el.classList.toggle('active', i === this.current));
+        document.querySelectorAll('.hero-dot').forEach((el, i) => el.classList.toggle('active', i === this.current));
+        this.restart();
+    },
+
+    start() {
+        this.timer = setInterval(() => this.goTo(this.current + 1), this.intervalMs);
+    },
+
+    restart() {
+        if (this.timer) clearInterval(this.timer);
+        this.start();
     }
 };
 

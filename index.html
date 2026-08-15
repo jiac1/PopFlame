@@ -44,16 +44,24 @@
     </header>
 
     <!-- Hero Section -->
-    <section class="hero">
-        <div class="hero-bg">
-            <img src="images/hero-banner.jpg" alt="PopFlame Collection" class="hero-img">
-            <div class="hero-overlay"></div>
+    <section class="hero" id="heroSection">
+        <div class="hero-slides" id="heroSlides">
+            <!-- Slide único por defecto; si hay banners cargados en el panel, JS lo reemplaza por el carrusel -->
+            <div class="hero-slide active">
+                <div class="hero-bg">
+                    <img src="images/hero-banner.jpg" alt="PopFlame Collection" class="hero-img">
+                    <div class="hero-overlay"></div>
+                </div>
+                <div class="hero-content">
+                    <h1 class="hero-title">NUEVA COLECCIÓN</h1>
+                    <p class="hero-subtitle">Streetwear que quema</p>
+                    <a href="#products" class="btn btn-primary">VER PRODUCTOS</a>
+                </div>
+            </div>
         </div>
-        <div class="hero-content">
-            <h1 class="hero-title">NUEVA COLECCIÓN</h1>
-            <p class="hero-subtitle">Streetwear que quema</p>
-            <a href="#products" class="btn btn-primary">VER PRODUCTOS</a>
-        </div>
+        <button class="hero-nav hero-prev" id="heroPrev" aria-label="Banner anterior" style="display:none;">‹</button>
+        <button class="hero-nav hero-next" id="heroNext" aria-label="Banner siguiente" style="display:none;">›</button>
+        <div class="hero-dots" id="heroDots" style="display:none;"></div>
     </section>
 
     <!-- Categories Section -->

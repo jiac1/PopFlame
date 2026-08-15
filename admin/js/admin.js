@@ -49,6 +49,7 @@ const AdminPanel = {
     categories: [],
     productImagesExisting: [],
     productImagesNewFiles: [],
+    banners: [],
 
     async init(profile) {
         this.profile = profile;
@@ -87,6 +88,7 @@ const AdminPanel = {
             inventario: () => this.loadInventory(),
             productos: () => this.loadProducts(),
             categorias: () => this.loadCategories(),
+            banners: () => this.loadBanners(),
             config: () => this.loadConfig(),
             usuarios: () => this.loadUsers()
         };
@@ -686,6 +688,145 @@ const AdminPanel = {
         await this.loadCategories();
     },
 
+    // ---------------- Banners del hero (solo super_admin) ----------------
+
+    async loadBanners() {
+        if (!this.isSuperAdmin()) return;
+        const container = document.getElementById('tab-banners');
+        container.innerHTML = '<div class="loading">Cargando banners...</div>';
+
+        const { data: banners, error } = await supabaseClient.from('banners').select('*').order('sort_order');
+        if (error) { container.innerHTML = `<div class="empty-state">Error: ${error.message}</div>`; return; }
+        this.banners = banners || [];
+
+        container.innerHTML = `
+            <div class="page-header">
+                <h1>Banners del hero</h1>
+                <button class="btn btn-primary" id="newBannerBtn">+ Nuevo banner</button>
+            </div>
+            <p style="font-size:12px;color:var(--admin-text-secondary);margin-bottom:16px;">
+                Si no hay ningún banner activo, la portada muestra el banner único de Configuración. Con uno o más banners activos, la portada se convierte en un carrusel navegable.
+            </p>
+            <div class="card">
+                <div class="table-wrap">
+                    <table>
+                        <thead><tr><th></th><th>Título</th><th>Orden</th><th>Activo</th><th></th></tr></thead>
+                        <tbody>
+                            ${this.banners.map(b => `
+                                <tr>
+                                    <td><img src="${this.resolveImagePath(b.media_url)}" style="width:60px;height:40px;object-fit:cover;border-radius:4px;" onerror="this.style.opacity=0.3"></td>
+                                    <td>${this.escapeHtml(b.title || '(sin título)')}</td>
+                                    <td>${b.sort_order}</td>
+                                    <td>${b.active ? '✅' : '—'}</td>
+                                    <td>
+                                        <button class="btn btn-secondary btn-sm edit-banner-btn" data-id="${b.id}">Editar</button>
+                                        <button class="btn btn-danger btn-sm delete-banner-btn" data-id="${b.id}">Eliminar</button>
+                                    </td>
+                                </tr>
+                            `).join('') || '<tr><td colspan="5" class="empty-state">Sin banners todavía. La portada usa el hero único de Configuración.</td></tr>'}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        `;
+
+        document.getElementById('newBannerBtn').addEventListener('click', () => this.openBannerModal());
+        container.querySelectorAll('.edit-banner-btn').forEach(btn =>
+            btn.addEventListener('click', () => this.openBannerModal(btn.dataset.id)));
+        container.querySelectorAll('.delete-banner-btn').forEach(btn =>
+            btn.addEventListener('click', () => this.deleteBanner(btn.dataset.id)));
+    },
+
+    openBannerModal(id) {
+        const banner = id ? this.banners.find(b => String(b.id) === String(id)) : null;
+        document.getElementById('bannerForm').reset();
+        document.getElementById('bannerModalTitle').textContent = banner ? 'Editar banner' : 'Nuevo banner';
+        document.getElementById('bannerId').value = banner ? banner.id : '';
+        document.getElementById('bannerFile').value = '';
+
+        if (banner) {
+            document.getElementById('bannerMediaUrl').value = banner.media_url || '';
+            document.getElementById('bannerTitle').value = banner.title || '';
+            document.getElementById('bannerSubtitle').value = banner.subtitle || '';
+            document.getElementById('bannerLink').value = banner.link_url || '';
+            document.getElementById('bannerSortOrder').value = banner.sort_order;
+            document.getElementById('bannerActive').checked = !!banner.active;
+        } else {
+            document.getElementById('bannerSortOrder').value = this.banners.length + 1;
+            document.getElementById('bannerActive').checked = true;
+        }
+        this.showBannerPreview(banner ? banner.media_url : '');
+        document.getElementById('bannerModal').classList.add('active');
+    },
+
+    showBannerPreview(url, forceVideo) {
+        const img = document.getElementById('bannerImagePreview');
+        const video = document.getElementById('bannerVideoPreview');
+        img.style.display = 'none';
+        video.style.display = 'none';
+        if (!url) return;
+        if (forceVideo || /\.(mp4|webm|mov)(\?.*)?$/i.test(url)) {
+            video.src = url;
+            video.style.display = 'block';
+        } else {
+            img.src = this.resolveImagePath(url);
+            img.style.display = 'block';
+        }
+    },
+
+    async saveBanner(e) {
+        e.preventDefault();
+        const id = document.getElementById('bannerId').value;
+        const saveBtn = e.target.querySelector('button[type="submit"]');
+        saveBtn.disabled = true;
+        saveBtn.textContent = 'Guardando...';
+
+        try {
+            let mediaUrl = document.getElementById('bannerMediaUrl').value.trim();
+            const file = document.getElementById('bannerFile').files[0];
+            if (file) {
+                mediaUrl = await this.uploadImage('site-assets', file);
+            }
+            if (!mediaUrl) throw new Error('Sube una imagen/video o pega una URL');
+
+            const sortOrderRaw = document.getElementById('bannerSortOrder').value.trim();
+            const sortOrder = sortOrderRaw ? parseInt(sortOrderRaw, 10) : 0;
+            if (isNaN(sortOrder)) throw new Error('El orden debe ser un número');
+
+            const payload = {
+                media_url: mediaUrl,
+                title: document.getElementById('bannerTitle').value.trim() || null,
+                subtitle: document.getElementById('bannerSubtitle').value.trim() || null,
+                link_url: document.getElementById('bannerLink').value.trim() || null,
+                sort_order: sortOrder,
+                active: document.getElementById('bannerActive').checked
+            };
+
+            const { error } = id
+                ? await supabaseClient.from('banners').update(payload).eq('id', id)
+                : await supabaseClient.from('banners').insert(payload);
+
+            if (error) throw error;
+
+            this.toast('Banner guardado');
+            document.getElementById('bannerModal').classList.remove('active');
+            await this.loadBanners();
+        } catch (error) {
+            this.toast('Error guardando banner: ' + error.message, 'error');
+        } finally {
+            saveBtn.disabled = false;
+            saveBtn.textContent = 'Guardar';
+        }
+    },
+
+    async deleteBanner(id) {
+        if (!confirm('¿Eliminar este banner?')) return;
+        const { error } = await supabaseClient.from('banners').delete().eq('id', id);
+        if (error) { this.toast('No se pudo eliminar: ' + error.message, 'error'); return; }
+        this.toast('Banner eliminado');
+        await this.loadBanners();
+    },
+
     // ---------------- Configuración (solo super_admin) ----------------
 
     async loadConfig() {
@@ -888,6 +1029,13 @@ const AdminPanel = {
         document.getElementById('productForm').addEventListener('submit', (e) => this.saveProduct(e));
         document.getElementById('categoryForm').addEventListener('submit', (e) => this.saveCategory(e));
         document.getElementById('bulkEditForm').addEventListener('submit', (e) => this.applyBulkEdit(e));
+        document.getElementById('bannerForm').addEventListener('submit', (e) => this.saveBanner(e));
+
+        document.getElementById('bannerFile').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            this.showBannerPreview(URL.createObjectURL(file), file.type.startsWith('video/'));
+        });
 
         document.getElementById('productImageFile').addEventListener('change', (e) => {
             const files = Array.from(e.target.files || []);
