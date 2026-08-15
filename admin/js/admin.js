@@ -47,6 +47,8 @@ const AdminPanel = {
     profile: null,
     products: [],
     categories: [],
+    productImagesExisting: [],
+    productImagesNewFiles: [],
 
     async init(profile) {
         this.profile = profile;
@@ -401,8 +403,13 @@ const AdminPanel = {
         const catSelect = document.getElementById('productCategory');
         catSelect.innerHTML = this.categories.map(c => `<option value="${c.id}">${this.escapeHtml(c.name)}</option>`).join('');
 
-        const preview = document.getElementById('productImagePreview');
         document.getElementById('productImageFile').value = '';
+        document.getElementById('productImageUrlInput').value = '';
+        this.productImagesExisting = product
+            ? ((product.images && product.images.length) ? [...product.images] : (product.image ? [product.image] : []))
+            : [];
+        this.productImagesNewFiles = [];
+        this.renderProductImagesGallery();
 
         if (product) {
             document.getElementById('productName').value = product.name;
@@ -411,16 +418,41 @@ const AdminPanel = {
             document.getElementById('productStock').value = product.stock;
             document.getElementById('productSizes').value = (product.sizes || []).join(', ');
             document.getElementById('productColors').value = (product.colors || []).join(', ');
-            document.getElementById('productImage').value = product.image || '';
             document.getElementById('productBadge').value = product.badge || '';
             document.getElementById('productDescription').value = product.description || '';
             document.getElementById('productFeatured').checked = !!product.featured;
-            preview.src = this.resolveImagePath(product.image, '../');
-            preview.style.display = product.image ? 'block' : 'none';
-        } else {
-            preview.style.display = 'none';
         }
         modal.classList.add('active');
+    },
+
+    // Dibuja las miniaturas de la galería (fotos existentes + nuevas seleccionadas aún no subidas)
+    renderProductImagesGallery() {
+        const container = document.getElementById('productImagesGallery');
+
+        const existingThumbs = this.productImagesExisting.map((url, i) => `
+            <div class="img-thumb">
+                <img src="${this.resolveImagePath(url, '../')}">
+                <button type="button" class="img-thumb-remove" data-kind="existing" data-index="${i}">×</button>
+            </div>
+        `).join('');
+
+        const newThumbs = this.productImagesNewFiles.map((file, i) => `
+            <div class="img-thumb">
+                <img src="${URL.createObjectURL(file)}">
+                <button type="button" class="img-thumb-remove" data-kind="new" data-index="${i}">×</button>
+            </div>
+        `).join('');
+
+        container.innerHTML = (existingThumbs + newThumbs) || '<p class="img-gallery-empty">Sin fotos todavía</p>';
+
+        container.querySelectorAll('.img-thumb-remove').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const idx = parseInt(btn.dataset.index, 10);
+                if (btn.dataset.kind === 'existing') this.productImagesExisting.splice(idx, 1);
+                else this.productImagesNewFiles.splice(idx, 1);
+                this.renderProductImagesGallery();
+            });
+        });
     },
 
     async saveProduct(e) {
@@ -440,11 +472,11 @@ const AdminPanel = {
                 throw new Error('El stock debe ser un número válido');
             }
 
-            let imagePath = document.getElementById('productImage').value.trim();
-            const file = document.getElementById('productImageFile').files[0];
-            if (file) {
-                imagePath = await this.uploadImage('product-images', file);
+            const uploadedUrls = [];
+            for (const file of this.productImagesNewFiles) {
+                uploadedUrls.push(await this.uploadImage('product-images', file));
             }
+            const images = [...this.productImagesExisting, ...uploadedUrls];
 
             const payload = {
                 name: document.getElementById('productName').value.trim(),
@@ -453,8 +485,8 @@ const AdminPanel = {
                 stock,
                 sizes: document.getElementById('productSizes').value.split(',').map(s => s.trim()).filter(Boolean),
                 colors: document.getElementById('productColors').value.split(',').map(s => s.trim()).filter(Boolean),
-                image: imagePath,
-                images: imagePath ? [imagePath] : [],
+                image: images[0] || null,
+                images,
                 badge: document.getElementById('productBadge').value.trim() || null,
                 description: document.getElementById('productDescription').value.trim(),
                 featured: document.getElementById('productFeatured').checked
@@ -842,11 +874,20 @@ const AdminPanel = {
         document.getElementById('bulkEditForm').addEventListener('submit', (e) => this.applyBulkEdit(e));
 
         document.getElementById('productImageFile').addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            const preview = document.getElementById('productImagePreview');
-            if (!file) return;
-            preview.src = URL.createObjectURL(file);
-            preview.style.display = 'block';
+            const files = Array.from(e.target.files || []);
+            if (files.length === 0) return;
+            this.productImagesNewFiles.push(...files);
+            e.target.value = '';
+            this.renderProductImagesGallery();
+        });
+
+        document.getElementById('addImageUrlBtn').addEventListener('click', () => {
+            const input = document.getElementById('productImageUrlInput');
+            const url = input.value.trim();
+            if (!url) return;
+            this.productImagesExisting.push(url);
+            input.value = '';
+            this.renderProductImagesGallery();
         });
 
         document.querySelectorAll('[data-close-modal]').forEach(btn => {

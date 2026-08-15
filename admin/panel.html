@@ -88,11 +88,14 @@
                     </div>
                 </div>
                 <div class="field">
-                    <label>Foto del producto</label>
-                    <img id="productImagePreview" style="display:none;max-height:120px;margin-bottom:8px;border-radius:6px;">
-                    <input type="file" id="productImageFile" accept="image/*">
-                    <p style="font-size:11px;color:var(--admin-text-secondary);margin:6px 0;">o pega una URL/ruta manualmente:</p>
-                    <input type="text" id="productImage" placeholder="images/products/poleras/polera-1.jpg">
+                    <label>Fotos del producto (puedes subir varias, para distintos ángulos)</label>
+                    <div id="productImagesGallery" class="img-gallery"></div>
+                    <input type="file" id="productImageFile" accept="image/*" multiple>
+                    <p style="font-size:11px;color:var(--admin-text-secondary);margin:8px 0 4px;">La primera foto es la que se ve en el catálogo. O agrega una por URL:</p>
+                    <div style="display:flex;gap:8px;">
+                        <input type="text" id="productImageUrlInput" placeholder="https://..." style="flex:1;">
+                        <button type="button" class="btn btn-secondary btn-sm" id="addImageUrlBtn">Agregar</button>
+                    </div>
                 </div>
                 <div class="field">
                     <label>Descripción</label>

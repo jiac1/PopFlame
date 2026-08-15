@@ -521,10 +521,30 @@
         });
 
         function renderProduct() {
-            // Set main image
-            document.getElementById('mainImage').src = ProductsManager.resolveImagePath(currentProduct.image, '../');
+            // Set main image (galería: usa el arreglo images[] si tiene más de una foto)
+            const gallery = (currentProduct.images && currentProduct.images.length) ? currentProduct.images : [currentProduct.image];
+            document.getElementById('mainImage').src = ProductsManager.resolveImagePath(gallery[0], '../');
             document.getElementById('mainImage').alt = currentProduct.name;
-            
+
+            const thumbnails = document.getElementById('thumbnails');
+            if (gallery.length > 1) {
+                thumbnails.innerHTML = gallery.map((img, i) => `
+                    <div class="product-thumbnail ${i === 0 ? 'active' : ''}" data-index="${i}">
+                        <img src="${ProductsManager.resolveImagePath(img, '../')}" alt="${currentProduct.name} - foto ${i + 1}">
+                    </div>
+                `).join('');
+
+                thumbnails.querySelectorAll('.product-thumbnail').forEach(thumb => {
+                    thumb.addEventListener('click', () => {
+                        thumbnails.querySelectorAll('.product-thumbnail').forEach(t => t.classList.remove('active'));
+                        thumb.classList.add('active');
+                        document.getElementById('mainImage').src = ProductsManager.resolveImagePath(gallery[thumb.dataset.index], '../');
+                    });
+                });
+            } else {
+                thumbnails.innerHTML = '';
+            }
+
             // Set breadcrumb
             document.getElementById('categoryLink').textContent = currentProduct.category.charAt(0).toUpperCase() + currentProduct.category.slice(1);
             document.getElementById('categoryLink').href = currentProduct.category + '.html';
