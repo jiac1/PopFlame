@@ -103,6 +103,14 @@ const AdminPanel = {
         return '$' + Number(n || 0).toLocaleString('es-CL');
     },
 
+    // Igual que ProductsManager.resolveImagePath del sitio público, pero sin depender de él
+    // (el panel no carga js/products.js, así que resuelve la ruta de forma independiente).
+    resolveImagePath(path, prefix = '') {
+        if (!path) return '';
+        if (/^https?:\/\//i.test(path)) return path;
+        return prefix + path;
+    },
+
     escapeHtml(str) {
         const div = document.createElement('div');
         div.textContent = str ?? '';
@@ -389,7 +397,7 @@ const AdminPanel = {
             document.getElementById('productBadge').value = product.badge || '';
             document.getElementById('productDescription').value = product.description || '';
             document.getElementById('productFeatured').checked = !!product.featured;
-            preview.src = ProductsManager.resolveImagePath(product.image, '../');
+            preview.src = this.resolveImagePath(product.image, '../');
             preview.style.display = product.image ? 'block' : 'none';
         } else {
             preview.style.display = 'none';

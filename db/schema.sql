@@ -26,7 +26,7 @@ create table if not exists public.categories (
 
 create table if not exists public.products (
     id           bigint generated always as identity primary key,
-    name         text not null,
+    name         text not null unique,
     category_id  text not null references public.categories(id) on delete restrict,
     price        numeric not null check (price >= 0),
     sizes        text[] not null default '{}',
@@ -342,6 +342,25 @@ create policy "site_assets_super_admin_delete" on storage.objects
     for delete using (bucket_id = 'site-assets' and public.is_super_admin());
 
 -- ---------------------------------------------------------
+-- 5.6 Si la tabla products ya existía sin la restricción "unique (name)"
+--    (versión anterior de este schema), esto limpia los duplicados que haya
+--    dejado y agrega la restricción para que correr este script de nuevo
+--    nunca vuelva a duplicar productos.
+-- ---------------------------------------------------------
+
+delete from public.products a using public.products b
+where a.name = b.name and a.id > b.id;
+
+do $$
+begin
+    if not exists (
+        select 1 from pg_constraint where conname = 'products_name_key'
+    ) then
+        alter table public.products add constraint products_name_key unique (name);
+    end if;
+end $$;
+
+-- ---------------------------------------------------------
 -- 6. DATOS INICIALES (categorías, productos, configuración)
 -- ---------------------------------------------------------
 
@@ -368,7 +387,7 @@ insert into public.products (name, category_id, price, sizes, colors, image, ima
     ('Gorro PopFlame Beanie', 'accesorios', 14990, '{Única}', '{Negro,Gris}', 'images/products/accesorios/gorro-1.jpg', '{gorro-1.jpg}', 'Gorro tejido con etiqueta PopFlame.', false, 50, null),
     ('Mochila PopFlame Bag', 'accesorios', 39990, '{Única}', '{Negro}', 'images/products/accesorios/mochila-1.jpg', '{mochila-1.jpg}', 'Mochila urbana con múltiples compartimentos y logo PopFlame.', false, 20, null),
     ('Calcetines PopFlame Pack', 'accesorios', 12990, '{S,M,L}', '{Negro,Blanco}', 'images/products/accesorios/calcetines-1.jpg', '{calcetines-1.jpg}', 'Pack de 3 pares de calcetines con logo PopFlame.', false, 100, null)
-on conflict do nothing;
+on conflict (name) do nothing;
 
 insert into public.config (id, store_name, whatsapp_number, shipping_cost, free_shipping_min, currency, hero_title, hero_subtitle)
 values (1, 'PopFlame', null, 5990, 50000, 'CLP', 'NUEVA COLECCIÓN', 'Streetwear que quema')
