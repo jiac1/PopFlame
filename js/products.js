@@ -173,6 +173,32 @@ const ProductsManager = {
         `;
     },
 
+    // Diagrama de pantalón (prenda inferior): forma distinta a la de arriba, con sus
+    // propios puntos de medida (Largo, Cintura, Tiro/entrepierna).
+    sizeGuideDiagramSvgPants() {
+        return `
+            <svg viewBox="0 0 200 220" width="120" height="132" style="flex-shrink:0;">
+                <path d="M62 15 H138 V52 L120 205 H98 L92 85 L86 205 H64 L62 52 Z"
+                      fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+                <line x1="20" y1="15" x2="20" y2="205" stroke="#E31837" stroke-width="1.5"/>
+                <text x="10" y="113" fill="#E31837" font-size="13" font-weight="700">A</text>
+                <line x1="62" y1="10" x2="138" y2="10" stroke="#E31837" stroke-width="1.5"/>
+                <text x="95" y="8" fill="#E31837" font-size="13" font-weight="700">B</text>
+                <line x1="66" y1="85" x2="118" y2="85" stroke="#E31837" stroke-width="1.5"/>
+                <text x="88" y="79" fill="#E31837" font-size="13" font-weight="700">C</text>
+            </svg>
+        `;
+    },
+
+    // Categorías de prenda inferior (pantalón), que usan un diagrama distinto al de arriba.
+    // Se detecta por id o por nombre, para que también funcione con categorías nuevas
+    // parecidas (ej. "shorts", "faldas") sin tener que tocar código de nuevo.
+    isBottomWearCategory(categoryId) {
+        const cat = this.categories.find(c => c.id === categoryId);
+        const text = `${categoryId} ${cat?.name || ''}`.toLowerCase();
+        return /pantal|short|falda|jean/.test(text);
+    },
+
     // Diagrama + tabla de talles de una categoría. Si no hay medidas cargadas todavía,
     // avisa en vez de mostrar una tabla vacía.
     renderSizeGuideHtml(categoryId) {
@@ -195,9 +221,13 @@ const ProductsManager = {
             return `<tr><td><strong>${this.escapeHtml(r.size)}</strong></td>${cells}</tr>`;
         }).join('');
 
+        const diagram = this.isBottomWearCategory(categoryId)
+            ? this.sizeGuideDiagramSvgPants()
+            : this.sizeGuideDiagramSvg();
+
         return `
             <div class="size-guide-wrap">
-                <div class="size-guide-diagram">${this.sizeGuideDiagramSvg()}</div>
+                <div class="size-guide-diagram">${diagram}</div>
                 <div class="size-guide-table-wrap">
                     <table class="size-guide-table">
                         <thead><tr><th>Talla</th>${headerCells}</tr></thead>
