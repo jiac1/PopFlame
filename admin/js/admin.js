@@ -297,7 +297,7 @@ const AdminPanel = {
                                         <span class="${p.stock <= 5 ? 'badge low-stock' : ''}">${p.stock}</span>
                                     </td>
                                     <td>
-                                        <input type="number" min="0" value="${p.stock}" data-stock-id="${p.id}" style="width:80px;padding:6px 8px;border:1px solid var(--admin-border);border-radius:6px;">
+                                        <input type="text" inputmode="numeric" pattern="[0-9]*" value="${p.stock}" data-stock-id="${p.id}" style="width:80px;padding:6px 8px;border:1px solid var(--admin-border);border-radius:6px;">
                                         <button class="btn btn-secondary btn-sm save-stock-btn" data-stock-id="${p.id}">Guardar</button>
                                     </td>
                                 </tr>
@@ -335,6 +335,7 @@ const AdminPanel = {
         ]);
         this.products = products || [];
         this.categories = categories || [];
+        this.selectedProductIds = new Set();
 
         container.innerHTML = `
             <div class="page-header">
@@ -342,12 +343,18 @@ const AdminPanel = {
                 <button class="btn btn-primary" id="newProductBtn">+ Nuevo producto</button>
             </div>
             <div class="card">
+                <div class="toolbar" id="bulkToolbar" style="display:none;">
+                    <span id="bulkCount"></span>
+                    <button type="button" class="btn btn-secondary btn-sm" id="bulkEditBtn">Editar seleccionados</button>
+                    <button type="button" class="btn btn-danger btn-sm" id="bulkDeleteBtn">Eliminar seleccionados</button>
+                </div>
                 <div class="table-wrap">
                     <table>
-                        <thead><tr><th>Nombre</th><th>Categoría</th><th>Precio</th><th>Stock</th><th>Destacado</th><th></th></tr></thead>
+                        <thead><tr><th><input type="checkbox" id="selectAllProducts"></th><th>Nombre</th><th>Categoría</th><th>Precio</th><th>Stock</th><th>Destacado</th><th></th></tr></thead>
                         <tbody>
                             ${this.products.map(p => `
                                 <tr>
+                                    <td><input type="checkbox" class="product-select" data-id="${p.id}"></td>
                                     <td>${this.escapeHtml(p.name)}</td>
                                     <td>${this.escapeHtml(p.category_id)}</td>
                                     <td>${this.formatPrice(p.price)}</td>
@@ -358,7 +365,7 @@ const AdminPanel = {
                                         <button class="btn btn-danger btn-sm delete-product-btn" data-id="${p.id}">Eliminar</button>
                                     </td>
                                 </tr>
-                            `).join('') || '<tr><td colspan="6" class="empty-state">Sin productos. Crea el primero.</td></tr>'}
+                            `).join('') || '<tr><td colspan="7" class="empty-state">Sin productos. Crea el primero.</td></tr>'}
                         </tbody>
                     </table>
                 </div>
@@ -366,6 +373,17 @@ const AdminPanel = {
         `;
 
         document.getElementById('newProductBtn').addEventListener('click', () => this.openProductModal());
+
+        document.getElementById('selectAllProducts').addEventListener('change', (e) => {
+            container.querySelectorAll('.product-select').forEach(cb => { cb.checked = e.target.checked; });
+            this.syncProductSelection(container);
+        });
+        container.querySelectorAll('.product-select').forEach(cb => {
+            cb.addEventListener('change', () => this.syncProductSelection(container));
+        });
+        document.getElementById('bulkDeleteBtn').addEventListener('click', () => this.bulkDeleteProducts());
+        document.getElementById('bulkEditBtn').addEventListener('click', () => this.openBulkEditModal());
+
         container.querySelectorAll('.edit-product-btn').forEach(btn =>
             btn.addEventListener('click', () => this.openProductModal(btn.dataset.id)));
         container.querySelectorAll('.delete-product-btn').forEach(btn =>
@@ -413,6 +431,15 @@ const AdminPanel = {
         saveBtn.textContent = 'Guardando...';
 
         try {
+            const price = Number(document.getElementById('productPrice').value.trim());
+            const stock = parseInt(document.getElementById('productStock').value.trim(), 10);
+            if (!document.getElementById('productPrice').value.trim() || isNaN(price) || price < 0) {
+                throw new Error('El precio debe ser un número válido');
+            }
+            if (!document.getElementById('productStock').value.trim() || isNaN(stock) || stock < 0) {
+                throw new Error('El stock debe ser un número válido');
+            }
+
             let imagePath = document.getElementById('productImage').value.trim();
             const file = document.getElementById('productImageFile').files[0];
             if (file) {
@@ -422,8 +449,8 @@ const AdminPanel = {
             const payload = {
                 name: document.getElementById('productName').value.trim(),
                 category_id: document.getElementById('productCategory').value,
-                price: Number(document.getElementById('productPrice').value),
-                stock: parseInt(document.getElementById('productStock').value, 10),
+                price,
+                stock,
                 sizes: document.getElementById('productSizes').value.split(',').map(s => s.trim()).filter(Boolean),
                 colors: document.getElementById('productColors').value.split(',').map(s => s.trim()).filter(Boolean),
                 image: imagePath,
@@ -455,6 +482,72 @@ const AdminPanel = {
         const { error } = await supabaseClient.from('products').delete().eq('id', id);
         if (error) { this.toast('No se pudo eliminar: ' + error.message, 'error'); return; }
         this.toast('Producto eliminado');
+        await this.loadProducts();
+    },
+
+    // ---------------- Selección múltiple / acciones en lote ----------------
+
+    syncProductSelection(container) {
+        this.selectedProductIds = new Set(
+            Array.from(container.querySelectorAll('.product-select:checked')).map(cb => cb.dataset.id)
+        );
+        const count = this.selectedProductIds.size;
+        const toolbar = document.getElementById('bulkToolbar');
+        toolbar.style.display = count > 0 ? 'flex' : 'none';
+        document.getElementById('bulkCount').textContent = `${count} seleccionado${count === 1 ? '' : 's'}`;
+    },
+
+    async bulkDeleteProducts() {
+        const ids = Array.from(this.selectedProductIds);
+        if (ids.length === 0) return;
+        if (!confirm(`¿Eliminar ${ids.length} producto(s)? Esta acción no se puede deshacer.`)) return;
+
+        const { error } = await supabaseClient.from('products').delete().in('id', ids);
+        if (error) { this.toast('No se pudo eliminar: ' + error.message, 'error'); return; }
+        this.toast(`${ids.length} producto(s) eliminado(s)`);
+        await this.loadProducts();
+    },
+
+    openBulkEditModal() {
+        if (this.selectedProductIds.size === 0) return;
+        document.getElementById('bulkEditCount').textContent = this.selectedProductIds.size;
+        document.getElementById('bulkEditForm').reset();
+
+        const catSelect = document.getElementById('bulkCategory');
+        catSelect.innerHTML = '<option value="">— Sin cambios —</option>' +
+            this.categories.map(c => `<option value="${c.id}">${this.escapeHtml(c.name)}</option>`).join('');
+
+        document.getElementById('bulkEditModal').classList.add('active');
+    },
+
+    async applyBulkEdit(e) {
+        e.preventDefault();
+        const ids = Array.from(this.selectedProductIds);
+        if (ids.length === 0) return;
+
+        const category = document.getElementById('bulkCategory').value;
+        const featured = document.getElementById('bulkFeatured').value;
+        const stockRaw = document.getElementById('bulkStock').value.trim();
+
+        const payload = {};
+        if (category) payload.category_id = category;
+        if (featured) payload.featured = featured === 'true';
+        if (stockRaw) {
+            const stock = parseInt(stockRaw, 10);
+            if (isNaN(stock) || stock < 0) { this.toast('Stock inválido', 'error'); return; }
+            payload.stock = stock;
+        }
+
+        if (Object.keys(payload).length === 0) {
+            this.toast('No cambiaste ningún campo', 'error');
+            return;
+        }
+
+        const { error } = await supabaseClient.from('products').update(payload).in('id', ids);
+        if (error) { this.toast('Error aplicando cambios: ' + error.message, 'error'); return; }
+
+        this.toast(`${ids.length} producto(s) actualizado(s)`);
+        document.getElementById('bulkEditModal').classList.remove('active');
         await this.loadProducts();
     },
 
@@ -596,11 +689,11 @@ const AdminPanel = {
                     <div class="form-row-2">
                         <div class="field">
                             <label>Costo de envío</label>
-                            <input type="number" id="cfgShipping" value="${cfg?.shipping_cost ?? 5990}" min="0" required>
+                            <input type="text" inputmode="numeric" pattern="[0-9]*" id="cfgShipping" value="${cfg?.shipping_cost ?? 5990}" required>
                         </div>
                         <div class="field">
                             <label>Envío gratis desde</label>
-                            <input type="number" id="cfgFreeMin" value="${cfg?.free_shipping_min ?? 50000}" min="0" required>
+                            <input type="text" inputmode="numeric" pattern="[0-9]*" id="cfgFreeMin" value="${cfg?.free_shipping_min ?? 50000}" required>
                         </div>
                     </div>
                     <div class="form-row-2">
@@ -663,11 +756,17 @@ const AdminPanel = {
 
         document.getElementById('configForm').addEventListener('submit', async (e) => {
             e.preventDefault();
+            const shippingCost = Number(document.getElementById('cfgShipping').value.trim());
+            const freeMin = Number(document.getElementById('cfgFreeMin').value.trim());
+            if (isNaN(shippingCost) || shippingCost < 0 || isNaN(freeMin) || freeMin < 0) {
+                this.toast('Costo de envío y envío gratis deben ser números válidos', 'error');
+                return;
+            }
             const payload = {
                 store_name: document.getElementById('cfgStoreName').value.trim(),
                 whatsapp_number: document.getElementById('cfgWhatsapp').value.trim() || null,
-                shipping_cost: Number(document.getElementById('cfgShipping').value),
-                free_shipping_min: Number(document.getElementById('cfgFreeMin').value),
+                shipping_cost: shippingCost,
+                free_shipping_min: freeMin,
                 hero_title: document.getElementById('cfgHeroTitle').value.trim(),
                 hero_subtitle: document.getElementById('cfgHeroSubtitle').value.trim(),
                 social_instagram: document.getElementById('cfgInstagram').value.trim() || null,
@@ -740,6 +839,7 @@ const AdminPanel = {
     bindModals() {
         document.getElementById('productForm').addEventListener('submit', (e) => this.saveProduct(e));
         document.getElementById('categoryForm').addEventListener('submit', (e) => this.saveCategory(e));
+        document.getElementById('bulkEditForm').addEventListener('submit', (e) => this.applyBulkEdit(e));
 
         document.getElementById('productImageFile').addEventListener('change', (e) => {
             const file = e.target.files[0];
