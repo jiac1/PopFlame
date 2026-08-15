@@ -20,18 +20,27 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
+const corsHeaders = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type'
+};
+
 Deno.serve(async (req: Request) => {
+    if (req.method === 'OPTIONS') {
+        return new Response('ok', { headers: corsHeaders });
+    }
+
     try {
         const payload = await req.json();
         const product = payload.record;
         if (!product) {
-            return new Response(JSON.stringify({ error: 'sin producto en el payload' }), { status: 400 });
+            return new Response(JSON.stringify({ error: 'sin producto en el payload' }), { status: 400, headers: corsHeaders });
         }
 
         const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
         const FROM_EMAIL = Deno.env.get('FROM_EMAIL') || 'PopFlame <onboarding@resend.dev>';
         if (!RESEND_API_KEY) {
-            return new Response(JSON.stringify({ error: 'RESEND_API_KEY no configurada' }), { status: 500 });
+            return new Response(JSON.stringify({ error: 'RESEND_API_KEY no configurada' }), { status: 500, headers: corsHeaders });
         }
 
         const supabase = createClient(
@@ -48,7 +57,7 @@ Deno.serve(async (req: Request) => {
 
         if (!subscribers || subscribers.length === 0) {
             return new Response(JSON.stringify({ success: true, sent: 0 }), {
-                headers: { 'Content-Type': 'application/json' }
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
             });
         }
 
@@ -88,9 +97,9 @@ Deno.serve(async (req: Request) => {
         }
 
         return new Response(JSON.stringify({ success: true, sent }), {
-            headers: { 'Content-Type': 'application/json' }
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         });
     } catch (err) {
-        return new Response(JSON.stringify({ error: String(err) }), { status: 500 });
+        return new Response(JSON.stringify({ error: String(err) }), { status: 500, headers: corsHeaders });
     }
 });
