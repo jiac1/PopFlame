@@ -728,9 +728,13 @@ const AdminPanel = {
         const container = document.getElementById('tab-banners');
         container.innerHTML = '<div class="loading">Cargando banners...</div>';
 
-        const { data: banners, error } = await supabaseClient.from('banners').select('*').order('sort_order');
+        const [{ data: banners, error }, { data: categories }] = await Promise.all([
+            supabaseClient.from('banners').select('*').order('sort_order'),
+            supabaseClient.from('categories').select('*').order('sort_order')
+        ]);
         if (error) { container.innerHTML = `<div class="empty-state">Error: ${error.message}</div>`; return; }
         this.banners = banners || [];
+        this.categories = categories || [];
 
         container.innerHTML = `
             <div class="page-header">
@@ -770,6 +774,21 @@ const AdminPanel = {
             btn.addEventListener('click', () => this.deleteBanner(btn.dataset.id)));
     },
 
+    // Opciones fijas de destino + una por cada categoría real. value = lo que se guarda
+    // en link_url (o "custom" para que el admin escriba una URL a mano).
+    bannerLinkOptions() {
+        const opts = [
+            { value: '#products', label: 'Productos destacados (inicio)' },
+            { value: 'index.html', label: 'Inicio' },
+            { value: 'pages/categoria.html', label: 'Todos los productos' }
+        ];
+        (this.categories || []).forEach(c => {
+            opts.push({ value: `pages/categoria.html?cat=${encodeURIComponent(c.id)}`, label: `Categoría: ${c.name}` });
+        });
+        opts.push({ value: 'custom', label: 'URL personalizada (WhatsApp, externo, etc.)' });
+        return opts;
+    },
+
     openBannerModal(id) {
         const banner = id ? this.banners.find(b => String(b.id) === String(id)) : null;
         document.getElementById('bannerForm').reset();
@@ -777,11 +796,20 @@ const AdminPanel = {
         document.getElementById('bannerId').value = banner ? banner.id : '';
         document.getElementById('bannerFile').value = '';
 
+        const linkOptions = this.bannerLinkOptions();
+        const linkSelect = document.getElementById('bannerLinkType');
+        linkSelect.innerHTML = linkOptions.map(o => `<option value="${o.value}">${this.escapeHtml(o.label)}</option>`).join('');
+
+        const savedLink = banner ? (banner.link_url || '#products') : '#products';
+        const matchesKnownOption = linkOptions.some(o => o.value !== 'custom' && o.value === savedLink);
+        linkSelect.value = matchesKnownOption ? savedLink : 'custom';
+        document.getElementById('bannerCustomLink').value = matchesKnownOption ? '' : savedLink;
+        this.toggleBannerCustomLink();
+
         if (banner) {
             document.getElementById('bannerMediaUrl').value = banner.media_url || '';
             document.getElementById('bannerTitle').value = banner.title || '';
             document.getElementById('bannerSubtitle').value = banner.subtitle || '';
-            document.getElementById('bannerLink').value = banner.link_url || '';
             document.getElementById('bannerSortOrder').value = banner.sort_order;
             document.getElementById('bannerActive').checked = !!banner.active;
         } else {
@@ -790,6 +818,11 @@ const AdminPanel = {
         }
         this.showBannerPreview(banner ? banner.media_url : '');
         document.getElementById('bannerModal').classList.add('active');
+    },
+
+    toggleBannerCustomLink() {
+        const isCustom = document.getElementById('bannerLinkType').value === 'custom';
+        document.getElementById('bannerCustomLinkField').style.display = isCustom ? 'block' : 'none';
     },
 
     showBannerPreview(url, forceVideo) {
@@ -826,11 +859,17 @@ const AdminPanel = {
             const sortOrder = sortOrderRaw ? parseInt(sortOrderRaw, 10) : 0;
             if (isNaN(sortOrder)) throw new Error('El orden debe ser un número');
 
+            const linkType = document.getElementById('bannerLinkType').value;
+            const linkUrl = linkType === 'custom'
+                ? document.getElementById('bannerCustomLink').value.trim()
+                : linkType;
+            if (linkType === 'custom' && !linkUrl) throw new Error('Escribe la URL personalizada o elige otro destino');
+
             const payload = {
                 media_url: mediaUrl,
                 title: document.getElementById('bannerTitle').value.trim() || null,
                 subtitle: document.getElementById('bannerSubtitle').value.trim() || null,
-                link_url: document.getElementById('bannerLink').value.trim() || null,
+                link_url: linkUrl,
                 sort_order: sortOrder,
                 active: document.getElementById('bannerActive').checked
             };
@@ -1076,6 +1115,7 @@ const AdminPanel = {
         });
         document.getElementById('bulkEditForm').addEventListener('submit', (e) => this.applyBulkEdit(e));
         document.getElementById('bannerForm').addEventListener('submit', (e) => this.saveBanner(e));
+        document.getElementById('bannerLinkType').addEventListener('change', () => this.toggleBannerCustomLink());
 
         document.getElementById('bannerFile').addEventListener('change', (e) => {
             const file = e.target.files[0];
