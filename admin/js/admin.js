@@ -414,6 +414,10 @@ const AdminPanel = {
     },
 
     openProductModal(id) {
+        if (!this.categories || this.categories.length === 0) {
+            this.toast('Primero crea una categoría (pestaña Categorías, solo Super Admin)', 'error');
+            return;
+        }
         const product = id ? this.products.find(p => String(p.id) === String(id)) : null;
         const modal = document.getElementById('productModal');
         const form = document.getElementById('productForm');

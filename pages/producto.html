@@ -506,6 +506,10 @@
         document.addEventListener('DOMContentLoaded', async () => {
             await ProductsManager.loadProducts();
             CartManager.init();
+            App.applySiteConfig();
+            App.renderNav();
+            App.renderFooterCategoryLinks();
+            App.setupMobileMenu();
             
             const productId = App.getUrlParam('id');
             if (productId) {
@@ -542,9 +546,11 @@
                 thumbnails.innerHTML = '';
             }
 
-            // Set breadcrumb
-            document.getElementById('categoryLink').textContent = currentProduct.category.charAt(0).toUpperCase() + currentProduct.category.slice(1);
-            document.getElementById('categoryLink').href = currentProduct.category + '.html';
+            // Set breadcrumb (usa la categoría real de Supabase y apunta a la página dinámica)
+            const productCategory = ProductsManager.getCategoryById(currentProduct.category);
+            const categoryName = productCategory ? productCategory.name : currentProduct.category;
+            document.getElementById('categoryLink').textContent = categoryName.charAt(0).toUpperCase() + categoryName.slice(1);
+            document.getElementById('categoryLink').href = 'categoria.html?cat=' + encodeURIComponent(currentProduct.category);
             document.getElementById('productName').textContent = currentProduct.name;
             
             // Set product info

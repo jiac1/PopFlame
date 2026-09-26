@@ -244,16 +244,18 @@ const ProductsManager = {
         const badgeHTML = product.badge
             ? `<span class="product-badge">${product.badge}</span>`
             : '';
+        const safeName = this.escapeHtml(product.name);
+        const safeCategory = this.escapeHtml(product.category);
 
         return `
             <a href="pages/producto.html?id=${product.id}" class="product-card">
                 <div class="product-image">
                     ${badgeHTML}
-                    <img src="${this.resolveImagePath(product.image)}" alt="${product.name}" loading="lazy">
+                    <img src="${this.resolveImagePath(product.image)}" alt="${safeName}" loading="lazy" onerror="this.onerror=null;this.src='images/products/poleras/placeholder.svg';">
                 </div>
                 <div class="product-info">
-                    <span class="product-category">${product.category}</span>
-                    <h3 class="product-name">${product.name}</h3>
+                    <span class="product-category">${safeCategory}</span>
+                    <h3 class="product-name">${safeName}</h3>
                     <p class="product-price">${this.formatPrice(product.price)}</p>
                 </div>
             </a>
@@ -265,16 +267,18 @@ const ProductsManager = {
         const badgeHTML = product.badge
             ? `<span class="product-badge">${product.badge}</span>`
             : '';
+        const safeName = this.escapeHtml(product.name);
+        const safeCategory = this.escapeHtml(product.category);
 
         return `
             <a href="producto.html?id=${product.id}" class="product-card">
                 <div class="product-image">
                     ${badgeHTML}
-                    <img src="${this.resolveImagePath(product.image, '../')}" alt="${product.name}" loading="lazy">
+                    <img src="${this.resolveImagePath(product.image, '../')}" alt="${safeName}" loading="lazy" onerror="this.onerror=null;this.src='../images/products/poleras/placeholder.svg';">
                 </div>
                 <div class="product-info">
-                    <span class="product-category">${product.category}</span>
-                    <h3 class="product-name">${product.name}</h3>
+                    <span class="product-category">${safeCategory}</span>
+                    <h3 class="product-name">${safeName}</h3>
                     <p class="product-price">${this.formatPrice(product.price)}</p>
                 </div>
             </a>

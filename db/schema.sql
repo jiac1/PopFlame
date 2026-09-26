@@ -431,8 +431,11 @@ create policy "size_guide_write_admins" on public.size_guide
 -- ---------------------------------------------------------
 -- 5.5 STORAGE: buckets públicos para imágenes subidas desde el panel
 --    - "product-images": fotos de prendas
---    - "site-assets": logo, logo blanco, banner del hero
---    Lectura pública, escritura solo super_admin.
+--    - "site-assets": logo, logo blanco, banner del hero, fotos de categorías/banners
+--    Lectura pública, escritura admin y super_admin (ambos gestionan catálogo).
+--    (site-assets se permite a ambos porque banners/categorías con foto los
+--    usa el dueño también; la tabla `config` sigue siendo solo super_admin,
+--    así que el logo/hero no queda expuesto igual.)
 -- ---------------------------------------------------------
 
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
@@ -455,32 +458,38 @@ create policy "product_images_public_read" on storage.objects
     for select using (bucket_id = 'product-images');
 
 drop policy if exists "product_images_super_admin_write" on storage.objects;
-create policy "product_images_super_admin_write" on storage.objects
-    for insert with check (bucket_id = 'product-images' and public.is_super_admin());
+drop policy if exists "product_images_admins_write" on storage.objects;
+create policy "product_images_admins_write" on storage.objects
+    for insert with check (bucket_id = 'product-images' and public.is_admin());
 
 drop policy if exists "product_images_super_admin_update" on storage.objects;
-create policy "product_images_super_admin_update" on storage.objects
-    for update using (bucket_id = 'product-images' and public.is_super_admin());
+drop policy if exists "product_images_admins_update" on storage.objects;
+create policy "product_images_admins_update" on storage.objects
+    for update using (bucket_id = 'product-images' and public.is_admin());
 
 drop policy if exists "product_images_super_admin_delete" on storage.objects;
-create policy "product_images_super_admin_delete" on storage.objects
-    for delete using (bucket_id = 'product-images' and public.is_super_admin());
+drop policy if exists "product_images_admins_delete" on storage.objects;
+create policy "product_images_admins_delete" on storage.objects
+    for delete using (bucket_id = 'product-images' and public.is_admin());
 
 drop policy if exists "site_assets_public_read" on storage.objects;
 create policy "site_assets_public_read" on storage.objects
     for select using (bucket_id = 'site-assets');
 
 drop policy if exists "site_assets_super_admin_write" on storage.objects;
-create policy "site_assets_super_admin_write" on storage.objects
-    for insert with check (bucket_id = 'site-assets' and public.is_super_admin());
+drop policy if exists "site_assets_admins_write" on storage.objects;
+create policy "site_assets_admins_write" on storage.objects
+    for insert with check (bucket_id = 'site-assets' and public.is_admin());
 
 drop policy if exists "site_assets_super_admin_update" on storage.objects;
-create policy "site_assets_super_admin_update" on storage.objects
-    for update using (bucket_id = 'site-assets' and public.is_super_admin());
+drop policy if exists "site_assets_admins_update" on storage.objects;
+create policy "site_assets_admins_update" on storage.objects
+    for update using (bucket_id = 'site-assets' and public.is_admin());
 
 drop policy if exists "site_assets_super_admin_delete" on storage.objects;
-create policy "site_assets_super_admin_delete" on storage.objects
-    for delete using (bucket_id = 'site-assets' and public.is_super_admin());
+drop policy if exists "site_assets_admins_delete" on storage.objects;
+create policy "site_assets_admins_delete" on storage.objects
+    for delete using (bucket_id = 'site-assets' and public.is_admin());
 
 -- ---------------------------------------------------------
 -- 5.55 Entregas presenciales en Metro: si la tabla orders ya existía con estas
@@ -518,7 +527,8 @@ insert into public.categories (id, name, description, image, sort_order) values
     ('poleras',     'Poleras',     'Poleras exclusivas con estampados PopFlame', null, 1),
     ('polerones',   'Polerones',   'Polerones premium streetwear',               null, 2),
     ('pantalones',  'Pantalones',  'Pantalones urbanos y cómodos',                null, 3),
-    ('accesorios',  'Accesorios',  'Complementos para tu outfit',                 null, 4)
+    ('accesorios',  'Accesorios',  'Complementos para tu outfit',                 null, 4),
+    ('chaquetas',   'Chaquetas',   'Chaquetas y denim PopFlame',                  null, 5)
 on conflict (id) do nothing;
 
 -- Limpia las rutas de ejemplo (images/categories/*.jpg) que dejó una versión anterior
@@ -528,22 +538,20 @@ update public.categories
 set image = null
 where image like 'images/categories/%';
 
+-- Productos reales con fotos en images/products/. Precio, tallas y stock son valores
+-- genéricos de partida: se ajustan desde el panel (Productos > Editar).
+-- "images" guarda rutas completas porque producto.html las resuelve igual que "image".
+-- (La polera cuadro = "Polera PopFlame Básica" y la chaqueta = "Chaqueta Mezclilla PopFlame"
+-- ya se crearon desde el panel con fotos en Storage; no se repiten aquí.)
 insert into public.products (name, category_id, price, sizes, colors, image, images, description, featured, stock, badge) values
-    ('Polera PopFlame Básica', 'poleras', 29990, '{S,M,L,XL}', '{Negro,Blanco}', 'images/products/poleras/polera-1.jpg', '{polera-1.jpg}', 'Polera de algodón 100% con estampado PopFlame. Diseño exclusivo streetwear.', true, 50, 'Nuevo'),
-    ('Polera PopFlame Logo', 'poleras', 32990, '{S,M,L,XL}', '{Negro}', 'images/products/poleras/polera-2.jpg', '{polera-2.jpg}', 'Polera premium con logo bordado PopFlame. Edición limitada.', true, 30, 'Edición Limitada'),
-    ('Polera PopFlame Flame', 'poleras', 34990, '{S,M,L,XL}', '{Negro,Rojo}', 'images/products/poleras/polera-3.jpg', '{polera-3.jpg}', 'Polera con estampado de llama PopFlame. 100% algodón.', false, 40, null),
-    ('Polera PopFlame Urban', 'poleras', 29990, '{S,M,L,XL}', '{Blanco,Gris}', 'images/products/poleras/polera-4.jpg', '{polera-4.jpg}', 'Polera urbana con diseño minimalista PopFlame.', false, 45, null),
-    ('Poleron PopFlame Hoodie', 'polerones', 59990, '{S,M,L,XL}', '{Negro,Gris}', 'images/products/polerones/poleron-1.jpg', '{poleron-1.jpg}', 'Poleron con capucha premium. Estampado PopFlame en pecho.', true, 25, 'Popular'),
-    ('Poleron PopFlame Zip', 'polerones', 64990, '{S,M,L,XL}', '{Negro}', 'images/products/polerones/poleron-2.jpg', '{poleron-2.jpg}', 'Poleron con cierre full zip. Diseño premium streetwear.', true, 20, null),
-    ('Poleron PopFlame Oversized', 'polerones', 69990, '{S,M,L,XL}', '{Gris,Negro}', 'images/products/polerones/poleron-3.jpg', '{poleron-3.jpg}', 'Poleron oversized con logo grande PopFlame en espalda.', false, 15, null),
-    ('Poleron PopFlame Cropped', 'polerones', 54990, '{S,M,L}', '{Negro,Blanco}', 'images/products/polerones/poleron-4.jpg', '{poleron-4.jpg}', 'Poleron cropped para estilo urbano. Estampado frontal.', false, 30, null),
-    ('Pantalón PopFlame Cargo', 'pantalones', 49990, '{28,30,32,34,36}', '{Negro,"Verde Militar"}', 'images/products/pantalones/pantalon-1.jpg', '{pantalon-1.jpg}', 'Pantalón cargo con bolsillos laterales. Tela resistente.', true, 35, null),
-    ('Pantalón PopFlame Jogger', 'pantalones', 44990, '{S,M,L,XL}', '{Negro,Gris}', 'images/products/pantalones/pantalon-2.jpg', '{pantalon-2.jpg}', 'Jogger cómodo con elastano. Perfecto para el día a día.', false, 40, null),
-    ('Pantalón PopFlame Wide', 'pantalones', 52990, '{28,30,32,34}', '{Negro}', 'images/products/pantalones/pantalon-3.jpg', '{pantalon-3.jpg}', 'Pantalón wide leg con estampado lateral PopFlame.', false, 25, null),
-    ('Gorra PopFlame Cap', 'accesorios', 19990, '{Única}', '{Negro,Blanco,Rojo}', 'images/products/accesorios/gorra-1.jpg', '{gorra-1.jpg}', 'Gorra snapback con logo bordado PopFlame.', true, 60, 'Nuevo'),
-    ('Gorro PopFlame Beanie', 'accesorios', 14990, '{Única}', '{Negro,Gris}', 'images/products/accesorios/gorro-1.jpg', '{gorro-1.jpg}', 'Gorro tejido con etiqueta PopFlame.', false, 50, null),
-    ('Mochila PopFlame Bag', 'accesorios', 39990, '{Única}', '{Negro}', 'images/products/accesorios/mochila-1.jpg', '{mochila-1.jpg}', 'Mochila urbana con múltiples compartimentos y logo PopFlame.', false, 20, null),
-    ('Calcetines PopFlame Pack', 'accesorios', 12990, '{S,M,L}', '{Negro,Blanco}', 'images/products/accesorios/calcetines-1.jpg', '{calcetines-1.jpg}', 'Pack de 3 pares de calcetines con logo PopFlame.', false, 100, null)
+    ('Cartera PopFlame', 'accesorios', 39990, '{Única}', '{Gris}',
+     'images/products/accesorios/cartera-3.jpg',
+     '{images/products/accesorios/cartera-3.jpg,images/products/accesorios/cartera-4.jpg,images/products/accesorios/cartera-1.jpg,images/products/accesorios/cartera-2.jpg,images/products/accesorios/cartera-5.jpg,images/products/accesorios/cartera-6.jpg,images/products/accesorios/cartera-7.jpg,images/products/accesorios/cartera-8.jpg}',
+     'Cartera tote con textura croco y colgante metálico PopFlame.', true, 10, 'Nuevo'),
+    ('Collar PopFlame', 'accesorios', 24990, '{Única}', '{Plateado}',
+     'images/products/accesorios/joya-1.jpg',
+     '{images/products/accesorios/joya-1.jpg,images/products/accesorios/joya-2.jpg,images/products/accesorios/joya-3.jpg}',
+     'Collar de cadena plateada con dije del logo PopFlame.', true, 10, 'Nuevo')
 on conflict (name) do nothing;
 
 insert into public.config (id, store_name, whatsapp_number, shipping_cost, free_shipping_min, currency, hero_title, hero_subtitle)
@@ -562,7 +570,11 @@ insert into public.size_guide (category_id, size, measurement, sort_order) value
     ('pantalones', '28', '71cm', 1),
     ('pantalones', '30', '76cm', 2),
     ('pantalones', '32', '81cm', 3),
-    ('pantalones', '34', '86cm', 4)
+    ('pantalones', '34', '86cm', 4),
+    ('chaquetas', 'S', '56cm', 1),
+    ('chaquetas', 'M', '59cm', 2),
+    ('chaquetas', 'L', '62cm', 3),
+    ('chaquetas', 'XL', '65cm', 4)
 on conflict (category_id, size) do nothing;
 
 insert into public.pages (slug, title, content) values

@@ -8,8 +8,9 @@ tienda, permisos acotados a pedidos/inventario).
 
 1. Entra a tu proyecto en [supabase.com](https://supabase.com) → **SQL Editor** → *New query*.
 2. Copia y pega **todo** el contenido de [`db/schema.sql`](db/schema.sql) y dale **Run**.
-   Esto crea las tablas, la seguridad a nivel de fila (RLS), las funciones y carga los
-   15 productos de ejemplo.
+   Esto crea las tablas, la seguridad a nivel de fila (RLS), las funciones, las 5 categorías
+   (incluida Chaquetas) y productos iniciales (cartera y collar) con precios/tallas genéricos
+   que se ajustan después desde el panel.
 3. Ve a **Authentication → Users → Add user** y crea las dos cuentas de acceso:
 
    | Usuario visible | Email a usar en Supabase | Rol asignado |

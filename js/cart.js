@@ -151,10 +151,11 @@ const CartManager = {
         if (!container) return;
 
         if (this.cart.length === 0) {
+            const homePrefix = this.getImagePrefix();
             container.innerHTML = `
                 <div class="cart-empty">
                     <p>Tu carrito está vacío</p>
-                    <a href="index.html" class="btn btn-secondary mt-24">IR A LA TIENDA</a>
+                    <a href="${homePrefix}index.html" class="btn btn-secondary mt-24">IR A LA TIENDA</a>
                 </div>
             `;
             if (footer) footer.style.display = 'none';

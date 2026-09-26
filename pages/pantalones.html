@@ -177,6 +177,10 @@
         document.addEventListener('DOMContentLoaded', async () => {
             await ProductsManager.loadProducts();
             CartManager.init();
+            App.applySiteConfig();
+            App.renderNav();
+            App.renderFooterCategoryLinks();
+            App.setupMobileMenu();
             
             const products = ProductsManager.getProductsByCategory('pantalones');
             ProductsManager.renderProducts('categoryProducts', products, true);

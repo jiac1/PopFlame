@@ -173,6 +173,10 @@
         document.addEventListener('DOMContentLoaded', async () => {
             await ProductsManager.loadProducts();
             CartManager.init();
+            App.applySiteConfig();
+            App.renderNav();
+            App.renderFooterCategoryLinks();
+            App.setupMobileMenu();
             
             const products = ProductsManager.getProductsByCategory('accesorios');
             ProductsManager.renderProducts('categoryProducts', products, true);
