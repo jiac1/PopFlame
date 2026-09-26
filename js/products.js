@@ -1,128 +1,181 @@
-// Products Manager
+// Datos de la tienda (productos, categorías, configuración y guía de tallas) desde Supabase.
+// Usa "stale-while-revalidate": pinta al instante con lo guardado de la visita anterior
+// (localStorage) y vuelve a pintar solo si Supabase trae algo distinto.
 const ProductsManager = {
     products: [],
     categories: [],
     config: {},
     sizeGuide: [],
+    loaded: false,
+    cacheKey: 'pf_store_cache',
+    cacheMaxAgeMs: 1000 * 60 * 60 * 24,
 
-    // Load products, categories, config and size guide from Supabase
+    // Llama a onData(data, { fresh }) una vez con el cache (si existe) y otra con los datos
+    // frescos si cambiaron. Devuelve una promesa que se resuelve con los datos frescos.
+    async load(onData) {
+        const cached = this.readCache();
+        let cachedSig = null;
+        if (cached) {
+            this.apply(cached);
+            cachedSig = JSON.stringify(cached);
+            onData && onData(this, { fresh: false });
+        }
+
+        const fresh = await this.fetchFresh();
+        if (fresh) {
+            const sig = JSON.stringify(fresh);
+            this.apply(fresh);
+            this.writeCache(fresh);
+            if (sig !== cachedSig) onData && onData(this, { fresh: true });
+        } else if (!cached) {
+            onData && onData(this, { fresh: true, failed: true });
+        }
+        return this;
+    },
+
+    // Compatibilidad con código anterior
     async loadProducts() {
+        await this.load();
+        return { products: this.products, categories: this.categories, config: this.config };
+    },
+
+    async fetchFresh() {
+        if (typeof supabaseClient === 'undefined') return null;
         try {
-            const [{ data: products, error: pErr }, { data: categories, error: cErr }, { data: cfg, error: cfgErr }, { data: sizeGuide, error: sgErr }] =
-                await Promise.all([
-                    supabaseClient.from('products').select('*').order('id'),
-                    supabaseClient.from('categories').select('*').order('sort_order'),
-                    supabaseClient.from('config').select('*').eq('id', 1).maybeSingle(),
-                    supabaseClient.from('size_guide').select('*')
-                ]);
+            const [p, c, cfg, sg] = await Promise.all([
+                supabaseClient.from('products').select('*').order('id', { ascending: false }),
+                supabaseClient.from('categories').select('*').order('sort_order'),
+                supabaseClient.from('config').select('*').eq('id', 1).maybeSingle(),
+                supabaseClient.from('size_guide').select('*')
+            ]);
+            if (p.error) throw p.error;
+            if (c.error) throw c.error;
+            if (sg.error) console.warn('No se pudo cargar size_guide:', sg.error.message);
 
-            if (pErr) throw pErr;
-            if (cErr) throw cErr;
-            if (cfgErr) throw cfgErr;
-            // size_guide es opcional: si la tabla todavía no existe (falta correr el schema.sql
-            // nuevo), no rompe el resto del sitio, solo no muestra medidas junto a la talla.
-            if (sgErr) console.warn('No se pudo cargar size_guide:', sgErr.message);
-            this.sizeGuide = sizeGuide || [];
-
-            this.products = (products || []).map(p => ({
-                id: p.id,
-                name: p.name,
-                category: p.category_id,
-                price: Number(p.price),
-                sizes: p.sizes || [],
-                colors: p.colors || [],
-                image: p.image,
-                images: (p.images && p.images.length) ? p.images : (p.image ? [p.image] : []),
-                description: p.description || '',
-                featured: p.featured,
-                stock: p.stock,
-                badge: p.badge || undefined
-            }));
-
-            this.categories = categories || [];
-
-            this.config = cfg ? {
-                currency: cfg.currency,
-                currencySymbol: '$',
-                whatsappNumber: cfg.whatsapp_number || '',
-                shippingCost: Number(cfg.shipping_cost),
-                freeShippingMin: Number(cfg.free_shipping_min),
-                storeName: cfg.store_name,
-                heroTitle: cfg.hero_title,
-                heroSubtitle: cfg.hero_subtitle,
-                logoUrl: cfg.logo_url || '',
-                logoWhiteUrl: cfg.logo_white_url || '',
-                heroBannerUrl: cfg.hero_banner_url || '',
-                socialLinks: {
-                    instagram: cfg.social_instagram || '',
-                    tiktok: cfg.social_tiktok || '',
-                    twitter: cfg.social_twitter || ''
-                }
-            } : {};
-
-            return { products: this.products, categories: this.categories, config: this.config };
+            return {
+                products: (p.data || []).map(row => this.mapProduct(row)),
+                categories: c.data || [],
+                config: this.mapConfig(cfg.data),
+                sizeGuide: sg.data || []
+            };
         } catch (error) {
-            console.error('Error loading products from Supabase:', error);
+            console.error('Error cargando la tienda desde Supabase:', error);
             return null;
         }
     },
 
-    // Get all products
-    getAllProducts() {
-        return this.products;
+    mapProduct(p) {
+        const images = (p.images && p.images.length) ? p.images : (p.image ? [p.image] : []);
+        return {
+            id: p.id,
+            name: p.name,
+            category: p.category_id,
+            price: Number(p.price),
+            sizes: p.sizes || [],
+            colors: p.colors || [],
+            image: p.image || images[0] || '',
+            images,
+            description: p.description || '',
+            featured: !!p.featured,
+            stock: Number(p.stock ?? 0),
+            badge: p.badge || '',
+            createdAt: p.created_at
+        };
     },
 
-    // Get products by category
-    getProductsByCategory(category) {
-        return this.products.filter(p => p.category === category);
+    mapConfig(cfg) {
+        if (!cfg) return {};
+        return {
+            currency: cfg.currency,
+            whatsappNumber: cfg.whatsapp_number || '',
+            shippingCost: Number(cfg.shipping_cost || 0),
+            freeShippingMin: Number(cfg.free_shipping_min || 0),
+            storeName: cfg.store_name,
+            heroTitle: cfg.hero_title,
+            heroSubtitle: cfg.hero_subtitle,
+            logoUrl: cfg.logo_url || '',
+            logoWhiteUrl: cfg.logo_white_url || '',
+            heroBannerUrl: cfg.hero_banner_url || '',
+            socialLinks: {
+                instagram: cfg.social_instagram || '',
+                tiktok: cfg.social_tiktok || '',
+                twitter: cfg.social_twitter || ''
+            }
+        };
     },
 
-    // Get product by ID
-    getProductById(id) {
-        return this.products.find(p => p.id === parseInt(id));
+    apply(data) {
+        this.products = data.products || [];
+        this.categories = data.categories || [];
+        this.config = data.config || {};
+        this.sizeGuide = data.sizeGuide || [];
+        this.loaded = true;
     },
 
-    // Get featured products
-    getFeaturedProducts() {
-        return this.products.filter(p => p.featured);
+    readCache() {
+        try {
+            const raw = JSON.parse(localStorage.getItem(this.cacheKey) || 'null');
+            if (!raw || !raw.savedAt || Date.now() - raw.savedAt > this.cacheMaxAgeMs) return null;
+            return { products: raw.products, categories: raw.categories, config: raw.config, sizeGuide: raw.sizeGuide };
+        } catch (e) {
+            return null;
+        }
     },
 
-    // Categorías que tienen al menos un producto: las vacías (ej. "Pantalones" sin stock
-    // cargado) no se muestran en el menú ni en la portada, y vuelven solas al agregarles uno.
+    writeCache(data) {
+        try {
+            localStorage.setItem(this.cacheKey, JSON.stringify({ ...data, savedAt: Date.now() }));
+        } catch (e) { /* almacenamiento lleno o bloqueado: se ignora */ }
+    },
+
+    // ===== Consultas =====
+    getAllProducts() { return this.products; },
+    getProductsByCategory(category) { return this.products.filter(p => p.category === category); },
+    getProductById(id) { return this.products.find(p => p.id === parseInt(id, 10)); },
+    getFeaturedProducts() { return this.products.filter(p => p.featured); },
+    getCategoryById(id) { return this.categories.find(c => c.id === id); },
+
+    // Categorías con al menos un producto: las vacías no se muestran en el menú ni en la portada.
     getVisibleCategories() {
         return this.categories.filter(c => this.products.some(p => p.category === c.id));
     },
 
-    // Get category by ID
-    getCategoryById(id) {
-        return this.categories.find(c => c.id === id);
+    searchProducts(query) {
+        const q = this.normalize(query);
+        if (!q) return [];
+        return this.products.filter(p => {
+            const cat = this.getCategoryById(p.category);
+            const hay = this.normalize(`${p.name} ${p.description} ${cat?.name || ''} ${p.colors.join(' ')}`);
+            return q.split(/\s+/).every(term => hay.includes(term));
+        });
     },
 
-    // Format price in CLP
+    normalize(str) {
+        return String(str || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
+    },
+
+    // ===== Formato =====
     formatPrice(price) {
-        return '$' + price.toLocaleString('es-CL');
+        return '$' + Number(price || 0).toLocaleString('es-CL');
     },
 
-    // Resuelve la ruta de una imagen: si ya es una URL absoluta (ej. Supabase Storage),
-    // se usa tal cual; si es una ruta relativa local, se le antepone el prefijo del nivel de carpeta.
-    resolveImagePath(path, prefix = '') {
-        if (!path) return prefix + 'images/products/poleras/placeholder.svg';
-        if (/^https?:\/\//i.test(path)) return path;
-        return prefix + path;
+    // Ruta de imagen: URL absoluta (Supabase Storage) se usa tal cual; ruta local se resuelve
+    // desde la raíz del sitio, sin importar en qué carpeta esté la página.
+    resolveImagePath(path) {
+        if (!path) return PF.url('images/products/poleras/placeholder.svg');
+        if (/^(https?:)?\/\//i.test(path) || path.startsWith('data:')) return path;
+        return PF.url(path);
     },
 
-    // Mapa de nombres de color (tal como se escriben en el panel) a un color real para
-    // pintar la bolita de selección. Si el color no está en la lista, se intenta usar el
-    // texto tal cual como color CSS (funciona para nombres en inglés, ej. "blue").
     colorMap: {
-        'negro': '#000000', 'blanco': '#ffffff', 'gris': '#808080',
-        'rojo': '#E31837', 'azul': '#1E3A8A', 'celeste': '#38BDF8',
+        'negro': '#0B0B0B', 'blanco': '#FFFFFF', 'gris': '#8C8C8C',
+        'rojo': '#E31837', 'azul': '#1E3A8A', 'celeste': '#7DC3E8',
         'verde': '#166534', 'verde militar': '#4B5320', 'amarillo': '#EAB308',
         'naranjo': '#EA580C', 'naranja': '#EA580C', 'café': '#5C3A21', 'cafe': '#5C3A21',
-        'marrón': '#5C3A21', 'marron': '#5C3A21', 'beige': '#D2B48C',
+        'marrón': '#5C3A21', 'marron': '#5C3A21', 'beige': '#D8C3A0',
         'rosado': '#F472B6', 'rosa': '#F472B6', 'morado': '#7C3AED', 'púrpura': '#7C3AED',
-        'purpura': '#7C3AED', 'dorado': '#D4AF37', 'plateado': '#C0C0C0',
-        'turquesa': '#14B8A6', 'crema': '#F5F0DC', 'vino': '#722F37', 'única': '#555555'
+        'purpura': '#7C3AED', 'dorado': '#D4AF37', 'plateado': '#C9CCD1',
+        'turquesa': '#14B8A6', 'crema': '#F2EBD9', 'vino': '#722F37', 'única': '#555555'
     },
 
     resolveColorSwatch(name) {
@@ -130,41 +183,32 @@ const ProductsManager = {
         return this.colorMap[key] || name || '#555555';
     },
 
-    // Medida real de una talla para una categoría (ej. "48cm"), editable desde
-    // el panel (Super Admin > Tallas). Devuelve '' si no hay medida cargada.
+    stockState(product) {
+        if (product.stock <= 0) return 'out';
+        if (product.stock <= 3) return 'low';
+        return 'in';
+    },
+
+    // ===== Guía de tallas =====
     getSizeMeasurement(categoryId, size) {
         const entry = this.sizeGuide.find(s => s.category_id === categoryId && s.size === size);
         return entry ? entry.measurement : '';
     },
 
-    escapeHtml(str) {
-        const div = document.createElement('div');
-        div.textContent = str ?? '';
-        return div.innerHTML;
-    },
+    escapeHtml(str) { return PF.escape(str); },
 
-    // Filas + nombres de columna (las que haya cargado el super_admin) de la tabla de
-    // medidas detallada de una categoría.
     getSizeGuideTable(categoryId) {
         const rows = this.sizeGuide
             .filter(s => s.category_id === categoryId)
             .sort((a, b) => a.sort_order - b.sort_order);
-
         const labels = [];
-        rows.forEach(r => {
-            Object.keys(r.measurements || {}).forEach(k => {
-                if (!labels.includes(k)) labels.push(k);
-            });
-        });
-
+        rows.forEach(r => Object.keys(r.measurements || {}).forEach(k => { if (!labels.includes(k)) labels.push(k); }));
         return { rows, labels };
     },
 
-    // Diagrama genérico de referencia (ilustración propia, no depende de ninguna imagen externa)
-    // con los puntos de medida A/B/C/D marcados, para acompañar la tabla de talles.
     sizeGuideDiagramSvg() {
         return `
-            <svg viewBox="0 0 200 220" width="120" height="132" style="flex-shrink:0;">
+            <svg viewBox="0 0 200 220" width="120" height="132" aria-hidden="true">
                 <path d="M85 20 Q100 8 115 20 L130 30 L165 50 L140 78 L130 88 L130 190 L70 190 L70 88 L60 78 L35 50 L70 30 Z"
                       fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
                 <line x1="15" y1="20" x2="15" y2="190" stroke="#E31837" stroke-width="1.5"/>
@@ -175,15 +219,12 @@ const ProductsManager = {
                 <text x="170" y="48" fill="#E31837" font-size="13" font-weight="700">C</text>
                 <line x1="85" y1="12" x2="115" y2="12" stroke="#E31837" stroke-width="1.5"/>
                 <text x="95" y="8" fill="#E31837" font-size="13" font-weight="700">D</text>
-            </svg>
-        `;
+            </svg>`;
     },
 
-    // Diagrama de pantalón (prenda inferior): forma distinta a la de arriba, con sus
-    // propios puntos de medida (Largo, Cintura, Tiro/entrepierna).
     sizeGuideDiagramSvgPants() {
         return `
-            <svg viewBox="0 0 200 220" width="120" height="132" style="flex-shrink:0;">
+            <svg viewBox="0 0 200 220" width="120" height="132" aria-hidden="true">
                 <path d="M65 20 L135 20 L135 55 L120 190 L103 190 L100 95 L97 190 L80 190 L65 55 Z"
                       fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
                 <line x1="20" y1="20" x2="20" y2="190" stroke="#E31837" stroke-width="1.5"/>
@@ -192,166 +233,108 @@ const ProductsManager = {
                 <text x="95" y="8" fill="#E31837" font-size="13" font-weight="700">B</text>
                 <line x1="75" y1="95" x2="125" y2="95" stroke="#E31837" stroke-width="1.5"/>
                 <text x="128" y="99" fill="#E31837" font-size="13" font-weight="700">C</text>
-            </svg>
-        `;
+            </svg>`;
     },
 
-    // Categorías de prenda inferior (pantalón), que usan un diagrama distinto al de arriba.
-    // Se detecta por id o por nombre, para que también funcione con categorías nuevas
-    // parecidas (ej. "shorts", "faldas") sin tener que tocar código de nuevo.
     isBottomWearCategory(categoryId) {
         const cat = this.categories.find(c => c.id === categoryId);
         const text = `${categoryId} ${cat?.name || ''}`.toLowerCase();
         return /pantal|short|falda|jean/.test(text);
     },
 
-    // Diagrama + tabla de talles de una categoría. Si no hay medidas cargadas todavía,
-    // avisa en vez de mostrar una tabla vacía.
     renderSizeGuideHtml(categoryId) {
         const { rows, labels } = this.getSizeGuideTable(categoryId);
-
         if (rows.length === 0) {
-            return '<p>Guía de talles no disponible todavía para esta categoría.</p>';
+            return '<p>Todavía no hay medidas cargadas para esta categoría. Escríbenos por WhatsApp y te ayudamos a elegir tu talla.</p>';
         }
-
-        const hasDetailedLabels = labels.length > 0;
-
-        const headerCells = hasDetailedLabels
-            ? labels.map(l => `<th>${this.escapeHtml(l)}</th>`).join('')
-            : '<th>Medida</th>';
-
-        const bodyRows = rows.map(r => {
-            const cells = hasDetailedLabels
-                ? labels.map(l => `<td>${this.escapeHtml((r.measurements || {})[l] ?? '—')}</td>`).join('')
-                : `<td>${this.escapeHtml(r.measurement)}</td>`;
-            return `<tr><td><strong>${this.escapeHtml(r.size)}</strong></td>${cells}</tr>`;
+        const detailed = labels.length > 0;
+        const head = detailed ? labels.map(l => `<th>${PF.escape(l)}</th>`).join('') : '<th>Medida</th>';
+        const body = rows.map(r => {
+            const cells = detailed
+                ? labels.map(l => `<td>${PF.escape((r.measurements || {})[l] ?? '—')}</td>`).join('')
+                : `<td>${PF.escape(r.measurement)}</td>`;
+            return `<tr><td><strong>${PF.escape(r.size)}</strong></td>${cells}</tr>`;
         }).join('');
-
-        const diagram = this.isBottomWearCategory(categoryId)
-            ? this.sizeGuideDiagramSvgPants()
-            : this.sizeGuideDiagramSvg();
+        const diagram = this.isBottomWearCategory(categoryId) ? this.sizeGuideDiagramSvgPants() : this.sizeGuideDiagramSvg();
 
         return `
             <div class="size-guide-wrap">
                 <div class="size-guide-diagram">${diagram}</div>
                 <div class="size-guide-table-wrap">
                     <table class="size-guide-table">
-                        <thead><tr><th>Talla</th>${headerCells}</tr></thead>
-                        <tbody>${bodyRows}</tbody>
+                        <thead><tr><th>Talla</th>${head}</tr></thead>
+                        <tbody>${body}</tbody>
                     </table>
                     <p class="size-guide-note">* Medidas aproximadas, en centímetros.</p>
                 </div>
-            </div>
-        `;
+            </div>`;
     },
 
-    // Generate product card HTML (para index.html, en la raíz del sitio)
-    createProductCard(product) {
-        const badgeHTML = product.badge
-            ? `<span class="product-badge">${product.badge}</span>`
+    // ===== Tarjeta de producto =====
+    productUrl(product) {
+        return PF.url(`pages/producto.html?id=${product.id}`);
+    },
+
+    createProductCard(product, { eager = false } = {}) {
+        const name = PF.escape(product.name);
+        const cat = this.getCategoryById(product.category);
+        const main = this.resolveImagePath(product.images[0] || product.image);
+        const alt = product.images[1] ? this.resolveImagePath(product.images[1]) : '';
+        const stock = this.stockState(product);
+
+        const tags = [];
+        if (stock === 'out') tags.push('<span class="tag tag-dark">Agotado</span>');
+        else if (product.badge) tags.push(`<span class="tag ${/oferta|sale|limitad/i.test(product.badge) ? 'tag-red' : ''}">${PF.escape(product.badge)}</span>`);
+        if (stock === 'low') tags.push('<span class="tag tag-red">Últimas unidades</span>');
+
+        const sizes = (product.sizes || []).filter(s => s && s.toLowerCase() !== 'única');
+        const quick = stock !== 'out' && sizes.length
+            ? `<div class="product-quick" aria-hidden="true">${sizes.map(s => `<span>${PF.escape(s)}</span>`).join('')}</div>`
             : '';
-        const safeName = this.escapeHtml(product.name);
-        const safeCategory = this.escapeHtml(product.category);
+
+        const swatches = (product.colors || []).length > 1
+            ? `<div class="product-swatches" aria-label="Colores disponibles">${product.colors.map(c =>
+                `<span class="swatch-dot" title="${PF.escape(c)}" style="background:${PF.escape(this.resolveColorSwatch(c))}"></span>`).join('')}</div>`
+            : '';
+
+        const loading = eager ? 'eager' : 'lazy';
 
         return `
-            <a href="pages/producto.html?id=${product.id}" class="product-card">
-                <div class="product-image">
-                    ${badgeHTML}
-                    <img src="${this.resolveImagePath(product.image)}" alt="${safeName}" loading="lazy" onerror="this.onerror=null;this.src='images/products/poleras/placeholder.svg';">
+            <a href="${this.productUrl(product)}" class="product-card${stock === 'out' ? ' product-soldout' : ''}">
+                <div class="product-media${alt ? ' has-alt' : ''}">
+                    <img class="img-main" src="${main}" alt="${name}" loading="${loading}" decoding="async"
+                         onerror="this.onerror=null;this.src='${PF.url('images/products/poleras/placeholder.svg')}'">
+                    ${alt ? `<img class="img-alt" src="${alt}" alt="" loading="lazy" decoding="async" aria-hidden="true">` : ''}
+                    ${tags.length ? `<div class="product-tags">${tags.join('')}</div>` : ''}
+                    ${quick}
                 </div>
-                <div class="product-info">
-                    <span class="product-category">${safeCategory}</span>
-                    <h3 class="product-name">${safeName}</h3>
-                    <p class="product-price">${this.formatPrice(product.price)}</p>
+                <div class="product-meta">
+                    <div>
+                        <h3 class="product-name">${name}</h3>
+                        <span class="product-sub">${PF.escape(cat?.name || '')}</span>
+                        ${swatches}
+                    </div>
+                    <span class="product-price">${this.formatPrice(product.price)}</span>
                 </div>
-            </a>
-        `;
+            </a>`;
     },
 
-    // Generate product card HTML for category pages (dentro de /pages/)
-    createProductCardCategory(product) {
-        const badgeHTML = product.badge
-            ? `<span class="product-badge">${product.badge}</span>`
-            : '';
-        const safeName = this.escapeHtml(product.name);
-        const safeCategory = this.escapeHtml(product.category);
-
-        return `
-            <a href="producto.html?id=${product.id}" class="product-card">
-                <div class="product-image">
-                    ${badgeHTML}
-                    <img src="${this.resolveImagePath(product.image, '../')}" alt="${safeName}" loading="lazy" onerror="this.onerror=null;this.src='../images/products/poleras/placeholder.svg';">
-                </div>
-                <div class="product-info">
-                    <span class="product-category">${safeCategory}</span>
-                    <h3 class="product-name">${safeName}</h3>
-                    <p class="product-price">${this.formatPrice(product.price)}</p>
-                </div>
-            </a>
-        `;
+    skeletonCards(n = 4) {
+        return Array.from({ length: n }, () => `
+            <div class="skeleton-card" aria-hidden="true">
+                <div class="product-media"></div>
+                <div class="skeleton-line"></div>
+                <div class="skeleton-line short"></div>
+            </div>`).join('');
     },
 
-    // Render products to container
-    renderProducts(containerId, products, isCategoryPage = false) {
-        const container = document.getElementById(containerId);
+    renderProducts(containerId, products, opts = {}) {
+        const container = typeof containerId === 'string' ? document.getElementById(containerId) : containerId;
         if (!container) return;
-
-        const createCard = isCategoryPage 
-            ? this.createProductCardCategory.bind(this)
-            : this.createProductCard.bind(this);
-
-        container.innerHTML = products.map(createCard).join('');
-    },
-
-    // Search products
-    searchProducts(query) {
-        const lowerQuery = query.toLowerCase();
-        return this.products.filter(p => 
-            p.name.toLowerCase().includes(lowerQuery) ||
-            p.description.toLowerCase().includes(lowerQuery)
-        );
-    },
-
-    // Filter products by price range
-    filterByPrice(min, max) {
-        return this.products.filter(p => p.price >= min && p.price <= max);
-    },
-
-    // Filter products by size
-    filterBySize(size) {
-        return this.products.filter(p => p.sizes.includes(size));
-    },
-
-    // Filter products by color
-    filterByColor(color) {
-        return this.products.filter(p => p.colors.includes(color));
-    },
-
-    // Get all available sizes
-    getAllSizes() {
-        const sizes = new Set();
-        this.products.forEach(p => p.sizes.forEach(s => sizes.add(s)));
-        return Array.from(sizes);
-    },
-
-    // Get all available colors
-    getAllColors() {
-        const colors = new Set();
-        this.products.forEach(p => p.colors.forEach(c => colors.add(c)));
-        return Array.from(colors);
-    },
-
-    // Get price range
-    getPriceRange() {
-        const prices = this.products.map(p => p.price);
-        return {
-            min: Math.min(...prices),
-            max: Math.max(...prices)
-        };
+        container.innerHTML = products.map((p, i) => this.createProductCard(p, { eager: opts.eagerCount ? i < opts.eagerCount : false })).join('');
     }
 };
 
-// Export for use in other files
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = ProductsManager;
 }

@@ -1,232 +1,71 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="es-CL">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Categoría | PopFlame</title>
-    <meta name="description" content="Catálogo PopFlame. Streetwear que quema.">
-    <link rel="stylesheet" href="../css/style.css">
-    <link rel="stylesheet" href="../css/responsive.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>Catálogo | PopFlame</title>
+    <meta name="description" content="Todo el catálogo PopFlame: poleras, polerones, chaquetas y accesorios streetwear hechos en Chile.">
+    <meta name="theme-color" content="#0B0B0B">
+    <link rel="icon" href="../images/favicon-32.png" sizes="32x32" type="image/png">
+    <link rel="apple-touch-icon" href="../images/apple-touch-icon.png">
+    <link rel="manifest" href="../site.webmanifest">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="PopFlame">
+    <meta property="og:title" content="Catálogo | PopFlame">
+    <meta property="og:description" content="Streetwear hecho en Chile.">
+    <meta property="og:image" content="https://jiac1.github.io/PopFlame/images/og-image.jpg">
+    <link rel="preconnect" href="https://ysxinhpymvhdnfbdanvn.supabase.co" crossorigin>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@125,700;125,800;125,900&family=Inter:wght@400;500;600;700&display=swap">
+    <link rel="stylesheet" href="../css/style.css?v=3">
 </head>
-<body>
-    <!-- Header -->
-    <header class="header">
-        <div class="container">
-            <a href="../index.html" class="logo">
-                <img src="../images/logo.png" alt="PopFlame" class="logo-img">
-            </a>
+<body data-page="category">
+    <script src="../js/layout.js?v=3"></script>
 
-            <nav class="nav">
-                <!-- Se llena solo con las categorías reales (js/app.js -> renderNav) -->
-            </nav>
-
-            <div class="header-actions">
-                <button class="cart-btn" id="cartBtn">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <circle cx="9" cy="21" r="1"></circle>
-                        <circle cx="20" cy="21" r="1"></circle>
-                        <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
-                    </svg>
-                    <span class="cart-count" id="cartCount">0</span>
-                </button>
-
-                <button class="menu-btn" id="menuBtn">
-                    <span></span>
-                    <span></span>
-                    <span></span>
-                </button>
+    <main id="main" class="page-offset">
+        <header class="page-head">
+            <div class="container">
+                <nav class="breadcrumbs" aria-label="Ruta">
+                    <a href="../index.html">Inicio</a><span aria-hidden="true">/</span>
+                    <span id="crumbCurrent">Catálogo</span>
+                </nav>
+                <h1 class="page-title" id="catTitle">Catálogo</h1>
+                <p class="page-desc" id="catDesc">Todo lo que tenemos disponible en este momento.</p>
             </div>
-        </div>
-    </header>
+        </header>
 
-    <!-- Page Header -->
-    <section class="page-header">
-        <div class="container">
-            <h1 class="page-title" id="categoryTitle">CATEGORÍA</h1>
-            <p class="page-subtitle" id="categorySubtitle"></p>
-        </div>
-    </section>
-
-    <!-- Filters -->
-    <section class="filters">
-        <div class="container">
-            <div class="filters-bar">
-                <div class="filter-group">
-                    <label>Talla:</label>
-                    <select id="sizeFilter">
-                        <option value="">Todas</option>
+        <div class="toolbar">
+            <div class="container toolbar-inner">
+                <div class="toolbar-chips" id="catChips" aria-label="Categorías"></div>
+                <div class="toolbar-filters">
+                    <label class="sr-only" for="sizeFilter">Talla</label>
+                    <select class="select" id="sizeFilter"><option value="">Talla</option></select>
+                    <label class="sr-only" for="colorFilter">Color</label>
+                    <select class="select" id="colorFilter"><option value="">Color</option></select>
+                    <label class="sr-only" for="sortFilter">Ordenar</label>
+                    <select class="select" id="sortFilter">
+                        <option value="featured">Destacados</option>
+                        <option value="new">Más nuevos</option>
+                        <option value="price-asc">Precio: menor a mayor</option>
+                        <option value="price-desc">Precio: mayor a menor</option>
+                        <option value="name">Nombre A–Z</option>
                     </select>
-                </div>
-
-                <div class="filter-group">
-                    <label>Color:</label>
-                    <select id="colorFilter">
-                        <option value="">Todos</option>
-                    </select>
-                </div>
-
-                <div class="filter-group">
-                    <label>Ordenar:</label>
-                    <select id="sortFilter">
-                        <option value="default">Destacados</option>
-                        <option value="price-asc">Precio: Menor a Mayor</option>
-                        <option value="price-desc">Precio: Mayor a Menor</option>
-                        <option value="name">Nombre</option>
-                    </select>
+                    <span class="result-count" id="resultCount" aria-live="polite"></span>
                 </div>
             </div>
         </div>
-    </section>
 
-    <!-- Products -->
-    <section class="products">
-        <div class="container">
-            <div class="products-grid" id="categoryProducts">
-                <!-- Products loaded via JS -->
-            </div>
-        </div>
-    </section>
+        <section class="container" style="padding-bottom:96px">
+            <div class="product-grid" id="catGrid"></div>
+        </section>
+    </main>
 
-    <!-- Footer -->
-    <footer class="footer">
-        <div class="container">
-            <div class="footer-grid">
-                <div class="footer-col">
-                    <img src="../images/logo.png" alt="PopFlame" class="footer-logo">
-                    <p>Streetwear que quema 🔥</p>
-                </div>
-
-                <div class="footer-col">
-                    <h4>TIENDA</h4>
-                    <!-- Se llena solo (js/app.js -> renderFooterCategoryLinks) -->
-                </div>
-
-                <div class="footer-col">
-                    <h4>AYUDA</h4>
-                    <a href="info.html?slug=envios">Envíos</a>
-                    <a href="info.html?slug=devoluciones">Devoluciones</a>
-                    <a href="info.html?slug=guia-de-talles">Guía de Talles</a>
-                    <a href="info.html?slug=contacto">Contacto</a>
-                </div>
-
-                <div class="footer-col">
-                    <h4>REDES</h4>
-                    <a href="#">Instagram</a>
-                    <a href="#">TikTok</a>
-                    <a href="#">Twitter</a>
-                </div>
-            </div>
-
-            <div class="footer-bottom">
-                <p>&copy; 2026 PopFlame. Todos los derechos reservados.</p>
-            </div>
-        </div>
-    </footer>
-
-    <!-- Cart Drawer -->
-    <div class="cart-overlay" id="cartOverlay"></div>
-    <div class="cart-drawer" id="cartDrawer">
-        <div class="cart-header">
-            <h3>TU CARRITO</h3>
-            <button class="cart-close" id="cartClose">
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <line x1="18" y1="6" x2="6" y2="18"></line>
-                    <line x1="6" y1="6" x2="18" y2="18"></line>
-                </svg>
-            </button>
-        </div>
-
-        <div class="cart-items" id="cartItems">
-            <!-- Cart items loaded via JS -->
-        </div>
-
-        <div class="cart-footer" id="cartFooter">
-            <div class="cart-total">
-                <span>TOTAL:</span>
-                <span id="cartTotal">$0</span>
-            </div>
-            <a href="checkout.html" class="btn btn-primary btn-full">FINALIZAR COMPRA</a>
-        </div>
-    </div>
-
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="../js/supabaseClient.js"></script>
-    <script src="../js/products.js"></script>
-    <script src="../js/cart.js"></script>
-    <script src="../js/app.js"></script>
-    <script>
-        let currentCategoryId = null;
-
-        document.addEventListener('DOMContentLoaded', async () => {
-            await ProductsManager.loadProducts();
-            CartManager.init();
-            App.applySiteConfig();
-            App.renderNav();
-            App.renderFooterCategoryLinks();
-
-            currentCategoryId = App.getUrlParam('cat');
-            const category = currentCategoryId ? ProductsManager.getCategoryById(currentCategoryId) : null;
-
-            document.getElementById('categoryTitle').textContent = category ? category.name.toUpperCase() : 'TODOS LOS PRODUCTOS';
-            document.getElementById('categorySubtitle').textContent = category ? (category.description || '') : 'Todo el catálogo PopFlame';
-            document.title = (category ? category.name : 'Catálogo') + ' | PopFlame';
-
-            // Marca el link activo en el menú (si existe esta categoría en la nav)
-            document.querySelectorAll('.nav-link').forEach(a => {
-                if (a.getAttribute('href') === `categoria.html?cat=${currentCategoryId}`) a.classList.add('active');
-            });
-
-            populateFilterOptions();
-            renderCategoryProducts();
-
-            document.getElementById('sizeFilter')?.addEventListener('change', applyFilters);
-            document.getElementById('colorFilter')?.addEventListener('change', applyFilters);
-            document.getElementById('sortFilter')?.addEventListener('change', applyFilters);
-        });
-
-        function getBaseProducts() {
-            return currentCategoryId
-                ? ProductsManager.getProductsByCategory(currentCategoryId)
-                : ProductsManager.getAllProducts();
-        }
-
-        function populateFilterOptions() {
-            const products = getBaseProducts();
-            const sizes = new Set();
-            const colors = new Set();
-            products.forEach(p => {
-                (p.sizes || []).forEach(s => sizes.add(s));
-                (p.colors || []).forEach(c => colors.add(c));
-            });
-
-            const sizeSelect = document.getElementById('sizeFilter');
-            sizes.forEach(s => sizeSelect.insertAdjacentHTML('beforeend', `<option value="${s}">${s}</option>`));
-
-            const colorSelect = document.getElementById('colorFilter');
-            colors.forEach(c => colorSelect.insertAdjacentHTML('beforeend', `<option value="${c}">${c}</option>`));
-        }
-
-        function renderCategoryProducts() {
-            ProductsManager.renderProducts('categoryProducts', getBaseProducts(), true);
-        }
-
-        function applyFilters() {
-            let products = getBaseProducts();
-
-            const size = document.getElementById('sizeFilter')?.value;
-            const color = document.getElementById('colorFilter')?.value;
-            const sort = document.getElementById('sortFilter')?.value;
-
-            if (size) products = products.filter(p => p.sizes.includes(size));
-            if (color) products = products.filter(p => p.colors.includes(color));
-
-            if (sort === 'price-asc') products.sort((a, b) => a.price - b.price);
-            else if (sort === 'price-desc') products.sort((a, b) => b.price - a.price);
-            else if (sort === 'name') products.sort((a, b) => a.name.localeCompare(b.name));
-
-            ProductsManager.renderProducts('categoryProducts', products, true);
-        }
-    </script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" defer></script>
+    <script src="../js/supabaseClient.js?v=3" defer></script>
+    <script src="../js/products.js?v=3" defer></script>
+    <script src="../js/cart.js?v=3" defer></script>
+    <script src="../js/app.js?v=3" defer></script>
+    <script src="../js/category.js?v=3" defer></script>
 </body>
 </html>

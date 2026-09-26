@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="es-CL">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>Página no encontrada | PopFlame</title>
+    <meta name="robots" content="noindex">
+    <meta name="theme-color" content="#0B0B0B">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@125,700;125,800;125,900&family=Inter:wght@400;500;600;700&display=swap">
+    <style>
+        /* Página independiente: GitHub Pages la sirve en cualquier ruta, por eso no depende de rutas relativas. */
+        :root { --red:#E31837; --ink:#0B0B0B; --bg:#F6F4F0; }
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body { min-height:100vh; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center;
+               padding:32px 16px; background:var(--bg); color:var(--ink); font-family:Inter, system-ui, sans-serif; }
+        .big { font-family:Archivo, 'Arial Black', sans-serif; font-stretch:125%; font-weight:900; font-size:clamp(120px, 28vw, 340px); line-height:.8; }
+        .big span { color:var(--red); }
+        h1 { font-family:Archivo, sans-serif; font-stretch:125%; font-weight:800; text-transform:uppercase; font-size:clamp(22px,3vw,32px); margin:28px 0 12px; }
+        p { color:#4A4A4A; margin-bottom:28px; max-width:420px; }
+        a { display:inline-flex; align-items:center; min-height:50px; padding:0 28px; background:var(--ink); color:#fff; text-decoration:none;
+            font-size:12px; font-weight:700; letter-spacing:.14em; text-transform:uppercase; transition:background .3s; }
+        a:hover { background:var(--red); }
+    </style>
+</head>
+<body>
+    <div class="big">4<span>0</span>4</div>
+    <h1>Esta página se quemó</h1>
+    <p>El link que seguiste no existe o fue movido. Vuelve a la tienda y sigue explorando.</p>
+    <a href="#" id="home">Volver a la tienda</a>
+    <script>
+        // Funciona tanto en un dominio propio como en un subdirectorio (ej. usuario.github.io/PopFlame/).
+        const parts = location.pathname.split('/').filter(Boolean);
+        const base = location.hostname.endsWith('github.io') && parts.length ? '/' + parts[0] + '/' : '/';
+        document.getElementById('home').href = base;
+    </script>
+</body>
+</html>

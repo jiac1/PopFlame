@@ -1,356 +1,312 @@
-// Main App
-const App = {
-    // Initialize app
-    async init() {
-        // Load products
-        await ProductsManager.loadProducts();
+// Núcleo de la tienda: se encarga de todo lo común a las páginas (menús, buscador, carrito,
+// newsletter, redes, animaciones) y le entrega los datos a la página actual.
+//
+// Cada página llama a Site.start({ render(data, { fresh }) { ... } }).
+// render() se ejecuta al instante con el cache y otra vez si Supabase trae datos nuevos.
 
-        // Apply logo/banner/hero text configured from el panel de Super Admin
-        this.applySiteConfig();
+const UI = {
+    openLayer: null,
+    lastFocus: null,
 
-        // Categorías dinámicas: nav, footer y grid de la portada según lo que
-        // exista realmente en Supabase (así una categoría nueva, ej. "chaquetas",
-        // aparece sola sin tocar código)
-        this.renderNav();
-        this.renderFooterCategoryLinks();
-        this.renderCategoriesGrid();
-
-        // Initialize cart
-        CartManager.init();
-
-        // Setup mobile menu
-        this.setupMobileMenu();
-
-        // Render featured products on homepage
-        this.renderFeaturedProducts();
-
-        // Setup scroll animations
-        this.setupScrollAnimations();
-
-        // Setup newsletter form
-        this.setupNewsletter();
-
-        // Botón flotante al panel: solo aparece si hay una sesión de admin activa,
-        // los clientes (sin sesión) nunca lo ven.
-        this.setupAdminShortcut();
-
-        // Carrusel del hero (solo en portada, y solo si hay banners cargados)
-        HeroSlider.init();
+    toast(message, type = 'ok') {
+        const stack = document.getElementById('toastStack');
+        if (!stack) return;
+        const el = document.createElement('div');
+        el.className = 'toast' + (type === 'error' ? ' is-error' : '');
+        el.innerHTML = `${type === 'error' ? PF.icons.alert : PF.icons.check}<span>${PF.escape(message)}</span>`;
+        stack.appendChild(el);
+        setTimeout(() => {
+            el.classList.add('is-leaving');
+            el.addEventListener('animationend', () => el.remove(), { once: true });
+        }, 2800);
     },
 
-    // Muestra un botón flotante "Ir al panel" cuando hay sesión activa (útil mientras
-    // subes imágenes/editas productos y quieres ver el resultado en la tienda al toque).
+    // Abre un panel (menú, carrito, buscador, modal) con overlay, bloqueo de scroll y foco accesible.
+    open(id) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        if (this.openLayer && this.openLayer !== el) this.close(true);
+        this.lastFocus = document.activeElement;
+        this.openLayer = el;
+        el.classList.add('is-open');
+        el.setAttribute('aria-hidden', 'false');
+        if (!el.classList.contains('modal') && !el.classList.contains('lightbox')) {
+            document.getElementById('overlay')?.classList.add('is-open');
+        }
+        document.body.classList.add('no-scroll');
+        const trigger = document.querySelector(`[aria-controls="${id}"]`);
+        trigger?.setAttribute('aria-expanded', 'true');
+        const focusTarget = el.querySelector('input:not([type=hidden]), [data-autofocus], button, a');
+        setTimeout(() => focusTarget?.focus({ preventScroll: true }), 60);
+    },
+
+    close(silent) {
+        const el = this.openLayer;
+        if (!el) return;
+        el.classList.remove('is-open');
+        el.setAttribute('aria-hidden', 'true');
+        document.getElementById('overlay')?.classList.remove('is-open');
+        document.body.classList.remove('no-scroll');
+        document.querySelector(`[aria-controls="${el.id}"]`)?.setAttribute('aria-expanded', 'false');
+        this.openLayer = null;
+        if (!silent) this.lastFocus?.focus?.({ preventScroll: true });
+    }
+};
+
+const Site = {
+    pageHandlers: null,
+    revealObserver: null,
+
+    start(handlers = {}) {
+        this.pageHandlers = handlers;
+        // Espera a que layout.js haya agregado el menú, carrito y footer (se agregan al terminar de leer el HTML).
+        const run = () => this.boot();
+        if (PF.shellReady) run();
+        else document.addEventListener('pf:shell', run, { once: true });
+    },
+
+    async boot() {
+        CartManager.init();
+        this.bindShell();
+        this.setupHeaderScroll();
+        this.setupAdminShortcut();
+
+        await ProductsManager.load((store, meta) => {
+            this.applyConfig(store.config);
+            this.renderCategoryLinks();
+            CartManager.sync();
+            try {
+                this.pageHandlers?.render?.(store, meta);
+            } catch (e) {
+                console.error('Error al pintar la página:', e);
+            }
+            this.observeReveals();
+            if (UI.openLayer?.id === 'searchPanel') this.runSearch(document.getElementById('searchInput').value);
+        });
+    },
+
+    // ===== Header / menús =====
+    bindShell() {
+        document.addEventListener('click', (e) => {
+            const t = e.target;
+            if (t.closest('#menuOpen')) return UI.open('mobileMenu');
+            if (t.closest('#cartOpen')) return UI.open('cartDrawer');
+            if (t.closest('#searchOpen')) { UI.open('searchPanel'); this.runSearch(''); return; }
+            if (t.closest('[data-close]') || t.id === 'overlay' || t.classList.contains('modal-backdrop')) return UI.close();
+
+            const qty = t.closest('[data-cart-qty]');
+            if (qty) return CartManager.updateQuantity(+qty.dataset.cartQty, +qty.dataset.delta);
+            const rm = t.closest('[data-cart-remove]');
+            if (rm) return CartManager.removeFromCart(+rm.dataset.cartRemove);
+
+            // Links dentro de menús cierran el panel
+            if (t.closest('.drawer a, .search-panel a') && UI.openLayer) UI.close(true);
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && UI.openLayer) UI.close();
+            if ((e.key === '/' || (e.key === 'k' && (e.metaKey || e.ctrlKey))) && !/input|textarea|select/i.test(document.activeElement.tagName)) {
+                e.preventDefault();
+                UI.open('searchPanel');
+                this.runSearch('');
+            }
+        });
+
+        const input = document.getElementById('searchInput');
+        let timer;
+        input?.addEventListener('input', () => {
+            clearTimeout(timer);
+            timer = setTimeout(() => this.runSearch(input.value), 120);
+        });
+        document.getElementById('searchForm')?.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const first = document.querySelector('#searchResults .product-card');
+            if (first) window.location.href = first.href;
+        });
+
+        this.setupNewsletter();
+    },
+
+    setupHeaderScroll() {
+        const header = document.getElementById('siteHeader');
+        if (!header) return;
+        const onScroll = () => header.classList.toggle('is-scrolled', window.scrollY > 8);
+        onScroll();
+        window.addEventListener('scroll', onScroll, { passive: true });
+    },
+
+    runSearch(query) {
+        const box = document.getElementById('searchResults');
+        if (!box) return;
+        const q = query.trim();
+        const cats = ProductsManager.getVisibleCategories();
+
+        if (!q) {
+            const popular = ProductsManager.getFeaturedProducts().slice(0, 4);
+            box.innerHTML = `
+                <span class="eyebrow">Categorías</span>
+                <div class="search-suggestions">
+                    ${cats.map(c => `<a class="chip" href="${PF.url('pages/categoria.html?cat=' + encodeURIComponent(c.id))}">${PF.escape(c.name)}</a>`).join('')}
+                    <a class="chip" href="${PF.url('pages/categoria.html')}">Ver todo</a>
+                </div>
+                ${popular.length ? `<div style="margin-top:36px"><span class="eyebrow">Destacados</span><div class="product-grid" style="margin-top:16px">${popular.map(p => ProductsManager.createProductCard(p)).join('')}</div></div>` : ''}`;
+            return;
+        }
+
+        const results = ProductsManager.searchProducts(q);
+        box.innerHTML = results.length
+            ? `<span class="eyebrow">${results.length} resultado${results.length === 1 ? '' : 's'}</span>
+               <div class="product-grid" style="margin-top:16px">${results.slice(0, 12).map(p => ProductsManager.createProductCard(p)).join('')}</div>`
+            : `<p class="search-hint">No encontramos productos para "<strong>${PF.escape(q)}</strong>". Prueba con otra palabra o <a href="${PF.url('pages/categoria.html')}">mira todo el catálogo</a>.</p>`;
+    },
+
+    // ===== Datos de configuración =====
+    applyConfig(cfg = {}) {
+        if (cfg.logoUrl) {
+            document.querySelectorAll('.brand').forEach(brand => {
+                const current = brand.querySelector('.brand-logo');
+                if (current && current.getAttribute('src') === cfg.logoUrl) return;
+                brand.innerHTML = PF.logoHtml(cfg.logoUrl, 'brand-logo');
+            });
+        }
+
+        const announce = document.getElementById('announce');
+        if (announce) {
+            const items = PF.announcements(cfg);
+            const row = items.map(t => `<span class="announce-item">${PF.escape(t)}</span>`).join('');
+            const html = `<div class="announce-track">${row}${row}</div>`;
+            if (announce.innerHTML !== html) announce.innerHTML = html;
+        }
+
+        const socials = this.socialLinks(cfg);
+        document.querySelectorAll('[data-social-list]').forEach(el => {
+            el.innerHTML = socials.map(s => `<a href="${PF.escape(s.url)}" target="_blank" rel="noopener">${s.label}</a>`).join('')
+                || '<a href="#" aria-disabled="true">Pronto</a>';
+        });
+        const icons = document.getElementById('footerSocial');
+        if (icons) {
+            icons.innerHTML = socials.map(s =>
+                `<a href="${PF.escape(s.url)}" target="_blank" rel="noopener" aria-label="${s.label}">${PF.icons[s.icon]}</a>`).join('');
+        }
+    },
+
+    socialLinks(cfg = {}) {
+        const out = [];
+        const s = cfg.socialLinks || {};
+        if (s.instagram) out.push({ label: 'Instagram', url: s.instagram, icon: 'instagram' });
+        if (s.tiktok) out.push({ label: 'TikTok', url: s.tiktok, icon: 'tiktok' });
+        if (s.twitter) out.push({ label: 'X / Twitter', url: s.twitter, icon: 'twitter' });
+        const wa = CartManager.whatsappLink();
+        if (wa) out.push({ label: 'WhatsApp', url: wa, icon: 'whatsapp' });
+        return out;
+    },
+
+    renderCategoryLinks() {
+        const cats = ProductsManager.getVisibleCategories();
+        const active = new URLSearchParams(location.search).get('cat');
+        const catUrl = (c) => PF.url('pages/categoria.html?cat=' + encodeURIComponent(c.id));
+
+        const nav = document.getElementById('mainNav');
+        if (nav) {
+            nav.innerHTML = cats.map(c =>
+                `<a href="${catUrl(c)}" class="${PF.page === 'category' && active === c.id ? 'is-active' : ''}">${PF.escape(c.name)}</a>`).join('');
+        }
+
+        const mobile = document.getElementById('mobileNav');
+        if (mobile) {
+            mobile.innerHTML = cats.map(c => `<a href="${catUrl(c)}">${PF.escape(c.name)} ${PF.icons.arrowRight}</a>`).join('')
+                + `<a href="${PF.url('pages/categoria.html')}">Ver todo ${PF.icons.arrowRight}</a>`;
+        }
+
+        const footer = document.getElementById('footerCats');
+        if (footer) {
+            footer.innerHTML = cats.map(c => `<a href="${catUrl(c)}">${PF.escape(c.name)}</a>`).join('')
+                + `<a href="${PF.url('pages/categoria.html')}">Ver todo</a>`;
+        }
+    },
+
+    // ===== Newsletter =====
+    setupNewsletter() {
+        const form = document.getElementById('newsForm');
+        if (!form) return;
+        const msg = document.getElementById('newsMsg');
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const input = form.querySelector('input');
+            const email = input.value.trim().toLowerCase();
+            msg.className = 'news-msg';
+            if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
+                msg.textContent = 'Ingresa un correo válido.';
+                msg.classList.add('is-error');
+                input.focus();
+                return;
+            }
+            const btn = form.querySelector('button');
+            btn.disabled = true;
+            try {
+                const { error } = await supabaseClient.from('subscribers').insert({ email });
+                if (error && error.code !== '23505') throw error;
+                if (!error) supabaseClient.functions.invoke('welcome-email', { body: { email } }).catch(() => {});
+                msg.textContent = error ? 'Ya estabas suscrito. ¡Gracias por seguirnos!' : '¡Listo! Ya eres parte del club PopFlame.';
+                msg.classList.add('is-ok');
+                form.reset();
+            } catch (err) {
+                msg.textContent = 'No pudimos guardar tu correo. Intenta de nuevo en unos segundos.';
+                msg.classList.add('is-error');
+            } finally {
+                btn.disabled = false;
+            }
+        });
+    },
+
+    // ===== Animaciones de entrada =====
+    observeReveals() {
+        const els = document.querySelectorAll('.reveal:not(.is-in)');
+        if (!els.length) return;
+        if (!('IntersectionObserver' in window)) { els.forEach(el => el.classList.add('is-in')); return; }
+        if (!this.revealObserver) {
+            this.revealObserver = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        entry.target.classList.add('is-in');
+                        this.revealObserver.unobserve(entry.target);
+                    }
+                });
+            }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
+        }
+        els.forEach(el => this.revealObserver.observe(el));
+    },
+
+    // Botón flotante al panel: solo con sesión de admin activa (los clientes nunca lo ven).
     async setupAdminShortcut() {
         if (typeof supabaseClient === 'undefined') return;
         try {
             const { data: { session } } = await supabaseClient.auth.getSession();
             if (!session) return;
-
-            const adminBase = window.location.pathname.includes('/pages/') ? '../admin/' : 'admin/';
-            const link = document.createElement('a');
-            link.href = adminBase + 'panel.html';
-            link.className = 'admin-shortcut-btn';
-            link.textContent = '⚙ Ir al panel';
-            document.body.appendChild(link);
-        } catch (error) {
-            // sin sesión o sin conexión: no se muestra nada
-        }
+            const a = document.createElement('a');
+            a.href = PF.url('admin/panel.html');
+            a.className = 'admin-shortcut';
+            a.innerHTML = `${PF.icons.settings}<span>Panel</span>`;
+            document.body.appendChild(a);
+        } catch (e) { /* sin sesión */ }
     },
 
-    // Reemplaza logo, banner y textos del hero con lo configurado en Supabase (si existe)
-    applySiteConfig() {
-        const config = ProductsManager.config;
-        if (!config) return;
-
-        this.applyMedia('.logo-img', config.logoUrl);
-        this.applyMedia('.footer-logo', config.logoWhiteUrl);
-        this.applyMedia('.hero-img', config.heroBannerUrl);
-
-        const heroTitle = document.querySelector('.hero-title');
-        if (heroTitle && config.heroTitle) heroTitle.textContent = config.heroTitle;
-
-        const heroSubtitle = document.querySelector('.hero-subtitle');
-        if (heroSubtitle && config.heroSubtitle) heroSubtitle.textContent = config.heroSubtitle;
-
-        if (config.socialLinks) {
-            const map = { instagram: 'Instagram', tiktok: 'TikTok', twitter: 'Twitter' };
-            Object.entries(map).forEach(([key, label]) => {
-                const url = config.socialLinks[key];
-                if (!url) return;
-                document.querySelectorAll('.footer-col a').forEach(a => {
-                    if (a.textContent.trim() === label) a.href = url;
-                });
-            });
-        }
+    getUrlParam(name) {
+        return new URLSearchParams(window.location.search).get(name);
     },
 
-    escapeHtml(str) {
-        const div = document.createElement('div');
-        div.textContent = str ?? '';
-        return div.innerHTML;
-    },
-
-    // Dónde está la carpeta pages/ visto desde la página actual
-    pagesPrefix() {
-        return window.location.pathname.includes('/pages/') ? '' : 'pages/';
-    },
-
-    // Reconstruye el menú de navegación con las categorías reales de Supabase
-    // (en vez de los 4 links fijos que traía el sitio originalmente)
-    renderNav() {
-        const categories = ProductsManager.getVisibleCategories();
-        if (categories.length === 0) return;
-        const prefix = this.pagesPrefix();
-        const linksHtml = categories.map(c =>
-            `<a href="${prefix}categoria.html?cat=${encodeURIComponent(c.id)}" class="nav-link">${this.escapeHtml(c.name)}</a>`
-        ).join('');
-        document.querySelectorAll('.nav').forEach(nav => { nav.innerHTML = linksHtml; });
-    },
-
-    // Igual que renderNav() pero para la columna "TIENDA" del footer
-    renderFooterCategoryLinks() {
-        const categories = ProductsManager.getVisibleCategories();
-        if (categories.length === 0) return;
-        const prefix = this.pagesPrefix();
-        const linksHtml = categories.map(c =>
-            `<a href="${prefix}categoria.html?cat=${encodeURIComponent(c.id)}">${this.escapeHtml(c.name)}</a>`
-        ).join('');
-        document.querySelectorAll('.footer-col').forEach(col => {
-            const h4 = col.querySelector('h4');
-            if (h4 && h4.textContent.trim() === 'TIENDA') {
-                col.innerHTML = '<h4>TIENDA</h4>' + linksHtml;
-            }
-        });
-    },
-
-    // Grid de categorías de la portada (solo existe en index.html)
-    renderCategoriesGrid() {
-        const grid = document.getElementById('categoriesGrid');
-        const categories = ProductsManager.getVisibleCategories();
-        if (!grid || categories.length === 0) return;
-
-        const genericIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M20.38 3.46L16 2a4 4 0 01-8 0L3.62 3.46a2 2 0 00-1.34 2.23l.58 3.47a1 1 0 00.99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 002-2V10h2.15a1 1 0 00.99-.84l.58-3.47a2 2 0 00-1.34-2.23z"></path></svg>`;
-
-        grid.innerHTML = categories.map((c, i) => {
-            const hasImage = !!c.image;
-            // Si la imagen falla al cargar (ej. rutas de ejemplo que no existen como archivo),
-            // se cae al ícono genérico en vez de dejar la tarjeta rota.
-            const bgImg = hasImage
-                ? `<img class="category-bg-img" src="${ProductsManager.resolveImagePath(c.image)}" alt=""
-                       onerror="this.parentElement.classList.remove('has-image'); this.parentElement.querySelector('.category-icon-fallback').style.display='';this.remove();">`
-                : '';
-
-            return `
-                <a href="pages/categoria.html?cat=${encodeURIComponent(c.id)}" class="category-card${hasImage ? ' has-image' : ''}">
-                    ${bgImg}
-                    <span class="category-index">${String(i + 1).padStart(2, '0')}</span>
-                    <div class="category-icon category-icon-fallback" style="${hasImage ? 'display:none;' : ''}">${genericIcon}</div>
-                    <h3>${this.escapeHtml(c.name)}</h3>
-                    <span class="category-arrow">VER COLECCIÓN →</span>
-                </a>
-            `;
-        }).join('');
-    },
-
-    // Reemplaza un <img> por un <video> en loop si la URL configurada es un video
-    // (mismo <img>/<video> según lo que se haya subido en Configuración: logo, logo blanco o banner).
-    applyMedia(selector, url) {
-        if (!url) return;
-        const isVideo = /\.(mp4|webm|mov)(\?.*)?$/i.test(url);
-
-        document.querySelectorAll(selector).forEach(el => {
-            if (!isVideo) {
-                if (el.tagName === 'VIDEO') return; // ya es video, no hay imagen que poner
-                el.src = url;
-                return;
-            }
-            if (el.tagName === 'VIDEO') { el.src = url; return; }
-
-            const video = document.createElement('video');
-            video.className = el.className;
-            video.src = url;
-            video.autoplay = true;
-            video.loop = true;
-            video.muted = true;
-            video.playsInline = true;
-            video.setAttribute('aria-label', el.alt || '');
-            el.replaceWith(video);
-        });
-    },
-
-    // Setup mobile menu
-    setupMobileMenu() {
-        const menuBtn = document.getElementById('menuBtn');
-        const nav = document.querySelector('.nav');
-        
-        if (menuBtn && nav) {
-            menuBtn.addEventListener('click', () => {
-                nav.classList.toggle('active');
-                menuBtn.classList.toggle('active');
-            });
-        }
-    },
-
-    // Render featured products
-    renderFeaturedProducts() {
-        const container = document.getElementById('featuredProducts');
-        if (!container) return;
-
-        const featured = ProductsManager.getFeaturedProducts();
-        ProductsManager.renderProducts('featuredProducts', featured);
-    },
-
-    // Setup scroll animations
-    setupScrollAnimations() {
-        const observer = new IntersectionObserver((entries) => {
-            entries.forEach(entry => {
-                if (entry.isIntersecting) {
-                    entry.target.classList.add('animated');
-                }
-            });
-        }, { threshold: 0.1 });
-
-        document.querySelectorAll('[data-animate]').forEach(el => {
-            observer.observe(el);
-        });
-    },
-
-    // Setup newsletter
-    setupNewsletter() {
-        const form = document.querySelector('.newsletter-form');
-        if (!form) return;
-
-        form.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const input = form.querySelector('input');
-            const email = input.value.trim();
-            const btn = form.querySelector('button[type="submit"]');
-            const originalText = btn.textContent;
-            btn.disabled = true;
-            btn.textContent = '...';
-
-            try {
-                const { error } = await supabaseClient.from('subscribers').insert({ email });
-                // Si el email ya estaba suscrito (unique violation), lo tratamos igual como éxito.
-                if (error && error.code !== '23505') throw error;
-
-                // Dispara el correo de bienvenida (si la Edge Function ya está desplegada;
-                // si no existe todavía, falla en silencio y la suscripción queda guardada igual).
-                supabaseClient.functions.invoke('welcome-email', { body: { email } }).catch(() => {});
-
-                alert('¡Gracias por suscribirte! Te avisaremos de drops exclusivos y ofertas.');
-                form.reset();
-            } catch (error) {
-                alert('No pudimos guardar tu suscripción. Intenta de nuevo en unos segundos.');
-            } finally {
-                btn.disabled = false;
-                btn.textContent = originalText;
-            }
-        });
-    },
-
-    // Get URL parameters
-    getUrlParam(param) {
-        const urlParams = new URLSearchParams(window.location.search);
-        return urlParams.get(param);
+    setMeta(title, description, image) {
+        if (title) document.title = title;
+        const set = (sel, attr, val) => { const el = document.querySelector(sel); if (el && val) el.setAttribute(attr, val); };
+        set('meta[name="description"]', 'content', description);
+        set('meta[property="og:title"]', 'content', title);
+        set('meta[property="og:description"]', 'content', description);
+        set('meta[property="og:image"]', 'content', image);
     }
 };
 
-// Carrusel de banners del hero (portada). Si no hay banners cargados en el panel
-// (Banners), no hace nada y queda el hero único de config tal como lo dejó applySiteConfig().
-const HeroSlider = {
-    slides: [],
-    current: 0,
-    timer: null,
-    intervalMs: 6000,
-
-    async init() {
-        const container = document.getElementById('heroSlides');
-        if (!container || typeof supabaseClient === 'undefined') return;
-
-        try {
-            const { data, error } = await supabaseClient
-                .from('banners').select('*').eq('active', true).order('sort_order');
-            if (error || !data || data.length === 0) return;
-
-            this.slides = data;
-            this.render(container);
-            if (this.slides.length > 1) this.start();
-        } catch (error) {
-            // sin conexión: se queda con el hero por defecto
-        }
-    },
-
-    escapeHtml(str) {
-        const div = document.createElement('div');
-        div.textContent = str ?? '';
-        return div.innerHTML;
-    },
-
-    render(container) {
-        container.innerHTML = this.slides.map((s, i) => {
-            const isVideo = /\.(mp4|webm|mov)(\?.*)?$/i.test(s.media_url || '');
-            const media = isVideo
-                ? `<video class="hero-img" src="${s.media_url}" autoplay loop muted playsinline></video>`
-                : `<img class="hero-img" src="${s.media_url}" alt="${this.escapeHtml(s.title || 'PopFlame')}">`;
-
-            return `
-                <div class="hero-slide ${i === 0 ? 'active' : ''}" data-index="${i}">
-                    <div class="hero-bg">
-                        ${media}
-                        <div class="hero-overlay"></div>
-                    </div>
-                    <div class="hero-content">
-                        ${s.title ? `<h1 class="hero-title">${this.escapeHtml(s.title)}</h1>` : ''}
-                        ${s.subtitle ? `<p class="hero-subtitle">${this.escapeHtml(s.subtitle)}</p>` : ''}
-                        <a href="${s.link_url || '#products'}" class="btn btn-primary">VER PRODUCTOS</a>
-                    </div>
-                </div>
-            `;
-        }).join('');
-
-        const dots = document.getElementById('heroDots');
-        const prevBtn = document.getElementById('heroPrev');
-        const nextBtn = document.getElementById('heroNext');
-
-        if (this.slides.length > 1) {
-            dots.innerHTML = this.slides.map((_, i) => `<button class="hero-dot ${i === 0 ? 'active' : ''}" data-index="${i}" aria-label="Ir al banner ${i + 1}"></button>`).join('');
-            dots.style.display = 'flex';
-            prevBtn.style.display = 'flex';
-            nextBtn.style.display = 'flex';
-
-            prevBtn.addEventListener('click', () => this.goTo(this.current - 1));
-            nextBtn.addEventListener('click', () => this.goTo(this.current + 1));
-            dots.addEventListener('click', (e) => {
-                const btn = e.target.closest('.hero-dot');
-                if (btn) this.goTo(parseInt(btn.dataset.index, 10));
-            });
-        }
-    },
-
-    goTo(index) {
-        this.current = (index + this.slides.length) % this.slides.length;
-        document.querySelectorAll('.hero-slide').forEach((el, i) => el.classList.toggle('active', i === this.current));
-        document.querySelectorAll('.hero-dot').forEach((el, i) => el.classList.toggle('active', i === this.current));
-        this.restart();
-    },
-
-    start() {
-        this.timer = setInterval(() => this.goTo(this.current + 1), this.intervalMs);
-    },
-
-    restart() {
-        if (this.timer) clearInterval(this.timer);
-        this.start();
-    }
+// Compatibilidad con código anterior que usaba App.*
+const App = {
+    escapeHtml: (s) => PF.escape(s),
+    getUrlParam: (n) => Site.getUrlParam(n)
 };
-
-// Initialize on DOM load
-document.addEventListener('DOMContentLoaded', () => {
-    App.init();
-});
-
-// Export for use in other files
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = App;
-}

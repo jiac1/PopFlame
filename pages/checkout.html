@@ -1,587 +1,124 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="es-CL">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Checkout | PopFlame</title>
-    <meta name="description" content="Finalizar compra PopFlame.">
-    <link rel="stylesheet" href="../css/style.css">
-    <link rel="stylesheet" href="../css/responsive.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
-    <style>
-        /* Checkout Page Styles */
-        .checkout-page {
-            padding: 120px 0 80px;
-        }
-        
-        .checkout-layout {
-            display: grid;
-            grid-template-columns: 1fr 400px;
-            gap: 48px;
-            max-width: 1200px;
-            margin: 0 auto;
-        }
-        
-        .checkout-title {
-            font-size: 28px;
-            font-weight: 800;
-            margin-bottom: 32px;
-            grid-column: 1 / -1;
-        }
-        
-        .checkout-form {
-            background: var(--bg-card);
-            padding: 32px;
-            border: 1px solid var(--border);
-        }
-        
-        .form-section {
-            margin-bottom: 32px;
-        }
-        
-        .form-section:last-child {
-            margin-bottom: 0;
-        }
-        
-        .form-section-title {
-            font-size: 16px;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            margin-bottom: 20px;
-            padding-bottom: 12px;
-            border-bottom: 1px solid var(--border);
-        }
-        
-        .form-row {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 16px;
-        }
-        
-        .form-group {
-            margin-bottom: 16px;
-        }
-        
-        .form-group:last-child {
-            margin-bottom: 0;
-        }
-        
-        .form-group.full-width {
-            grid-column: 1 / -1;
-        }
-        
-        .form-label {
-            display: block;
-            font-size: 13px;
-            font-weight: 500;
-            margin-bottom: 8px;
-            color: var(--text-secondary);
-        }
-        
-        .form-input,
-        .form-select {
-            width: 100%;
-            padding: 14px 16px;
-            background: var(--bg-dark);
-            border: 1px solid var(--border);
-            color: var(--text-primary);
-            font-size: 14px;
-            font-family: inherit;
-            transition: var(--transition);
-        }
-        
-        .form-input:focus,
-        .form-select:focus {
-            outline: none;
-            border-color: var(--primary);
-        }
-        
-        .form-input::placeholder {
-            color: var(--text-muted);
-        }
-        
-        .form-select {
-            cursor: pointer;
-            appearance: none;
-            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23666' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
-            background-repeat: no-repeat;
-            background-position: right 16px center;
-        }
-        
-        .form-select option {
-            background: var(--bg-dark);
-            color: var(--text-primary);
-        }
-        
-        /* Order Summary */
-        .order-summary {
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            padding: 32px;
-            height: fit-content;
-            position: sticky;
-            top: 100px;
-        }
-        
-        .summary-title {
-            font-size: 16px;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            margin-bottom: 24px;
-            padding-bottom: 12px;
-            border-bottom: 1px solid var(--border);
-        }
-        
-        .summary-items {
-            margin-bottom: 24px;
-        }
-        
-        .summary-item {
-            display: flex;
-            gap: 12px;
-            padding-bottom: 16px;
-            margin-bottom: 16px;
-            border-bottom: 1px solid var(--border);
-        }
-        
-        .summary-item:last-child {
-            margin-bottom: 0;
-            padding-bottom: 0;
-            border-bottom: none;
-        }
-        
-        .summary-item-image {
-            width: 60px;
-            height: 75px;
-            background: var(--bg-dark);
-            overflow: hidden;
-        }
-        
-        .summary-item-image img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
-        
-        .summary-item-details {
-            flex: 1;
-        }
-        
-        .summary-item-name {
-            font-size: 13px;
-            font-weight: 600;
-            margin-bottom: 4px;
-        }
-        
-        .summary-item-variant {
-            font-size: 11px;
-            color: var(--text-muted);
-            margin-bottom: 4px;
-        }
-        
-        .summary-item-qty {
-            font-size: 12px;
-            color: var(--text-secondary);
-        }
-        
-        .summary-item-price {
-            font-size: 13px;
-            font-weight: 600;
-            color: var(--primary);
-            white-space: nowrap;
-        }
-        
-        .summary-row {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 12px;
-            font-size: 14px;
-        }
-        
-        .summary-row.total {
-            font-size: 18px;
-            font-weight: 700;
-            margin-top: 16px;
-            padding-top: 16px;
-            border-top: 1px solid var(--border);
-        }
-        
-        .summary-row.total span:last-child {
-            color: var(--primary);
-        }
-        
-        .payment-info {
-            margin-top: 24px;
-            padding: 16px;
-            background: var(--bg-dark);
-            border: 1px solid var(--border);
-        }
-
-        .delivery-note {
-            padding: 14px 16px;
-            margin-bottom: 20px;
-            background: var(--bg-darker);
-            border: 1px solid var(--border);
-            border-left: 3px solid var(--primary);
-            font-size: 13px;
-            line-height: 1.6;
-            color: var(--text-secondary);
-        }
-        
-        .payment-info h4 {
-            font-size: 13px;
-            font-weight: 600;
-            margin-bottom: 12px;
-            color: var(--text-secondary);
-        }
-        
-        .payment-info p {
-            font-size: 13px;
-            color: var(--text-muted);
-            line-height: 1.6;
-        }
-        
-        .whatsapp-btn {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 12px;
-            width: 100%;
-            padding: 18px;
-            background: #25D366;
-            color: white;
-            font-size: 16px;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            margin-top: 24px;
-            transition: var(--transition);
-        }
-        
-        .whatsapp-btn:hover {
-            background: #128C7E;
-            transform: translateY(-2px);
-        }
-        
-        .whatsapp-btn svg {
-            width: 24px;
-            height: 24px;
-        }
-        
-        .secure-badge {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-            margin-top: 16px;
-            font-size: 12px;
-            color: var(--text-muted);
-        }
-        
-        .secure-badge svg {
-            width: 16px;
-            height: 16px;
-        }
-        
-        @media (max-width: 992px) {
-            .checkout-layout {
-                grid-template-columns: 1fr;
-            }
-            
-            .order-summary {
-                position: static;
-                order: -1;
-            }
-        }
-        
-        @media (max-width: 576px) {
-            .form-row {
-                grid-template-columns: 1fr;
-            }
-            
-            .checkout-form,
-            .order-summary {
-                padding: 20px;
-            }
-        }
-    </style>
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>Finalizar compra | PopFlame</title>
+    <meta name="description" content="Finaliza tu compra PopFlame. Pago por transferencia y entrega en Metro de Santiago.">
+    <meta name="robots" content="noindex">
+    <meta name="theme-color" content="#0B0B0B">
+    <link rel="icon" href="../images/favicon-32.png" sizes="32x32" type="image/png">
+    <link rel="apple-touch-icon" href="../images/apple-touch-icon.png">
+    <link rel="manifest" href="../site.webmanifest">
+    <link rel="preconnect" href="https://ysxinhpymvhdnfbdanvn.supabase.co" crossorigin>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@125,700;125,800;125,900&family=Inter:wght@400;500;600;700&display=swap">
+    <link rel="stylesheet" href="../css/style.css?v=3">
 </head>
-<body>
-    <!-- Header -->
-    <header class="header">
-        <div class="container">
-            <a href="../index.html" class="logo">
-                <img src="../images/logo.png" alt="PopFlame" class="logo-img">
-            </a>
-            
-            <nav class="nav">
-                <a href="poleras.html" class="nav-link">Poleras</a>
-                <a href="polerones.html" class="nav-link">Polerones</a>
-                <a href="pantalones.html" class="nav-link">Pantalones</a>
-                <a href="accesorios.html" class="nav-link">Accesorios</a>
-            </nav>
+<body data-page="checkout">
+    <script src="../js/layout.js?v=3"></script>
 
-            <div class="header-actions">
-                <button class="cart-btn" id="cartBtn">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <circle cx="9" cy="21" r="1"></circle>
-                        <circle cx="20" cy="21" r="1"></circle>
-                        <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
-                    </svg>
-                    <span class="cart-count" id="cartCount">0</span>
-                </button>
-                
-                <button class="menu-btn" id="menuBtn">
-                    <span></span>
-                    <span></span>
-                    <span></span>
-                </button>
+    <main id="main" class="page-offset">
+        <header class="page-head">
+            <div class="container-narrow">
+                <nav class="breadcrumbs" aria-label="Ruta">
+                    <a href="../index.html">Inicio</a><span aria-hidden="true">/</span>
+                    <span>Finalizar compra</span>
+                </nav>
+                <h1 class="page-title" style="font-size:clamp(32px,5vw,64px)">Finalizar compra</h1>
             </div>
-        </div>
-    </header>
+        </header>
 
-    <!-- Checkout Page -->
-    <section class="checkout-page">
-        <div class="container">
-            <h1 class="checkout-title">FINALIZAR COMPRA</h1>
-            
-            <div class="checkout-layout">
-                <div class="checkout-form">
-                    <form id="checkoutForm">
-                        <div class="form-section">
-                            <h3 class="form-section-title">Datos Personales</h3>
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label class="form-label">Nombre *</label>
-                                    <input type="text" class="form-input" id="name" name="name" required>
-                                </div>
-                                <div class="form-group">
-                                    <label class="form-label">Apellido *</label>
-                                    <input type="text" class="form-input" id="lastName" name="lastName" required>
-                                </div>
+        <div class="container-narrow" id="checkoutRoot">
+            <div class="checkout" id="checkoutLayout">
+                <form id="checkoutForm" novalidate>
+                    <section class="co-step">
+                        <h2 class="co-step-title"><span>1</span>Tus datos</h2>
+                        <div class="form-grid">
+                            <div class="field">
+                                <label for="name">Nombre</label>
+                                <input id="name" name="name" autocomplete="given-name" required>
+                                <span class="field-msg"></span>
                             </div>
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label class="form-label">Email *</label>
-                                    <input type="email" class="form-input" id="email" name="email" required>
-                                </div>
-                                <div class="form-group">
-                                    <label class="form-label">Teléfono *</label>
-                                    <input type="tel" class="form-input" id="phone" name="phone" placeholder="+56 9 1234 5678" required>
-                                </div>
+                            <div class="field">
+                                <label for="lastName">Apellido</label>
+                                <input id="lastName" name="lastName" autocomplete="family-name" required>
+                                <span class="field-msg"></span>
+                            </div>
+                            <div class="field">
+                                <label for="email">Correo electrónico</label>
+                                <input id="email" name="email" type="email" autocomplete="email" inputmode="email" required>
+                                <span class="field-msg"></span>
+                            </div>
+                            <div class="field">
+                                <label for="phone">Teléfono (WhatsApp)</label>
+                                <input id="phone" name="phone" type="tel" autocomplete="tel" inputmode="tel" placeholder="+56 9 1234 5678" required>
+                                <span class="field-msg"></span>
                             </div>
                         </div>
-                        
-                        <div class="form-section">
-                            <h3 class="form-section-title">Entrega</h3>
-                            <div class="delivery-note">
-                                📍 Las entregas se coordinan de forma presencial en estaciones de <strong>Metro de Santiago</strong>.
-                                Si necesitas envío a otra región o a una zona alejada de Santiago, lo coordinamos directamente por WhatsApp después de tu pedido.
+                    </section>
+
+                    <section class="co-step">
+                        <h2 class="co-step-title"><span>2</span>Entrega</h2>
+                        <div class="notice">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M12 21s-7-6.2-7-11.5a7 7 0 0114 0C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg>
+                            <div>Entregamos <strong>gratis y en persona en estaciones de Metro de Santiago</strong>. Si estás en regiones o lejos del Metro, lo coordinamos por WhatsApp (el envío puede tener costo según la zona).</div>
+                        </div>
+                        <div class="form-grid">
+                            <div class="field full">
+                                <label for="meetingPoint">Estación de Metro preferida <em>(opcional)</em></label>
+                                <input id="meetingPoint" name="meetingPoint" placeholder="Ej: Baquedano, Línea 1" list="metroStations" autocomplete="off">
+                                <datalist id="metroStations"></datalist>
                             </div>
-                            <div class="form-group">
-                                <label class="form-label">Estación de Metro preferida (opcional)</label>
-                                <input type="text" class="form-input" id="meetingPoint" name="meetingPoint" placeholder="Ej: Los Dominicos, Línea 1">
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label">Nota adicional (opcional)</label>
-                                <input type="text" class="form-input" id="note" name="note" placeholder="Horario preferido, otra región, etc.">
+                            <div class="field full">
+                                <label for="note">Nota para tu pedido <em>(opcional)</em></label>
+                                <textarea id="note" name="note" placeholder="Horario que te acomoda, envío a otra región, etc."></textarea>
                             </div>
                         </div>
-                    </form>
-                </div>
+                    </section>
 
-                <div class="order-summary">
-                    <h3 class="summary-title">RESUMEN DEL PEDIDO</h3>
-                    
-                    <div class="summary-items" id="summaryItems">
-                        <!-- Items loaded via JS -->
-                    </div>
-                    
-                    <div class="summary-row">
-                        <span>Subtotal</span>
-                        <span id="summarySubtotal">$0</span>
-                    </div>
-                    <div class="summary-row">
-                        <span>Envío</span>
-                        <span id="summaryShipping">$0</span>
-                    </div>
-                    <div class="summary-row total">
-                        <span>TOTAL</span>
-                        <span id="summaryTotal">$0</span>
-                    </div>
-                    
-                    <div class="payment-info">
-                        <h4>Método de Pago</h4>
-                        <p>Transferencia bancaria. Los datos de la cuenta se enviarán por WhatsApp después de confirmar el pedido.</p>
-                    </div>
-                    
-                    <button class="whatsapp-btn" id="whatsappBtn">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
-                        </svg>
-                        ENVIAR PEDIDO POR WHATSAPP
+                    <section class="co-step">
+                        <h2 class="co-step-title"><span>3</span>Pago</h2>
+                        <div class="pay-option">
+                            <span class="radio" aria-hidden="true"></span>
+                            <div>
+                                <strong>Transferencia bancaria</strong>
+                                <small>Al enviar tu pedido te compartimos los datos de la cuenta por WhatsApp. Tu pedido se reserva por 24 horas.</small>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-whatsapp btn-block co-submit-mobile" id="submitMobile"></button>
+                    </section>
+                </form>
+
+                <aside class="summary" id="summary" aria-label="Resumen del pedido">
+                    <button type="button" class="summary-toggle" id="summaryToggle" aria-expanded="false" aria-controls="summaryBody">
+                        <span>Ver resumen del pedido</span><strong id="summaryToggleTotal"></strong>
                     </button>
-                    
-                    <div class="secure-badge">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-                            <path d="M7 11V7a5 5 0 0110 0v4"></path>
-                        </svg>
-                        <span>Compra segura</span>
+                    <h3>Resumen</h3>
+                    <div class="summary-body" id="summaryBody">
+                        <div class="summary-lines" id="summaryLines"></div>
+                        <div class="summary-rows">
+                            <div class="cart-row"><span>Subtotal</span><span id="sumSubtotal"></span></div>
+                            <div class="cart-row"><span>Entrega</span><span id="sumShipping"></span></div>
+                            <div class="cart-row is-total"><span>Total</span><span id="sumTotal"></span></div>
+                        </div>
                     </div>
-                </div>
+                    <button type="submit" form="checkoutForm" class="btn btn-whatsapp btn-block" id="submitDesktop"></button>
+                    <p class="summary-foot">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 018 0v3"/></svg>
+                        Tus datos solo se usan para coordinar tu pedido.
+                    </p>
+                </aside>
             </div>
         </div>
-    </section>
+    </main>
 
-    <!-- Footer -->
-    <footer class="footer">
-        <div class="container">
-            <div class="footer-bottom">
-                <p>&copy; 2026 PopFlame. Todos los derechos reservados.</p>
-            </div>
-        </div>
-    </footer>
-
-    <!-- Cart Drawer -->
-    <div class="cart-overlay" id="cartOverlay"></div>
-    <div class="cart-drawer" id="cartDrawer">
-        <div class="cart-header">
-            <h3>TU CARRITO</h3>
-            <button class="cart-close" id="cartClose">
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <line x1="18" y1="6" x2="6" y2="18"></line>
-                    <line x1="6" y1="6" x2="18" y2="18"></line>
-                </svg>
-            </button>
-        </div>
-        
-        <div class="cart-items" id="cartItems">
-            <!-- Cart items loaded via JS -->
-        </div>
-        
-        <div class="cart-footer" id="cartFooter">
-            <div class="cart-total">
-                <span>TOTAL:</span>
-                <span id="cartTotal">$0</span>
-            </div>
-            <a href="checkout.html" class="btn btn-primary btn-full">FINALIZAR COMPRA</a>
-        </div>
-    </div>
-
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="../js/supabaseClient.js"></script>
-    <script src="../js/products.js"></script>
-    <script src="../js/cart.js"></script>
-    <script src="../js/app.js"></script>
-    <script>
-        document.addEventListener('DOMContentLoaded', async () => {
-            await ProductsManager.loadProducts();
-            CartManager.init();
-            App.applySiteConfig();
-            App.renderNav();
-            App.renderFooterCategoryLinks();
-            App.setupMobileMenu();
-            
-            // Check if cart is empty
-            if (CartManager.getCount() === 0) {
-                alert('Tu carrito está vacío');
-                window.location.href = '../index.html';
-                return;
-            }
-            
-            renderOrderSummary();
-            setupFormValidation();
-        });
-        
-        function renderOrderSummary() {
-            const items = CartManager.getItems();
-            const container = document.getElementById('summaryItems');
-            
-            container.innerHTML = items.map(item => `
-                <div class="summary-item">
-                    <div class="summary-item-image">
-                        <img src="${ProductsManager.resolveImagePath(item.image, '../')}" alt="${item.name}">
-                    </div>
-                    <div class="summary-item-details">
-                        <h4 class="summary-item-name">${item.name}</h4>
-                        <p class="summary-item-variant">Talla: ${item.size} | Color: ${item.color}</p>
-                        <p class="summary-item-qty">Cantidad: ${item.quantity}</p>
-                    </div>
-                    <span class="summary-item-price">${ProductsManager.formatPrice(item.price * item.quantity)}</span>
-                </div>
-            `).join('');
-            
-            document.getElementById('summarySubtotal').textContent = ProductsManager.formatPrice(CartManager.getSubtotal());
-            document.getElementById('summaryShipping').textContent = CartManager.getShipping() === 0 ? 'GRATIS' : ProductsManager.formatPrice(CartManager.getShipping());
-            document.getElementById('summaryTotal').textContent = ProductsManager.formatPrice(CartManager.getTotal());
-        }
-        
-        function setupFormValidation() {
-            const form = document.getElementById('checkoutForm');
-            const whatsappBtn = document.getElementById('whatsappBtn');
-
-            whatsappBtn.addEventListener('click', async (e) => {
-                e.preventDefault();
-
-                // Validate form
-                if (!form.checkValidity()) {
-                    form.reportValidity();
-                    return;
-                }
-
-                // Get form data
-                const formData = new FormData(form);
-                const customerData = {
-                    name: `${formData.get('name')} ${formData.get('lastName')}`,
-                    email: formData.get('email'),
-                    phone: formData.get('phone'),
-                    meetingPoint: formData.get('meetingPoint') || '',
-                    note: formData.get('note') || ''
-                };
-
-                whatsappBtn.disabled = true;
-                whatsappBtn.textContent = 'PROCESANDO...';
-
-                try {
-                    // Guardar el pedido en Supabase (queda registrado aunque WhatsApp no esté configurado aún)
-                    const { data: order, error } = await supabaseClient.from('orders').insert({
-                        customer_name: customerData.name,
-                        customer_email: customerData.email,
-                        customer_phone: customerData.phone,
-                        customer_address: customerData.meetingPoint || null,
-                        note: customerData.note,
-                        items: CartManager.getItems(),
-                        subtotal: CartManager.getSubtotal(),
-                        shipping: CartManager.getShipping(),
-                        total: CartManager.getTotal(),
-                        status: 'pending',
-                        payment_method: 'transfer'
-                    }).select().single();
-
-                    if (error) throw error;
-
-                    const whatsappNumber = ProductsManager.config?.whatsappNumber;
-
-                    if (whatsappNumber) {
-                        const message = CartManager.generateWhatsAppMessage(customerData, order.order_number);
-                        window.open(`https://wa.me/${whatsappNumber}?text=${message}`, '_blank');
-                    } else {
-                        alert(`¡Pedido ${order.order_number} registrado! Aún no tenemos WhatsApp configurado, pero tu pedido ya quedó guardado y te contactaremos pronto.`);
-                    }
-
-                    CartManager.clearCart();
-                    window.location.href = '../index.html';
-                } catch (err) {
-                    console.error('Error creando el pedido:', err);
-                    alert('No pudimos registrar tu pedido. Intenta nuevamente en unos segundos.');
-                    whatsappBtn.disabled = false;
-                    whatsappBtn.textContent = 'ENVIAR PEDIDO POR WHATSAPP';
-                }
-            });
-        }
-    </script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" defer></script>
+    <script src="../js/supabaseClient.js?v=3" defer></script>
+    <script src="../js/products.js?v=3" defer></script>
+    <script src="../js/cart.js?v=3" defer></script>
+    <script src="../js/app.js?v=3" defer></script>
+    <script src="../js/checkout.js?v=3" defer></script>
 </body>
 </html>

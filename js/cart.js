@@ -1,263 +1,235 @@
-// Cart Manager
+// Carrito (localStorage) + mensaje de WhatsApp del pedido.
 const CartManager = {
     cart: [],
     storageKey: 'popflame_cart',
 
-    // Initialize cart from localStorage
     init() {
-        const savedCart = localStorage.getItem(this.storageKey);
-        if (savedCart) {
-            this.cart = JSON.parse(savedCart);
+        try {
+            this.cart = JSON.parse(localStorage.getItem(this.storageKey) || '[]');
+            if (!Array.isArray(this.cart)) this.cart = [];
+        } catch (e) {
+            this.cart = [];
         }
         this.updateUI();
-        this.setupEventListeners();
     },
 
-    // Setup event listeners
-    setupEventListeners() {
-        const cartBtn = document.getElementById('cartBtn');
-        const cartClose = document.getElementById('cartClose');
-        const cartOverlay = document.getElementById('cartOverlay');
-
-        if (cartBtn) {
-            cartBtn.addEventListener('click', () => this.openDrawer());
-        }
-
-        if (cartClose) {
-            cartClose.addEventListener('click', () => this.closeDrawer());
-        }
-
-        if (cartOverlay) {
-            cartOverlay.addEventListener('click', () => this.closeDrawer());
-        }
+    // Con los productos ya cargados, actualiza precio/nombre/foto de lo que hay en el carrito
+    // y quita lo que ya no existe o se agotó (así el total nunca queda desactualizado).
+    sync() {
+        if (!ProductsManager.loaded || !ProductsManager.products.length) return;
+        let changed = false;
+        this.cart = this.cart.filter(item => {
+            const p = ProductsManager.getProductById(item.productId);
+            if (!p || p.stock <= 0) { changed = true; return false; }
+            if (item.price !== p.price || item.name !== p.name || item.image !== p.image) {
+                item.price = p.price; item.name = p.name; item.image = p.image;
+                changed = true;
+            }
+            if (item.quantity > p.stock) { item.quantity = p.stock; changed = true; }
+            return true;
+        });
+        if (changed) this.save();
+        this.updateUI();
     },
 
-    // Add product to cart
+    maxFor(productId) {
+        const p = ProductsManager.getProductById(productId);
+        return p ? Math.max(0, p.stock) : 99;
+    },
+
+    quantityOf(productId) {
+        return this.cart.filter(i => i.productId === productId).reduce((t, i) => t + i.quantity, 0);
+    },
+
+    // Devuelve true si se agregó. Respeta el stock total del producto (entre todas sus variantes).
     addToCart(product, size, color, quantity = 1) {
-        const existingItem = this.cart.find(
-            item => item.productId === product.id && item.size === size && item.color === color
-        );
+        const available = product.stock - this.quantityOf(product.id);
+        if (available <= 0) {
+            UI.toast('Ya tienes en el carrito todo el stock disponible', 'error');
+            return false;
+        }
+        const qty = Math.min(quantity, available);
 
-        if (existingItem) {
-            existingItem.quantity += quantity;
+        const existing = this.cart.find(i => i.productId === product.id && i.size === size && i.color === color);
+        if (existing) {
+            existing.quantity += qty;
         } else {
             this.cart.push({
                 productId: product.id,
                 name: product.name,
                 price: product.price,
-                size: size,
-                color: color,
-                quantity: quantity,
+                size,
+                color,
+                quantity: qty,
                 image: product.image
             });
         }
 
-        this.saveCart();
+        this.save();
         this.updateUI();
-        this.showNotification('Producto agregado al carrito');
+        this.bumpCount();
+        if (qty < quantity) UI.toast(`Solo quedaban ${qty} unidades disponibles`, 'error');
+        return true;
     },
 
-    // Remove item from cart
     removeFromCart(index) {
         this.cart.splice(index, 1);
-        this.saveCart();
+        this.save();
         this.updateUI();
     },
 
-    // Update item quantity
     updateQuantity(index, change) {
         const item = this.cart[index];
-        item.quantity += change;
-
-        if (item.quantity <= 0) {
-            this.removeFromCart(index);
-        } else {
-            this.saveCart();
-            this.updateUI();
+        if (!item) return;
+        const next = item.quantity + change;
+        if (next <= 0) return this.removeFromCart(index);
+        if (change > 0 && this.quantityOf(item.productId) + change > this.maxFor(item.productId)) {
+            UI.toast('No hay más stock disponible de este producto', 'error');
+            return;
         }
-    },
-
-    // Get cart items
-    getItems() {
-        return this.cart;
-    },
-
-    // Get cart count
-    getCount() {
-        return this.cart.reduce((total, item) => total + item.quantity, 0);
-    },
-
-    // Get cart subtotal
-    getSubtotal() {
-        return this.cart.reduce((total, item) => total + (item.price * item.quantity), 0);
-    },
-
-    // Get shipping cost (usa la configuración cargada desde Supabase, con fallback)
-    getShipping() {
-        const subtotal = this.getSubtotal();
-        const freeMin = ProductsManager.config?.freeShippingMin ?? 50000;
-        const cost = ProductsManager.config?.shippingCost ?? 5990;
-        return subtotal >= freeMin ? 0 : cost;
-    },
-
-    // Get total
-    getTotal() {
-        return this.getSubtotal() + this.getShipping();
-    },
-
-    // Format price
-    formatPrice(price) {
-        return '$' + price.toLocaleString('es-CL');
-    },
-
-    // El carrito se renderiza tanto en index.html (raíz) como en pages/*.html
-    getImagePrefix() {
-        return window.location.pathname.includes('/pages/') ? '../' : '';
-    },
-
-    // Save cart to localStorage
-    saveCart() {
-        localStorage.setItem(this.storageKey, JSON.stringify(this.cart));
-    },
-
-    // Clear cart
-    clearCart() {
-        this.cart = [];
-        this.saveCart();
+        item.quantity = next;
+        this.save();
         this.updateUI();
     },
 
-    // Update UI elements
-    updateUI() {
-        this.updateCount();
-        this.updateDrawer();
-        this.updateTotals();
+    getItems() { return this.cart; },
+    getCount() { return this.cart.reduce((t, i) => t + i.quantity, 0); },
+    getSubtotal() { return this.cart.reduce((t, i) => t + i.price * i.quantity, 0); },
+
+    getShipping() {
+        const cfg = ProductsManager.config || {};
+        const cost = Number(cfg.shippingCost || 0);
+        const freeMin = Number(cfg.freeShippingMin || 0);
+        if (!cost) return 0;
+        return this.getSubtotal() >= freeMin && freeMin > 0 ? 0 : cost;
     },
 
-    // Update cart count badge
-    updateCount() {
+    shippingLabel() {
+        const s = this.getShipping();
+        return s === 0 ? 'Gratis en Metro' : this.formatPrice(s);
+    },
+
+    getTotal() { return this.getSubtotal() + this.getShipping(); },
+    formatPrice(price) { return ProductsManager.formatPrice(price); },
+
+    save() {
+        try { localStorage.setItem(this.storageKey, JSON.stringify(this.cart)); } catch (e) { /* ignorado */ }
+    },
+
+    clearCart() {
+        this.cart = [];
+        this.save();
+        this.updateUI();
+    },
+
+    bumpCount() {
+        const el = document.getElementById('cartCount');
+        if (!el) return;
+        el.classList.remove('bump');
+        void el.offsetWidth;
+        el.classList.add('bump');
+    },
+
+    updateUI() {
+        document.dispatchEvent(new Event('pf:cart'));
+        const count = this.getCount();
         const countEl = document.getElementById('cartCount');
         if (countEl) {
-            countEl.textContent = this.getCount();
-            countEl.style.display = this.getCount() > 0 ? 'flex' : 'none';
+            countEl.textContent = count;
+            countEl.classList.toggle('is-visible', count > 0);
         }
-    },
+        const drawerCount = document.getElementById('cartDrawerCount');
+        if (drawerCount) drawerCount.textContent = count ? `(${count})` : '';
 
-    // Update cart drawer content
-    updateDrawer() {
         const container = document.getElementById('cartItems');
-        const footer = document.getElementById('cartFooter');
-        
+        const foot = document.getElementById('cartFoot');
         if (!container) return;
 
         if (this.cart.length === 0) {
-            const homePrefix = this.getImagePrefix();
             container.innerHTML = `
                 <div class="cart-empty">
-                    <p>Tu carrito está vacío</p>
-                    <a href="${homePrefix}index.html" class="btn btn-secondary mt-24">IR A LA TIENDA</a>
-                </div>
-            `;
-            if (footer) footer.style.display = 'none';
+                    ${PF.icons.bag}
+                    <h4>Tu carrito está vacío</h4>
+                    <p>Explora la colección y encuentra tu próxima prenda favorita.</p>
+                    <a href="${PF.url('pages/categoria.html')}" class="btn btn-dark">Ver productos</a>
+                </div>`;
+            if (foot) foot.hidden = true;
             return;
         }
 
-        if (footer) footer.style.display = 'block';
-
-        const imgPrefix = this.getImagePrefix();
-        container.innerHTML = this.cart.map((item, index) => `
-            <div class="cart-item">
-                <img src="${ProductsManager.resolveImagePath(item.image, imgPrefix)}" alt="${item.name}" class="cart-item-image">
-                <div class="cart-item-details">
-                    <h4 class="cart-item-name">${item.name}</h4>
-                    <p class="cart-item-variant">Talla: ${item.size} | Color: ${item.color}</p>
-                    <div class="cart-item-controls">
-                        <button class="cart-qty-btn" onclick="CartManager.updateQuantity(${index}, -1)">-</button>
-                        <span class="cart-item-qty">${item.quantity}</span>
-                        <button class="cart-qty-btn" onclick="CartManager.updateQuantity(${index}, 1)">+</button>
-                        <button class="cart-item-remove" onclick="CartManager.removeFromCart(${index})">Eliminar</button>
+        if (foot) foot.hidden = false;
+        container.innerHTML = this.cart.map((item, index) => {
+            const max = this.maxFor(item.productId);
+            const atMax = this.quantityOf(item.productId) >= max;
+            const variant = [item.size && `Talla ${item.size}`, item.color].filter(Boolean).map(PF.escape).join(' · ');
+            const url = PF.url(`pages/producto.html?id=${item.productId}`);
+            return `
+                <div class="cart-line">
+                    <a href="${url}"><img class="cart-line-img" src="${ProductsManager.resolveImagePath(item.image)}" alt="${PF.escape(item.name)}" loading="lazy"></a>
+                    <div>
+                        <div class="cart-line-top">
+                            <a href="${url}" class="cart-line-name">${PF.escape(item.name)}</a>
+                            <span class="cart-line-price">${this.formatPrice(item.price * item.quantity)}</span>
+                        </div>
+                        <p class="cart-line-variant">${variant}</p>
+                        <div class="cart-line-bottom">
+                            <div class="stepper" role="group" aria-label="Cantidad">
+                                <button type="button" data-cart-qty="${index}" data-delta="-1" aria-label="Quitar uno">−</button>
+                                <span>${item.quantity}</span>
+                                <button type="button" data-cart-qty="${index}" data-delta="1" aria-label="Agregar uno" ${atMax ? 'disabled' : ''}>+</button>
+                            </div>
+                            <button type="button" class="cart-line-remove" data-cart-remove="${index}">Eliminar</button>
+                        </div>
                     </div>
-                </div>
-                <span class="cart-item-price">${this.formatPrice(item.price * item.quantity)}</span>
-            </div>
-        `).join('');
+                </div>`;
+        }).join('');
+
+        const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+        set('cartSubtotal', this.formatPrice(this.getSubtotal()));
+        set('cartShipping', this.shippingLabel());
+        set('cartTotal', this.formatPrice(this.getTotal()));
     },
 
-    // Update totals
-    updateTotals() {
-        const totalEl = document.getElementById('cartTotal');
-        if (totalEl) {
-            totalEl.textContent = this.formatPrice(this.getTotal());
-        }
+    // Número de WhatsApp en formato internacional sin "+" ni espacios (wa.me no acepta otro formato).
+    whatsappNumber() {
+        const raw = String(ProductsManager.config?.whatsappNumber || '').replace(/\D/g, '');
+        if (!raw) return '';
+        if (raw.length === 9 && raw.startsWith('9')) return '56' + raw;
+        return raw;
     },
 
-    // Open cart drawer
-    openDrawer() {
-        document.getElementById('cartDrawer')?.classList.add('active');
-        document.getElementById('cartOverlay')?.classList.add('active');
-        document.body.style.overflow = 'hidden';
+    whatsappLink(text) {
+        const n = this.whatsappNumber();
+        if (!n) return '';
+        return `https://wa.me/${n}${text ? `?text=${encodeURIComponent(text)}` : ''}`;
     },
 
-    // Close cart drawer
-    closeDrawer() {
-        document.getElementById('cartDrawer')?.classList.remove('active');
-        document.getElementById('cartOverlay')?.classList.remove('active');
-        document.body.style.overflow = '';
-    },
-
-    // Show notification
-    showNotification(message) {
-        const notification = document.createElement('div');
-        notification.className = 'cart-notification';
-        notification.textContent = message;
-        notification.style.cssText = `
-            position: fixed;
-            bottom: 24px;
-            right: 24px;
-            background: var(--primary);
-            color: white;
-            padding: 12px 24px;
-            border-radius: 4px;
-            font-size: 14px;
-            font-weight: 500;
-            z-index: 3000;
-            animation: fadeIn 0.3s ease;
-        `;
-        document.body.appendChild(notification);
-        
-        setTimeout(() => {
-            notification.remove();
-        }, 2000);
-    },
-
-    // Generate WhatsApp message
-    generateWhatsAppMessage(customerData, orderNumber) {
-        const items = this.cart.map((item, index) =>
-            `${index + 1}. ${item.name} x${item.quantity} - ${this.formatPrice(item.price * item.quantity)}`
+    generateWhatsAppText(customer, orderNumber, items = this.cart) {
+        const subtotal = items.reduce((t, i) => t + i.price * i.quantity, 0);
+        const lines = items.map((i, n) =>
+            `${n + 1}. ${i.name}${i.size ? ` (Talla ${i.size}` : ''}${i.color ? `${i.size ? ', ' : ' ('}${i.color}` : ''}${i.size || i.color ? ')' : ''} x${i.quantity} — ${this.formatPrice(i.price * i.quantity)}`
         ).join('\n');
 
-        const message = `🔥 *Nuevo Pedido PopFlame* 🔥
-${orderNumber ? `\n🧾 *Pedido:* ${orderNumber}\n` : ''}
-📦 *Productos:*
-${items}
-
-💰 *Subtotal:* ${this.formatPrice(this.getSubtotal())}
-🚚 *Envío:* ${this.getShipping() === 0 ? 'GRATIS' : this.formatPrice(this.getShipping())}
-💵 *TOTAL:* ${this.formatPrice(this.getTotal())}
-
-👤 *Datos del Cliente:*
-- Nombre: ${customerData.name}
-- Email: ${customerData.email}
-- Teléfono: ${customerData.phone}
-${customerData.meetingPoint ? `- Estación de Metro preferida: ${customerData.meetingPoint}\n` : ''}${customerData.note ? `- Nota: ${customerData.note}\n` : ''}
-📍 *Entrega:* presencial en Metro de Santiago (a coordinar). Si es fuera de Santiago o zona alejada, lo coordinamos por acá.
-📝 *Nota:* Pago por transferencia bancaria`;
-
-        return encodeURIComponent(message);
+        return [
+            `Hola PopFlame! Quiero confirmar mi pedido${orderNumber ? ` *${orderNumber}*` : ''}`,
+            '',
+            '*Productos:*',
+            lines,
+            '',
+            `*Total:* ${this.formatPrice(subtotal + this.getShipping())}`,
+            `*Entrega:* ${customer.meetingPoint ? `Metro ${customer.meetingPoint}` : 'Metro de Santiago (a coordinar)'}`,
+            '',
+            '*Mis datos:*',
+            `${customer.name}`,
+            `${customer.phone}`,
+            `${customer.email}`,
+            customer.note ? `Nota: ${customer.note}` : '',
+            '',
+            'Quedo atento/a a los datos para la transferencia.'
+        ].filter((l, i, arr) => !(l === '' && arr[i - 1] === '')).join('\n');
     }
 };
 
-// Export for use in other files
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = CartManager;
 }

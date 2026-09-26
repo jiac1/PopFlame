@@ -1,644 +1,156 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="es-CL">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>Producto | PopFlame</title>
-    <meta name="description" content="Detalle de producto PopFlame.">
-    <link rel="stylesheet" href="../css/style.css">
-    <link rel="stylesheet" href="../css/responsive.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
-    <style>
-        /* Product Page Styles */
-        .product-page {
-            padding: 120px 0 80px;
-        }
-        
-        .product-detail {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 48px;
-            max-width: 1200px;
-            margin: 0 auto;
-        }
-        
-        .product-gallery {
-            position: sticky;
-            top: 100px;
-        }
-        
-        .product-main-image {
-            aspect-ratio: 3/4;
-            background: var(--bg-card);
-            overflow: hidden;
-            margin-bottom: 16px;
-        }
-        
-        .product-main-image img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
-        
-        .product-thumbnails {
-            display: flex;
-            gap: 8px;
-        }
-        
-        .product-thumbnail {
-            width: 80px;
-            height: 100px;
-            background: var(--bg-card);
-            border: 2px solid transparent;
-            cursor: pointer;
-            overflow: hidden;
-            transition: var(--transition);
-        }
-        
-        .product-thumbnail.active,
-        .product-thumbnail:hover {
-            border-color: var(--primary);
-        }
-        
-        .product-thumbnail img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
-        
-        .product-info-section {
-            padding: 24px 0;
-        }
-        
-        .product-breadcrumb {
-            font-size: 13px;
-            color: var(--text-muted);
-            margin-bottom: 16px;
-        }
-        
-        .product-breadcrumb a {
-            color: var(--text-muted);
-            transition: var(--transition);
-        }
-        
-        .product-breadcrumb a:hover {
-            color: var(--primary);
-        }
-        
-        .product-page-title {
-            font-size: 32px;
-            font-weight: 800;
-            margin-bottom: 8px;
-        }
-        
-        .product-page-price {
-            font-size: 28px;
-            font-weight: 700;
-            color: var(--primary);
-            margin-bottom: 24px;
-        }
-        
-        .product-page-description {
-            color: var(--text-secondary);
-            margin-bottom: 32px;
-            line-height: 1.7;
-        }
-        
-        .product-options {
-            margin-bottom: 32px;
-        }
-        
-        .option-group {
-            margin-bottom: 24px;
-        }
-        
-        .option-label {
-            display: block;
-            font-size: 13px;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            margin-bottom: 12px;
-        }
-        
-        .option-label span {
-            font-weight: 400;
-            color: var(--text-secondary);
-            text-transform: none;
-            letter-spacing: 0;
-        }
-        
-        .size-options {
-            display: flex;
-            gap: 8px;
-            flex-wrap: wrap;
-        }
-        
-        .size-btn {
-            min-width: 48px;
-            height: 48px;
-            padding: 0 16px;
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            color: var(--text-primary);
-            font-size: 14px;
-            font-weight: 500;
-            transition: var(--transition);
-        }
-        
-        .size-btn:hover,
-        .size-btn.active {
-            border-color: var(--primary);
-            color: var(--primary);
-        }
-        
-        .color-options {
-            display: flex;
-            gap: 8px;
-        }
-        
-        .color-btn {
-            width: 32px;
-            height: 32px;
-            border-radius: 50%;
-            border: 2px solid transparent;
-            cursor: pointer;
-            transition: var(--transition);
-        }
-        
-        .color-btn:hover,
-        .color-btn.active {
-            border-color: var(--primary);
-            transform: scale(1.1);
-        }
-        
-        .color-btn[data-color="Negro"] { background: #000; }
-        .color-btn[data-color="Blanco"] { background: #fff; }
-        .color-btn[data-color="Gris"] { background: #808080; }
-        .color-btn[data-color="Rojo"] { background: #E31837; }
-        .color-btn[data-color="Verde Militar"] { background: #4B5320; }
-        
-        .quantity-selector {
-            display: flex;
-            align-items: center;
-            gap: 16px;
-        }
-        
-        .qty-btn {
-            width: 40px;
-            height: 40px;
-            background: var(--bg-card);
-            border: 1px solid var(--border);
-            color: var(--text-primary);
-            font-size: 20px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: var(--transition);
-        }
-        
-        .qty-btn:hover {
-            border-color: var(--primary);
-            color: var(--primary);
-        }
-        
-        .qty-value {
-            font-size: 18px;
-            font-weight: 600;
-            min-width: 40px;
-            text-align: center;
-        }
-        
-        .add-to-cart-section {
-            margin-top: 32px;
-        }
-        
-        .add-to-cart-btn {
-            width: 100%;
-            padding: 18px;
-            background: var(--primary);
-            color: #fff;
-            font-size: 16px;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 2px;
-            transition: var(--transition);
-        }
-        
-        .add-to-cart-btn:hover {
-            background: var(--primary-dark);
-            transform: translateY(-2px);
-            box-shadow: 0 8px 24px rgba(227, 24, 55, 0.4);
-        }
-        
-        .product-meta {
-            margin-top: 32px;
-            padding-top: 32px;
-            border-top: 1px solid var(--border);
-        }
-        
-        .meta-item {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            margin-bottom: 12px;
-            font-size: 14px;
-            color: var(--text-secondary);
-        }
-        
-        .meta-icon {
-            width: 20px;
-            height: 20px;
-            color: var(--text-muted);
-        }
-        
-        .product-tabs {
-            margin-top: 48px;
-        }
-
-        .product-tabs-top {
-            margin-top: 24px;
-            margin-bottom: 32px;
-        }
-        
-        .tabs-header {
-            display: flex;
-            border-bottom: 1px solid var(--border);
-            margin-bottom: 24px;
-        }
-        
-        .tab-btn {
-            padding: 12px 24px;
-            font-size: 14px;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            color: var(--text-muted);
-            border-bottom: 2px solid transparent;
-            transition: var(--transition);
-        }
-        
-        .tab-btn:hover,
-        .tab-btn.active {
-            color: var(--text-primary);
-            border-bottom-color: var(--primary);
-        }
-        
-        .tab-content {
-            color: var(--text-secondary);
-            line-height: 1.7;
-        }
-        
-        @media (max-width: 992px) {
-            .product-detail {
-                grid-template-columns: 1fr;
-            }
-            
-            .product-gallery {
-                position: static;
-            }
-        }
-        
-        @media (max-width: 576px) {
-            .product-page-title {
-                font-size: 24px;
-            }
-            
-            .product-page-price {
-                font-size: 22px;
-            }
-        }
-    </style>
+    <meta name="description" content="Streetwear PopFlame, hecho en Chile.">
+    <meta name="theme-color" content="#0B0B0B">
+    <link rel="icon" href="../images/favicon-32.png" sizes="32x32" type="image/png">
+    <link rel="apple-touch-icon" href="../images/apple-touch-icon.png">
+    <link rel="manifest" href="../site.webmanifest">
+    <meta property="og:type" content="product">
+    <meta property="og:site_name" content="PopFlame">
+    <meta property="og:title" content="PopFlame">
+    <meta property="og:description" content="Streetwear hecho en Chile.">
+    <meta property="og:image" content="https://jiac1.github.io/PopFlame/images/og-image.jpg">
+    <link rel="preconnect" href="https://ysxinhpymvhdnfbdanvn.supabase.co" crossorigin>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@125,700;125,800;125,900&family=Inter:wght@400;500;600;700&display=swap">
+    <link rel="stylesheet" href="../css/style.css?v=3">
 </head>
-<body>
-    <!-- Header -->
-    <header class="header">
-        <div class="container">
-            <a href="../index.html" class="logo">
-                <img src="../images/logo.png" alt="PopFlame" class="logo-img">
-            </a>
-            
-            <nav class="nav">
-                <a href="poleras.html" class="nav-link">Poleras</a>
-                <a href="polerones.html" class="nav-link">Polerones</a>
-                <a href="pantalones.html" class="nav-link">Pantalones</a>
-                <a href="accesorios.html" class="nav-link">Accesorios</a>
-            </nav>
+<body data-page="product">
+    <script src="../js/layout.js?v=3"></script>
 
-            <div class="header-actions">
-                <button class="cart-btn" id="cartBtn">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <circle cx="9" cy="21" r="1"></circle>
-                        <circle cx="20" cy="21" r="1"></circle>
-                        <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path>
-                    </svg>
-                    <span class="cart-count" id="cartCount">0</span>
-                </button>
-                
-                <button class="menu-btn" id="menuBtn">
-                    <span></span>
-                    <span></span>
-                    <span></span>
-                </button>
-            </div>
-        </div>
-    </header>
-
-    <!-- Product Page -->
-    <section class="product-page">
-        <div class="container">
-            <div class="product-detail">
-                <div class="product-gallery">
-                    <div class="product-main-image">
-                        <img id="mainImage" src="" alt="">
+    <main id="main" class="page-offset">
+        <div class="container" id="pdpRoot">
+            <div class="pdp">
+                <div class="pdp-gallery">
+                    <div class="pdp-grid" id="pdpGrid">
+                        <div class="skeleton-card" style="grid-column:1/-1"><div class="product-media" style="aspect-ratio:4/5"></div></div>
                     </div>
-                    <div class="product-thumbnails" id="thumbnails">
-                        <!-- Thumbnails loaded via JS -->
+                    <div class="pdp-slider" id="pdpSlider">
+                        <div class="pdp-track" id="pdpTrack"></div>
+                        <div class="pdp-dots" id="pdpDots"></div>
                     </div>
                 </div>
-                
-                <div class="product-info-section">
-                    <div class="product-breadcrumb" id="breadcrumb">
-                        <a href="../index.html">Inicio</a> / 
-                        <a href="#" id="categoryLink">Categoría</a> / 
-                        <span id="productName">Producto</span>
-                    </div>
-                    
-                    <h1 class="product-page-title" id="productTitle"></h1>
-                    <p class="product-page-price" id="productPrice"></p>
 
-                    <div class="product-tabs product-tabs-top">
-                        <div class="tabs-header">
-                            <button class="tab-btn active" data-tab="description">Descripción</button>
-                            <button class="tab-btn" data-tab="sizes">Guía de Talles</button>
-                        </div>
-                        <div class="tab-content" id="tabContent">
-                            <!-- Tab content loaded via JS -->
-                        </div>
+                <div class="pdp-info" id="pdpInfo">
+                    <nav class="breadcrumbs" aria-label="Ruta">
+                        <a href="../index.html">Inicio</a><span aria-hidden="true">/</span>
+                        <a href="categoria.html" id="crumbCat">Catálogo</a><span aria-hidden="true">/</span>
+                        <span id="crumbName"></span>
+                    </nav>
+                    <h1 class="pdp-title" id="pdpTitle"><span class="skeleton-line" style="display:block;height:32px;width:80%"></span></h1>
+                    <div class="pdp-price" id="pdpPrice"></div>
+                    <div id="pdpStock"></div>
+
+                    <div class="pdp-block" id="colorBlock" hidden>
+                        <div class="pdp-label"><span>Color<span class="value" id="colorValue"></span></span></div>
+                        <div class="swatches" id="colorOptions" role="radiogroup" aria-label="Color"></div>
                     </div>
 
-                    <div class="product-options">
-                        <div class="option-group">
-                            <label class="option-label">Talla: <span id="selectedSize">Seleccionar</span></label>
-                            <div class="size-options" id="sizeOptions">
-                                <!-- Sizes loaded via JS -->
-                            </div>
+                    <div class="pdp-block" id="sizeBlock" hidden>
+                        <div class="pdp-label">
+                            <span>Talla<span class="value" id="sizeValue"></span></span>
+                            <button type="button" id="sizeGuideOpen" aria-controls="sizeModal">Guía de tallas</button>
                         </div>
-                        
-                        <div class="option-group">
-                            <label class="option-label">Color: <span id="selectedColor">Seleccionar</span></label>
-                            <div class="color-options" id="colorOptions">
-                                <!-- Colors loaded via JS -->
-                            </div>
-                        </div>
-                        
-                        <div class="option-group">
-                            <label class="option-label">Cantidad:</label>
-                            <div class="quantity-selector">
-                                <button class="qty-btn" id="qtyMinus">-</button>
-                                <span class="qty-value" id="qtyValue">1</span>
-                                <button class="qty-btn" id="qtyPlus">+</button>
-                            </div>
-                        </div>
+                        <div class="sizes" id="sizeOptions" role="radiogroup" aria-label="Talla"></div>
+                        <p class="size-measure" id="sizeMeasure"></p>
                     </div>
-                    
-                    <div class="add-to-cart-section">
-                        <button class="add-to-cart-btn" id="addToCartBtn">AGREGAR AL CARRITO</button>
-                    </div>
-                    
-                    <div class="product-meta">
-                        <div class="meta-item">
-                            <svg class="meta-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M12 2a8 8 0 0 0-8 8c0 5.5 8 12 8 12s8-6.5 8-12a8 8 0 0 0-8-8z"></path>
-                                <circle cx="12" cy="10" r="3"></circle>
-                            </svg>
-                            <span>Entrega disponible en estaciones de Metro</span>
+
+                    <p class="field-error" id="pdpError" role="alert" hidden></p>
+
+                    <div class="pdp-buy" id="pdpBuy">
+                        <div class="stepper is-lg" role="group" aria-label="Cantidad">
+                            <button type="button" id="qtyMinus" aria-label="Quitar uno">−</button>
+                            <output id="qtyValue" aria-live="polite">1</output>
+                            <button type="button" id="qtyPlus" aria-label="Agregar uno">+</button>
                         </div>
-                        <div class="meta-item">
-                            <svg class="meta-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
-                                <polyline points="9 22 9 12 15 12 15 22"></polyline>
-                            </svg>
-                            <span>Envío a regiones o dentro de la región sujeto a ubicación y prestador de preferencia; se coordina al finalizar el pedido</span>
-                        </div>
+                        <button type="button" class="btn btn-dark" id="addToCart">Agregar al carrito</button>
                     </div>
+                    <a class="btn btn-outline btn-block pdp-wa" id="pdpWhatsapp" target="_blank" rel="noopener" hidden></a>
+
+                    <div class="pdp-trust">
+                        <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M12 21s-7-6.2-7-11.5a7 7 0 0114 0C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg>Entrega gratis en estaciones de Metro de Santiago</div>
+                        <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M2 6h12v10H2zM14 10h4l4 4v2h-8z"/><circle cx="6" cy="18" r="2"/><circle cx="18" cy="18" r="2"/></svg>Envíos a regiones coordinados por WhatsApp</div>
+                        <div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20M6 15h4"/></svg>Pago por transferencia bancaria</div>
+                    </div>
+
+                    <details class="accordion" open>
+                        <summary>Descripción</summary>
+                        <div class="accordion-body" id="pdpDescription"></div>
+                    </details>
+                    <details class="accordion" id="sizeAccordion">
+                        <summary>Guía de tallas</summary>
+                        <div class="accordion-body" id="pdpSizeGuide"></div>
+                    </details>
+                    <details class="accordion">
+                        <summary>Entregas y envíos</summary>
+                        <div class="accordion-body">
+                            <p>Entregamos de forma <strong>presencial y sin costo en estaciones de Metro de Santiago</strong>. Coordinamos día, hora y estación por WhatsApp una vez confirmado tu pedido.</p>
+                            <p>¿Estás en regiones o lejos del Metro? También despachamos: el costo depende de la zona y del courier que prefieras.</p>
+                        </div>
+                    </details>
+                    <details class="accordion">
+                        <summary>Pago y cambios</summary>
+                        <div class="accordion-body">
+                            <p>Pagas por <strong>transferencia bancaria</strong>: al enviar tu pedido te compartimos los datos de la cuenta por WhatsApp.</p>
+                            <p>Si tu prenda llega con una falla, escríbenos dentro de 48 horas y lo solucionamos. Los cambios de talla dependen del stock disponible.</p>
+                        </div>
+                    </details>
                 </div>
             </div>
         </div>
-    </section>
 
-    <!-- Footer -->
-    <footer class="footer">
-        <div class="container">
-            <div class="footer-grid">
-                <div class="footer-col">
-                    <img src="../images/logo.png" alt="PopFlame" class="footer-logo">
-                    <p>Streetwear que quema 🔥</p>
+        <section class="section" id="related" hidden>
+            <div class="container">
+                <div class="section-head">
+                    <div>
+                        <span class="eyebrow">Completa tu look</span>
+                        <h2 class="section-title">También te puede gustar</h2>
+                    </div>
                 </div>
-                
-                <div class="footer-col">
-                    <h4>TIENDA</h4>
-                    <a href="poleras.html">Poleras</a>
-                    <a href="polerones.html">Polerones</a>
-                    <a href="pantalones.html">Pantalones</a>
-                    <a href="accesorios.html">Accesorios</a>
-                </div>
-                
-                <div class="footer-col">
-                    <h4>AYUDA</h4>
-                    <a href="info.html?slug=envios">Envíos</a>
-                    <a href="info.html?slug=devoluciones">Devoluciones</a>
-                    <a href="info.html?slug=guia-de-talles">Guía de Talles</a>
-                    <a href="info.html?slug=contacto">Contacto</a>
-                </div>
-                
-                <div class="footer-col">
-                    <h4>REDES</h4>
-                    <a href="#">Instagram</a>
-                    <a href="#">TikTok</a>
-                    <a href="#">Twitter</a>
-                </div>
+                <div class="rail" id="relatedRail"></div>
             </div>
-            
-            <div class="footer-bottom">
-                <p>&copy; 2026 PopFlame. Todos los derechos reservados.</p>
-            </div>
-        </div>
-    </footer>
+        </section>
+    </main>
 
-    <!-- Cart Drawer -->
-    <div class="cart-overlay" id="cartOverlay"></div>
-    <div class="cart-drawer" id="cartDrawer">
-        <div class="cart-header">
-            <h3>TU CARRITO</h3>
-            <button class="cart-close" id="cartClose">
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <line x1="18" y1="6" x2="6" y2="18"></line>
-                    <line x1="6" y1="6" x2="18" y2="18"></line>
-                </svg>
-            </button>
+    <div class="sticky-buy" id="stickyBuy" aria-hidden="true">
+        <div class="sticky-buy-info">
+            <strong id="stickyName"></strong>
+            <span id="stickyPrice"></span>
         </div>
-        
-        <div class="cart-items" id="cartItems">
-            <!-- Cart items loaded via JS -->
-        </div>
-        
-        <div class="cart-footer" id="cartFooter">
-            <div class="cart-total">
-                <span>TOTAL:</span>
-                <span id="cartTotal">$0</span>
+        <button type="button" class="btn btn-dark" id="stickyAdd">Agregar</button>
+    </div>
+
+    <div class="modal" id="sizeModal" role="dialog" aria-modal="true" aria-labelledby="sizeModalTitle" aria-hidden="true">
+        <div class="modal-backdrop"></div>
+        <div class="modal-card">
+            <div class="modal-head">
+                <h3 id="sizeModalTitle">Guía de tallas</h3>
+                <button class="icon-btn" data-close aria-label="Cerrar guía de tallas"></button>
             </div>
-            <a href="checkout.html" class="btn btn-primary btn-full">FINALIZAR COMPRA</a>
+            <div id="sizeModalBody"></div>
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="../js/supabaseClient.js"></script>
-    <script src="../js/products.js"></script>
-    <script src="../js/cart.js"></script>
-    <script src="../js/app.js"></script>
-    <script>
-        let currentProduct = null;
-        let selectedSize = null;
-        let selectedColor = null;
-        let quantity = 1;
+    <div class="lightbox" id="lightbox" role="dialog" aria-modal="true" aria-label="Fotos del producto" aria-hidden="true">
+        <div class="lightbox-bar">
+            <span id="lightboxCount"></span>
+            <button class="icon-btn" data-close aria-label="Cerrar fotos" data-autofocus></button>
+        </div>
+        <div class="lightbox-track" id="lightboxTrack"></div>
+        <button class="lightbox-nav lightbox-prev" id="lightboxPrev" aria-label="Foto anterior"></button>
+        <button class="lightbox-nav lightbox-next" id="lightboxNext" aria-label="Foto siguiente"></button>
+    </div>
 
-        document.addEventListener('DOMContentLoaded', async () => {
-            await ProductsManager.loadProducts();
-            CartManager.init();
-            App.applySiteConfig();
-            App.renderNav();
-            App.renderFooterCategoryLinks();
-            App.setupMobileMenu();
-            
-            const productId = App.getUrlParam('id');
-            if (productId) {
-                currentProduct = ProductsManager.getProductById(productId);
-                if (currentProduct) {
-                    renderProduct();
-                    setupEventListeners();
-                }
-            }
-        });
-
-        function renderProduct() {
-            // Set main image (galería: usa el arreglo images[] si tiene más de una foto)
-            const gallery = (currentProduct.images && currentProduct.images.length) ? currentProduct.images : [currentProduct.image];
-            document.getElementById('mainImage').src = ProductsManager.resolveImagePath(gallery[0], '../');
-            document.getElementById('mainImage').alt = currentProduct.name;
-
-            const thumbnails = document.getElementById('thumbnails');
-            if (gallery.length > 1) {
-                thumbnails.innerHTML = gallery.map((img, i) => `
-                    <div class="product-thumbnail ${i === 0 ? 'active' : ''}" data-index="${i}">
-                        <img src="${ProductsManager.resolveImagePath(img, '../')}" alt="${currentProduct.name} - foto ${i + 1}">
-                    </div>
-                `).join('');
-
-                thumbnails.querySelectorAll('.product-thumbnail').forEach(thumb => {
-                    thumb.addEventListener('click', () => {
-                        thumbnails.querySelectorAll('.product-thumbnail').forEach(t => t.classList.remove('active'));
-                        thumb.classList.add('active');
-                        document.getElementById('mainImage').src = ProductsManager.resolveImagePath(gallery[thumb.dataset.index], '../');
-                    });
-                });
-            } else {
-                thumbnails.innerHTML = '';
-            }
-
-            // Set breadcrumb (usa la categoría real de Supabase y apunta a la página dinámica)
-            const productCategory = ProductsManager.getCategoryById(currentProduct.category);
-            const categoryName = productCategory ? productCategory.name : currentProduct.category;
-            document.getElementById('categoryLink').textContent = categoryName.charAt(0).toUpperCase() + categoryName.slice(1);
-            document.getElementById('categoryLink').href = 'categoria.html?cat=' + encodeURIComponent(currentProduct.category);
-            document.getElementById('productName').textContent = currentProduct.name;
-            
-            // Set product info
-            document.getElementById('productTitle').textContent = currentProduct.name;
-            document.getElementById('productPrice').textContent = ProductsManager.formatPrice(currentProduct.price);
-
-            // Render sizes
-            const sizeOptions = document.getElementById('sizeOptions');
-            sizeOptions.innerHTML = currentProduct.sizes.map(size => `
-                <button class="size-btn" data-size="${size}">${size}</button>
-            `).join('');
-            
-            // Render colors
-            const colorOptions = document.getElementById('colorOptions');
-            colorOptions.innerHTML = currentProduct.colors.map(color => `
-                <button class="color-btn" data-color="${color}" title="${color}" style="background:${ProductsManager.resolveColorSwatch(color)};"></button>
-            `).join('');
-            
-            // Set default tab content
-            document.getElementById('tabContent').innerHTML = `<p>${currentProduct.description}</p>`;
-            
-            // Update page title
-            document.title = currentProduct.name + ' | PopFlame';
-        }
-
-        function setupEventListeners() {
-            // Size selection
-            document.querySelectorAll('.size-btn').forEach(btn => {
-                btn.addEventListener('click', () => {
-                    document.querySelectorAll('.size-btn').forEach(b => b.classList.remove('active'));
-                    btn.classList.add('active');
-                    selectedSize = btn.dataset.size;
-                    const measurement = ProductsManager.getSizeMeasurement(currentProduct.category, selectedSize);
-                    document.getElementById('selectedSize').textContent = measurement ? `${selectedSize} (${measurement})` : selectedSize;
-                });
-            });
-            
-            // Color selection
-            document.querySelectorAll('.color-btn').forEach(btn => {
-                btn.addEventListener('click', () => {
-                    document.querySelectorAll('.color-btn').forEach(b => b.classList.remove('active'));
-                    btn.classList.add('active');
-                    selectedColor = btn.dataset.color;
-                    document.getElementById('selectedColor').textContent = selectedColor;
-                });
-            });
-            
-            // Quantity controls
-            document.getElementById('qtyMinus').addEventListener('click', () => {
-                if (quantity > 1) {
-                    quantity--;
-                    document.getElementById('qtyValue').textContent = quantity;
-                }
-            });
-            
-            document.getElementById('qtyPlus').addEventListener('click', () => {
-                quantity++;
-                document.getElementById('qtyValue').textContent = quantity;
-            });
-            
-            // Add to cart
-            document.getElementById('addToCartBtn').addEventListener('click', () => {
-                if (!selectedSize) {
-                    alert('Por favor selecciona una talla');
-                    return;
-                }
-                if (!selectedColor) {
-                    alert('Por favor selecciona un color');
-                    return;
-                }
-                
-                CartManager.addToCart(currentProduct, selectedSize, selectedColor, quantity);
-            });
-            
-            // Tab switching
-            document.querySelectorAll('.tab-btn').forEach(btn => {
-                btn.addEventListener('click', () => {
-                    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-                    btn.classList.add('active');
-                    
-                    if (btn.dataset.tab === 'description') {
-                        document.getElementById('tabContent').innerHTML = `<p>${currentProduct.description}</p>`;
-                    } else {
-                        document.getElementById('tabContent').innerHTML = ProductsManager.renderSizeGuideHtml(currentProduct.category);
-                    }
-                });
-            });
-        }
-    </script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" defer></script>
+    <script src="../js/supabaseClient.js?v=3" defer></script>
+    <script src="../js/products.js?v=3" defer></script>
+    <script src="../js/cart.js?v=3" defer></script>
+    <script src="../js/app.js?v=3" defer></script>
+    <script src="../js/product.js?v=3" defer></script>
 </body>
 </html>

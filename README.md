@@ -1,137 +1,92 @@
-# PopFlame - Sitio Web de Ropa Streetwear
+# PopFlame — Tienda online de streetwear
 
-Sitio e-commerce (HTML/CSS/JS) conectado a **Supabase** (base de datos + autenticación) con un
-panel de administración con dos roles: **Super Admin** (control total) y **Admin** (dueño de la
-tienda, permisos acotados a pedidos/inventario).
+Sitio e-commerce estático (HTML/CSS/JS, sin build) conectado a **Supabase** (base de datos, login y
+archivos) con un panel de administración con dos roles: **Super Admin** y **Admin** (dueño).
 
-## 1. Configurar Supabase (una sola vez)
+## 1. Configurar Supabase
 
-1. Entra a tu proyecto en [supabase.com](https://supabase.com) → **SQL Editor** → *New query*.
-2. Copia y pega **todo** el contenido de [`db/schema.sql`](db/schema.sql) y dale **Run**.
-   Esto crea las tablas, la seguridad a nivel de fila (RLS), las funciones, las 5 categorías
-   (incluida Chaquetas) y productos iniciales (cartera y collar) con precios/tallas genéricos
-   que se ajustan después desde el panel.
-3. Ve a **Authentication → Users → Add user** y crea las dos cuentas de acceso:
+1. En tu proyecto de [supabase.com](https://supabase.com) → **SQL Editor** → *New query*.
+2. Pega **todo** [`db/schema.sql`](db/schema.sql) y dale **Run**. Crea tablas, seguridad (RLS), funciones,
+   categorías y productos iniciales. Se puede volver a correr sin duplicar nada.
+3. **Authentication → Users → Add user** (marca *Auto Confirm User*):
 
-   | Usuario visible | Email a usar en Supabase | Rol asignado |
+   | Usuario del panel | Email en Supabase | Rol |
    |---|---|---|
-   | `k1llu4` (tú, Super Admin) | `k1llu4@popflame.cl` | `super_admin` |
-   | `ariaspopflame` (dueño, Admin) | `ariaspopflame@popflame.cl` | `admin` |
+   | `k1llu4` | `k1llu4@popflame.cl` | `super_admin` |
+   | `ariaspopflame` | `ariaspopflame@popflame.cl` | `admin` |
 
-   Define la contraseña que quieras para cada una y marca **"Auto Confirm User"**.
-   El trigger de la base de datos crea automáticamente el perfil con el rol correcto en cuanto
-   se crea el usuario (ver `handle_new_user()` en `db/schema.sql`).
-4. Cuando tengas los emails reales de cada persona, puedes cambiarlos desde
-   **Authentication → Users → (seleccionar usuario) → Edit** en Supabase. El `username` con el
-   que inician sesión en el panel (`k1llu4` / `ariaspopflame`) no cambia.
+   El rol se asigna solo (trigger `handle_new_user()`).
 
-La URL del proyecto y la clave pública (`sb_publishable_...`) ya están cargadas en
-[`js/supabaseClient.js`](js/supabaseClient.js) — es seguro tenerlas en el frontend, todo el
-acceso real lo controla RLS en Supabase.
+Si la base ya existía, en vez del schema completo corre solo los scripts nuevos de `db/` que falten
+(ej. [`db/2026-09-26_create_order_rpc.sql`](db/2026-09-26_create_order_rpc.sql), que hace que el
+servidor calcule precios y totales de cada pedido).
 
-## 2. Configurar el número de WhatsApp
+La URL del proyecto y la clave pública (`sb_publishable_...`) están en
+[`js/supabaseClient.js`](js/supabaseClient.js): es seguro tenerlas en el frontend, todo el acceso lo
+controla RLS.
 
-Todavía no está definido. Cuando lo tengas:
+> **Plan gratis de Supabase:** si el proyecto pasa ~1 semana sin visitas, Supabase lo **pausa** y la
+> tienda deja de cargar productos. Se reactiva desde el dashboard con *Restore project*.
 
-1. Entra al panel: `/admin/` → inicia sesión como `k1llu4` (Super Admin).
-2. Ve a **Configuración** y completa el campo **WhatsApp de ventas** en formato `569XXXXXXXX`.
+## 2. Publicar el sitio (GitHub Pages)
 
-Mientras no esté configurado, el checkout sigue funcionando: los pedidos quedan guardados en la
-base de datos igual, solo que no se abre WhatsApp automáticamente.
+1. En GitHub: **Settings → Pages → Build and deployment → Source: Deploy from a branch**.
+2. Branch **main**, carpeta **/ (root)** → **Save**.
+3. En 1–2 minutos queda en `https://jiac1.github.io/PopFlame/`. Cada `git push` a `main` lo actualiza.
 
-## 2.5 Correos automáticos (bienvenida + producto nuevo)
+Si más adelante usas un dominio propio (ej. `popflame.cl`), cambia la URL de `og:image` en los `<head>`
+de las páginas (es la imagen que aparece al compartir el link por WhatsApp/Instagram).
 
-El formulario de newsletter ya guarda los emails en la tabla `subscribers`, pero **para que
-efectivamente les llegue un correo** hay que conectar [Resend](https://resend.com) (gratis hasta
-3.000 emails/mes) y desplegar dos Edge Functions. No requiere instalar nada en tu computador,
-todo se hace desde el navegador:
-
-1. **Crea tu cuenta en [resend.com](https://resend.com)** y saca tu API key (Dashboard → API Keys →
-   Create API Key).
-2. En tu proyecto de Supabase, ve a **Edge Functions → Deploy a new function**:
-   - Crea una llamada `welcome-email` y pega el contenido de
-     [`supabase/functions/welcome-email/index.ts`](supabase/functions/welcome-email/index.ts).
-   - Crea otra llamada `notify-new-product` y pega el contenido de
-     [`supabase/functions/notify-new-product/index.ts`](supabase/functions/notify-new-product/index.ts).
-3. Ve a **Project Settings → Edge Functions → Secrets** y agrega:
-   - `RESEND_API_KEY` = tu API key de Resend
-   - `FROM_EMAIL` (opcional) = un remitente verificado en Resend, ej. `PopFlame <ventas@tudominio.cl>`.
-     Si lo dejas vacío, se manda desde el remitente de pruebas de Resend (`onboarding@resend.dev`),
-     que funciona pero se ve menos profesional.
-4. Para el aviso de "producto nuevo", ve a **Database → Webhooks → Create a new hook**:
-   - Tabla: `products` — Evento: solo **Insert** — Tipo: **Supabase Edge Functions** —
-     Función: `notify-new-product`.
-
-Desde ese momento: cualquiera que se suscriba en el sitio recibe el correo de bienvenida al
-instante, y cada producto nuevo que crees en **Productos → Nuevo producto** le llega por correo a
-todos los suscriptores activos (en copia oculta entre ellos).
-
-⚠️ **Límite de Resend mientras no verifiques un dominio propio**: con el remitente de pruebas
-(`onboarding@resend.dev`), Resend **solo permite enviar al correo con el que te registraste en
-Resend** — a cualquier otro destinatario le va a fallar el envío (aunque el sistema en sí
-funciona perfecto, ya probado de punta a punta). Para que le llegue a suscriptores reales,
-verifica un dominio en [resend.com/domains](https://resend.com/domains) y cambia `FROM_EMAIL`
-a una dirección de ese dominio (ej. `PopFlame <ventas@popflame.cl>`).
-
-## 3. Panel de administración
-
-URL: `/admin/` (login) → `/admin/panel.html` (dashboard).
-
-- **Super Admin** (`k1llu4`): Dashboard, Pedidos, Inventario, Productos (CRUD completo),
-  Categorías (CRUD), Configuración de la tienda, gestión de Usuarios/roles.
-- **Admin / dueño** (`ariaspopflame`): Dashboard, Pedidos (ver y cambiar estado), Inventario
-  (solo puede actualizar el stock, no precio/nombre/descripción — esto se aplica también del
-  lado del servidor con Postgres, no solo ocultando botones en la interfaz).
-
-## 4. Ejecutar el sitio localmente
+## 3. Ejecutar localmente
 
 ```bash
-# Con Python
 python -m http.server 8000
-
-# Con Node.js
-npx serve
 ```
 
-Ábrelo con un servidor local (no con `file://`) para que las peticiones a Supabase funcionen
-correctamente.
+Abre `http://localhost:8000` (no uses `file://`, Supabase necesita un servidor).
 
-## 5. Estructura del proyecto
+## 4. Panel de administración
+
+`/admin/` → login con usuario y contraseña → `/admin/panel.html`.
+
+- **Super Admin**: todo (productos, categorías, banners, páginas, tallas, configuración, usuarios).
+- **Admin (dueño)**: pedidos, inventario, productos, banners y tallas.
+
+Las fotos que subas desde el panel se **comprimen automáticamente** (máx. 2000 px) antes de subirlas.
+
+Para recuperar una contraseña olvidada: SQL Editor →
+`update auth.users set encrypted_password = extensions.crypt('NUEVA', extensions.gen_salt('bf')) where email = '...';`
+
+## 5. Estructura
 
 ```
-PopFlame/
-├── index.html              # Página principal
-├── css/                     # Estilos globales y responsive
-├── js/
-│   ├── supabaseClient.js   # Cliente de Supabase compartido
-│   ├── products.js         # Carga productos/categorías/config desde Supabase
-│   ├── cart.js              # Carrito (localStorage) + mensaje de WhatsApp
-│   └── app.js
-├── pages/                   # Categorías, producto, checkout
-├── db/
-│   └── schema.sql           # Migración completa de Supabase (tablas, RLS, seed data)
-├── admin/
-│   ├── index.html            # Login (usuario + contraseña)
-│   ├── panel.html             # Dashboard con pestañas según el rol
-│   ├── css/admin.css
-│   └── js/admin.js            # Auth + lógica de todas las pestañas del panel
-└── data/products.json         # (legado, ya no se usa — los datos viven en Supabase)
+index.html                Portada (hero con banners, lo nuevo, categorías, editoriales)
+404.html                  Página de error
+pages/
+  categoria.html          Catálogo y categorías (?cat=<id>), filtros y orden
+  producto.html           Ficha de producto (?id=<id>), galería con zoom, tallas, relacionados
+  checkout.html           Datos + pedido por WhatsApp (pago por transferencia)
+  info.html               Páginas de ayuda editables (?slug=envios|devoluciones|guia-de-talles|contacto)
+  poleras.html, ...       Redirecciones de links antiguos
+css/style.css             Todo el diseño (variables de marca al inicio)
+js/
+  layout.js               Header, menú, buscador, carrito y footer compartidos (se carga sin defer)
+  supabaseClient.js       Cliente Supabase
+  products.js             Datos (con caché local), tarjetas de producto, guía de tallas
+  cart.js                 Carrito (localStorage), validación de stock, mensaje de WhatsApp
+  app.js                  Núcleo común (menús, búsqueda, newsletter, animaciones)
+  home.js / category.js / product.js / checkout.js / info.js   Lógica de cada página
+admin/                    Panel de administración
+db/                       schema.sql + scripts de cambios
+supabase/functions/       Edge Functions de correo (bienvenida y producto nuevo)
 ```
 
-## 6. Hosting
+Al cambiar CSS/JS, sube el número `?v=` en los `<link>`/`<script>` de las páginas para que los
+navegadores descarguen la versión nueva.
 
-El sitio es estático, así que sirve cualquier hosting gratuito: **Netlify**, **Vercel** o
-**GitHub Pages**, conectado a este mismo repositorio de GitHub.
+## 6. Correos automáticos (opcional)
 
-## Funcionalidades
-
-- ✅ Catálogo por categorías con filtros (datos reales desde Supabase)
-- ✅ Carrito de compras persistente (localStorage)
-- ✅ Checkout que crea el pedido en la base de datos
-- ✅ Redirect a WhatsApp para pago por transferencia (cuando el número esté configurado)
-- ✅ Login con usuario/contraseña vía Supabase Auth
-- ✅ Panel Super Admin: productos, categorías, configuración, usuarios
-- ✅ Panel Admin (dueño): pedidos, inventario, dashboard de ventas
-- ✅ Seguridad a nivel de fila (RLS) — los permisos se cumplen en la base de datos, no solo en
-  la interfaz
-- ✅ Diseño responsive (móvil, tablet, desktop)
+El newsletter guarda los correos en `subscribers`. Para enviar correos de bienvenida y de "producto
+nuevo" hay que conectar [Resend](https://resend.com) y desplegar las dos Edge Functions de
+`supabase/functions/` (Supabase → Edge Functions), con los secretos `RESEND_API_KEY` y `FROM_EMAIL`.
+Mientras no verifiques un dominio en Resend, solo llegan al correo con que te registraste.

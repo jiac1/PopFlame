@@ -113,7 +113,8 @@ const AdminPanel = {
 
     // Igual que ProductsManager.resolveImagePath del sitio público, pero sin depender de él
     // (el panel no carga js/products.js, así que resuelve la ruta de forma independiente).
-    resolveImagePath(path, prefix = '') {
+    // El panel vive en /admin/, así que las rutas locales (images/...) se resuelven desde la carpeta de arriba.
+    resolveImagePath(path, prefix = '../') {
         if (!path) return '';
         if (/^https?:\/\//i.test(path)) return path;
         return prefix + path;
@@ -154,9 +155,44 @@ const AdminPanel = {
         }
     },
 
+    // Achica y comprime fotos antes de subirlas (máx. 2000px, JPEG 85% o PNG si tiene transparencia).
+    // Una foto de celular de 5-7 MB queda en ~300-500 KB y la tienda carga mucho más rápido.
+    // Videos, GIF y SVG se suben tal cual.
+    async compressImage(file, maxSide = 2000) {
+        if (!/^image\/(jpeg|png|webp)$/i.test(file.type) || typeof createImageBitmap !== 'function') return file;
+        try {
+            const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
+            const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
+            const w = Math.round(bitmap.width * scale);
+            const h = Math.round(bitmap.height * scale);
+            const canvas = document.createElement('canvas');
+            canvas.width = w;
+            canvas.height = h;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(bitmap, 0, 0, w, h);
+
+            // ¿Tiene transparencia? (muestreo de píxeles) -> se mantiene PNG para no perder el fondo transparente
+            let transparent = false;
+            if (file.type !== 'image/jpeg') {
+                const data = ctx.getImageData(0, 0, w, h).data;
+                const step = Math.max(4, Math.floor(data.length / 4 / 20000) * 4);
+                for (let i = 3; i < data.length; i += step) { if (data[i] < 250) { transparent = true; break; } }
+            }
+            const type = transparent ? 'image/png' : 'image/jpeg';
+            const blob = await new Promise(r => canvas.toBlob(r, type, 0.85));
+            if (!blob || (blob.size >= file.size && scale === 1)) return file;
+            const name = file.name.replace(/\.[^.]+$/, '') + (transparent ? '.png' : '.jpg');
+            return new File([blob], name, { type });
+        } catch (e) {
+            console.warn('No se pudo comprimir la imagen, se sube la original:', e);
+            return file;
+        }
+    },
+
     // Sube un archivo a un bucket público de Supabase Storage y devuelve la URL pública.
     async uploadImage(bucket, file) {
         if (!file) return null;
+        file = await this.compressImage(file);
         const ext = file.name.split('.').pop();
         const path = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
         const { error } = await supabaseClient.storage.from(bucket).upload(path, file, { upsert: false });
