@@ -98,9 +98,10 @@ const App = {
     // Reconstruye el menú de navegación con las categorías reales de Supabase
     // (en vez de los 4 links fijos que traía el sitio originalmente)
     renderNav() {
-        if (!ProductsManager.categories || ProductsManager.categories.length === 0) return;
+        const categories = ProductsManager.getVisibleCategories();
+        if (categories.length === 0) return;
         const prefix = this.pagesPrefix();
-        const linksHtml = ProductsManager.categories.map(c =>
+        const linksHtml = categories.map(c =>
             `<a href="${prefix}categoria.html?cat=${encodeURIComponent(c.id)}" class="nav-link">${this.escapeHtml(c.name)}</a>`
         ).join('');
         document.querySelectorAll('.nav').forEach(nav => { nav.innerHTML = linksHtml; });
@@ -108,9 +109,10 @@ const App = {
 
     // Igual que renderNav() pero para la columna "TIENDA" del footer
     renderFooterCategoryLinks() {
-        if (!ProductsManager.categories || ProductsManager.categories.length === 0) return;
+        const categories = ProductsManager.getVisibleCategories();
+        if (categories.length === 0) return;
         const prefix = this.pagesPrefix();
-        const linksHtml = ProductsManager.categories.map(c =>
+        const linksHtml = categories.map(c =>
             `<a href="${prefix}categoria.html?cat=${encodeURIComponent(c.id)}">${this.escapeHtml(c.name)}</a>`
         ).join('');
         document.querySelectorAll('.footer-col').forEach(col => {
@@ -124,11 +126,12 @@ const App = {
     // Grid de categorías de la portada (solo existe en index.html)
     renderCategoriesGrid() {
         const grid = document.getElementById('categoriesGrid');
-        if (!grid || !ProductsManager.categories || ProductsManager.categories.length === 0) return;
+        const categories = ProductsManager.getVisibleCategories();
+        if (!grid || categories.length === 0) return;
 
         const genericIcon = `<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M20.38 3.46L16 2a4 4 0 01-8 0L3.62 3.46a2 2 0 00-1.34 2.23l.58 3.47a1 1 0 00.99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 002-2V10h2.15a1 1 0 00.99-.84l.58-3.47a2 2 0 00-1.34-2.23z"></path></svg>`;
 
-        grid.innerHTML = ProductsManager.categories.map((c, i) => {
+        grid.innerHTML = categories.map((c, i) => {
             const hasImage = !!c.image;
             // Si la imagen falla al cargar (ej. rutas de ejemplo que no existen como archivo),
             // se cae al ícono genérico en vez de dejar la tarjeta rota.

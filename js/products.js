@@ -87,6 +87,12 @@ const ProductsManager = {
         return this.products.filter(p => p.featured);
     },
 
+    // Categorías que tienen al menos un producto: las vacías (ej. "Pantalones" sin stock
+    // cargado) no se muestran en el menú ni en la portada, y vuelven solas al agregarles uno.
+    getVisibleCategories() {
+        return this.categories.filter(c => this.products.some(p => p.category === c.id));
+    },
+
     // Get category by ID
     getCategoryById(id) {
         return this.categories.find(c => c.id === id);
