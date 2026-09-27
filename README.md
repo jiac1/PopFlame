@@ -28,14 +28,14 @@ controla RLS.
 > **Plan gratis de Supabase:** si el proyecto pasa ~1 semana sin visitas, Supabase lo **pausa** y la
 > tienda deja de cargar productos. Se reactiva desde el dashboard con *Restore project*.
 
-## 2. Publicar el sitio (GitHub Pages)
+## 2. Publicación (Vercel)
 
-1. En GitHub: **Settings → Pages → Build and deployment → Source: Deploy from a branch**.
-2. Branch **main**, carpeta **/ (root)** → **Save**.
-3. En 1–2 minutos queda en `https://jiac1.github.io/PopFlame/`. Cada `git push` a `main` lo actualiza.
+La tienda está publicada en **https://pop-flame.vercel.app**, conectada a este repositorio privado:
+cada `git push` a `main` la actualiza sola en ~1 minuto (panel en vercel.com → proyecto *pop-flame*).
+No necesita build: Vercel sirve los archivos tal cual (preset *Other*).
 
-Si más adelante usas un dominio propio (ej. `popflame.cl`), cambia la URL de `og:image` en los `<head>`
-de las páginas (es la imagen que aparece al compartir el link por WhatsApp/Instagram).
+Si más adelante usas un dominio propio (ej. `popflame.cl`, se agrega en Vercel → Settings → Domains),
+cambia la URL de `og:image` en los `<head>` de las páginas (es la imagen que aparece al compartir el link).
 
 ## 3. Ejecutar localmente
 
