@@ -632,6 +632,17 @@ begin
     if jsonb_typeof(p_items) <> 'array' or jsonb_array_length(p_items) = 0 then raise exception 'El carrito está vacío'; end if;
     if jsonb_array_length(p_items) > 50 then raise exception 'Demasiados productos'; end if;
 
+    -- Freno contra pedidos falsos en masa (bots): máx. 5 por hora con el mismo teléfono o correo,
+    -- y máx. 20 por minuto en toda la tienda.
+    if (select count(*) from public.orders
+         where (customer_email = v_email or regexp_replace(customer_phone, '\D', '', 'g') = regexp_replace(v_phone, '\D', '', 'g'))
+           and created_at > now() - interval '1 hour') >= 5 then
+        raise exception 'Recibimos varios pedidos seguidos con estos datos. Escríbenos por WhatsApp y lo resolvemos.';
+    end if;
+    if (select count(*) from public.orders where created_at > now() - interval '1 minute') >= 20 then
+        raise exception 'Hay muchos pedidos en este momento. Intenta de nuevo en un minuto.';
+    end if;
+
     -- Stock: suma de cantidades por producto (un mismo producto puede venir en varias tallas)
     perform 1
     from (

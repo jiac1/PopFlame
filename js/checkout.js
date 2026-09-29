@@ -227,7 +227,7 @@ const Checkout = {
         const missingFn = error.code === 'PGRST202' || /could not find the function/i.test(error.message || '');
         if (!missingFn) {
             const e = new Error(error.message);
-            e.userMessage = /stock|existe|vacío/i.test(error.message) ? error.message : null;
+            e.userMessage = /stock|existe|vacío|pedidos|minuto/i.test(error.message) ? error.message : null;
             throw e;
         }
 
