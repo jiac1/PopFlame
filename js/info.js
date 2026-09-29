@@ -1,10 +1,12 @@
-// Páginas de ayuda editables desde el panel (tabla pages): envíos, devoluciones, guía de tallas, contacto.
+// Páginas de ayuda y legales editables desde el panel (tabla pages).
 const Info = {
     pages: [
         ['envios', 'Envíos y entregas'],
         ['devoluciones', 'Cambios y devoluciones'],
         ['guia-de-talles', 'Guía de tallas'],
-        ['contacto', 'Contacto']
+        ['contacto', 'Contacto'],
+        ['terminos', 'Términos y condiciones'],
+        ['privacidad', 'Política de privacidad']
     ],
     page: null,
 

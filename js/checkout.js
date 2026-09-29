@@ -78,7 +78,7 @@ const Checkout = {
                 </div>
                 <div>
                     <h5>${PF.escape(i.name)}</h5>
-                    <p>${[i.size && `Talla ${i.size}`, i.color].filter(Boolean).map(PF.escape).join(' · ')}</p>
+                    <p>${PF.escape(CartManager.variantLabel(i))}</p>
                 </div>
                 <span class="price">${ProductsManager.formatPrice(i.price * i.quantity)}</span>
             </div>`).join('');

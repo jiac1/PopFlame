@@ -92,6 +92,12 @@ const CartManager = {
         this.updateUI();
     },
 
+    // "Talla M · Negro". La talla "Única" no aporta información y se omite.
+    variantLabel(item) {
+        const size = item.size && !/^[úu]nica$/i.test(item.size.trim()) ? `Talla ${item.size}` : '';
+        return [size, item.color].filter(Boolean).join(' · ');
+    },
+
     getItems() { return this.cart; },
     getCount() { return this.cart.reduce((t, i) => t + i.quantity, 0); },
     getSubtotal() { return this.cart.reduce((t, i) => t + i.price * i.quantity, 0); },
@@ -161,7 +167,7 @@ const CartManager = {
         container.innerHTML = this.cart.map((item, index) => {
             const max = this.maxFor(item.productId);
             const atMax = this.quantityOf(item.productId) >= max;
-            const variant = [item.size && `Talla ${item.size}`, item.color].filter(Boolean).map(PF.escape).join(' · ');
+            const variant = PF.escape(this.variantLabel(item));
             const url = PF.url(`pages/producto.html?id=${item.productId}`);
             return `
                 <div class="cart-line">
@@ -207,7 +213,7 @@ const CartManager = {
     generateWhatsAppText(customer, orderNumber, items = this.cart) {
         const subtotal = items.reduce((t, i) => t + i.price * i.quantity, 0);
         const lines = items.map((i, n) =>
-            `${n + 1}. ${i.name}${i.size ? ` (Talla ${i.size}` : ''}${i.color ? `${i.size ? ', ' : ' ('}${i.color}` : ''}${i.size || i.color ? ')' : ''} x${i.quantity} — ${this.formatPrice(i.price * i.quantity)}`
+            `${n + 1}. ${i.name}${this.variantLabel(i) ? ` (${this.variantLabel(i).replace(' · ', ', ')})` : ''} x${i.quantity} — ${this.formatPrice(i.price * i.quantity)}`
         ).join('\n');
 
         return [

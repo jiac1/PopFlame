@@ -1168,6 +1168,11 @@ video.brand-logo { mix-blend-mode: screen; filter: grayscale(1) contrast(1.9) br
     color: rgba(255,255,255,0.45);
 }
 .footer-bottom a:hover { color: #fff; }
+.footer-legal { display: flex; flex-wrap: wrap; gap: 20px; }
+.news-note a, .co-legal a { text-decoration: underline; text-underline-offset: 3px; }
+.news-note a:hover { color: #fff; }
+.co-legal { margin-top: 12px; font-size: 12px; line-height: 1.5; color: var(--muted); text-align: center; }
+.co-legal a:hover { color: var(--ink); }
 
 @media (max-width: 900px) {
     .footer-top { grid-template-columns: 1fr; gap: 48px; }
@@ -1933,6 +1938,11 @@ video.brand-logo { mix-blend-mode: screen; filter: grayscale(1) contrast(1.9) br
     .co-submit-mobile { display: block !important; }
 }
 .co-submit-mobile { display: none; margin-top: 8px; }
+.co-legal-mobile { display: none; }
+@media (max-width: 1023px) {
+    .co-legal-desktop { display: none; }
+    .co-legal-mobile { display: block; }
+}
 
 @media (max-width: 560px) {
     .form-grid { grid-template-columns: 1fr; }

@@ -121,6 +121,8 @@
                     <div class="mobile-menu-secondary">
                         <h4>AYUDA</h4>
                         ${helpLinks.map(([s, t]) => `<a href="${u('pages/info.html?slug=' + s)}">${t}</a>`).join('')}
+                        <a href="${u('pages/info.html?slug=terminos')}">Términos y condiciones</a>
+                        <a href="${u('pages/info.html?slug=privacidad')}">Política de privacidad</a>
                         <h4>SÍGUENOS</h4>
                         <div data-social-list></div>
                     </div>
@@ -169,6 +171,7 @@
                                 <button type="submit" aria-label="Suscribirme">${ICONS.arrowRight}</button>
                             </form>
                             <p class="news-msg" id="newsMsg" role="status"></p>
+                            <p class="news-note">Al suscribirte aceptas nuestra <a href="${u('pages/info.html?slug=privacidad')}">Política de privacidad</a>. Puedes darte de baja cuando quieras.</p>
                         </div>
                         <div class="footer-cols">
                             <div class="footer-col">
@@ -191,7 +194,10 @@
                     </div>
                     <div class="footer-bottom">
                         <span>&copy; ${new Date().getFullYear()} PopFlame. Streetwear hecho en Chile.</span>
-                        <span>Santiago, Chile · Pagos por transferencia</span>
+                        <span class="footer-legal">
+                            <a href="${u('pages/info.html?slug=terminos')}">Términos y condiciones</a>
+                            <a href="${u('pages/info.html?slug=privacidad')}">Política de privacidad</a>
+                        </span>
                     </div>
                 </div>
             </footer>`;
