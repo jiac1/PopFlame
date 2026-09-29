@@ -302,6 +302,17 @@ const Site = {
         set('meta[property="og:title"]', 'content', title);
         set('meta[property="og:description"]', 'content', description);
         set('meta[property="og:image"]', 'content', image);
+
+        let canonical = document.querySelector('link[rel="canonical"]');
+        if (!canonical) {
+            canonical = document.createElement('link');
+            canonical.rel = 'canonical';
+            document.head.appendChild(canonical);
+        }
+        const keep = ['id', 'cat', 'slug'];
+        const params = new URLSearchParams(location.search);
+        const q = keep.filter(k => params.get(k)).map(k => `${k}=${encodeURIComponent(params.get(k))}`).join('&');
+        canonical.href = location.origin + location.pathname + (q ? '?' + q : '');
     }
 };
 

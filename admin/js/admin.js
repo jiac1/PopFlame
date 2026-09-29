@@ -441,12 +441,26 @@ const Admin = {
         } catch (e) { /* se queda con el logo por defecto */ }
     },
 
+    lastPending: null,
+
+    // Contador de pedidos por pagar (se revisa cada minuto). Si llega uno nuevo con el panel
+    // abierto, avisa con un mensaje y con el número en la pestaña del navegador.
     async refreshBadge() {
-        const { count } = await supabaseClient.from('orders').select('id', { count: 'exact', head: true }).eq('status', 'pending');
+        const { count, error } = await supabaseClient.from('orders').select('id', { count: 'exact', head: true }).eq('status', 'pending');
+        if (error) return;
         const b = document.getElementById('pendingBadge');
-        if (!b) return;
-        b.hidden = !count;
-        b.textContent = count > 99 ? '99+' : count;
+        if (b) {
+            b.hidden = !count;
+            b.textContent = count > 99 ? '99+' : count;
+        }
+        if (this.lastPending !== null && count > this.lastPending) {
+            const n = count - this.lastPending;
+            UI.toast(n === 1 ? '¡Nuevo pedido recibido!' : `¡${n} pedidos nuevos!`);
+            if ((this.current === 'pedidos' || this.current === 'resumen') && !UI.sheetState) this.route();
+        }
+        this.lastPending = count;
+        document.title = document.title.replace(/^\(\d+\+?\)\s*/, '');
+        if (count) document.title = `(${count}) ${document.title}`;
     },
 
     async route() {
@@ -478,7 +492,7 @@ const Admin = {
             console.error(e);
             view.innerHTML = U.errorBox(e);
         }
-        document.title = `${document.getElementById('pageTitle').textContent} | Panel PopFlame`;
+        document.title = `${this.lastPending ? `(${this.lastPending}) ` : ''}${document.getElementById('pageTitle').textContent} | Panel PopFlame`;
     },
 
     header(title, sub = '', actions = '') {
