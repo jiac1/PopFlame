@@ -2,3 +2,5 @@ User-agent: *
 Allow: /
 Disallow: /admin/
 Disallow: /pages/checkout.html
+
+Sitemap: https://pop-flame.vercel.app/sitemap.xml

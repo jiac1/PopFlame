@@ -14,10 +14,10 @@
     --white: #FFFFFF;
     --text: #0B0B0B;
     --text-2: #4A4A4A;
-    --muted: #8A8680;
+    --muted: #6F6A63;
     --line: #DDD8CF;
     --line-dark: #2A2A2A;
-    --success: #1F8A4C;
+    --success: #16703C;
     --whatsapp: #25D366;
 
     --font-display: 'Archivo', 'Arial Black', Impact, sans-serif;
@@ -519,7 +519,7 @@ video.brand-logo { mix-blend-mode: screen; filter: grayscale(1) contrast(1.9) br
     text-transform: uppercase;
     outline: none;
 }
-.search-input::placeholder { color: #BDB8AF; }
+.search-input::placeholder { color: #A39E95; }
 
 .search-results { padding: 32px 0 48px; }
 .search-hint { color: var(--muted); font-size: 14px; }
