@@ -1,164 +1,310 @@
 // ============================================================
-// PopFlame Admin - Auth + Panel logic
-// Requiere que ../js/supabaseClient.js ya haya sido cargado.
+// PopFlame · Panel de administración — núcleo
+// Sesión, menú, navegación, avisos, diálogos, editor lateral y utilidades.
+// Las secciones (Views.*) viven en views-ventas.js, views-catalogo.js y views-sitio.js.
+// Requiere ../js/supabaseClient.js cargado antes.
 // ============================================================
 
+const ICON = {
+    home: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M3 10.5L12 3l9 7.5V20a1 1 0 01-1 1h-5v-6H9v6H4a1 1 0 01-1-1z"/></svg>',
+    orders: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/></svg>',
+    stock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M3 7l9-4 9 4-9 4-9-4z"/><path d="M3 7v10l9 4 9-4V7M12 11v10"/></svg>',
+    shirt: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M8 3l-5 3 2 5 2-1v11h10V10l2 1 2-5-5-3a4 4 0 01-8 0z"/></svg>',
+    image: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-9 9"/></svg>',
+    ruler: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M3 17L17 3l4 4L7 21z"/><path d="M7 13l2 2M10 10l2 2M13 7l2 2"/></svg>',
+    folder: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M3 6a1 1 0 011-1h5l2 2h9a1 1 0 011 1v10a1 1 0 01-1 1H4a1 1 0 01-1-1z"/></svg>',
+    page: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4M9 12h6M9 16h6"/></svg>',
+    settings: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.8-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 01-4 0v-.1a1.7 1.7 0 00-1.1-1.5 1.7 1.7 0 00-1.8.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.8 1.7 1.7 0 00-1.5-1H3a2 2 0 010-4h.1a1.7 1.7 0 001.5-1.1 1.7 1.7 0 00-.3-1.8l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.8.3H9a1.7 1.7 0 001-1.5V3a2 2 0 014 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.8-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.8V9a1.7 1.7 0 001.5 1H21a2 2 0 010 4h-.1a1.7 1.7 0 00-1.5 1z"/></svg>',
+    users: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0113 0M16 4.5a3.5 3.5 0 010 7M18 14a6.5 6.5 0 013.5 6"/></svg>',
+    plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
+    edit: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></svg>',
+    trash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>',
+    copy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 00-1-1H5a1 1 0 00-1 1v10a1 1 0 001 1h3"/></svg>',
+    eye: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>',
+    external: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 01-1 1H5a1 1 0 01-1-1V7a1 1 0 011-1h5"/></svg>',
+    search: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>',
+    up: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15l6-6 6 6"/></svg>',
+    down: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>',
+    left: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>',
+    right: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>',
+    close: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+    check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
+    alert: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7.5v5.5M12 16.5v.01"/></svg>',
+    info: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.01"/></svg>',
+    upload: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5M4 16v3a1 1 0 001 1h14a1 1 0 001-1v-3"/></svg>',
+    download: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v12M7 11l5 5 5-5M4 16v3a1 1 0 001 1h14a1 1 0 001-1v-3"/></svg>',
+    whatsapp: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M17.47 14.38c-.3-.15-1.76-.87-2.03-.97-.27-.1-.47-.15-.67.15-.2.3-.77.97-.94 1.16-.17.2-.35.22-.64.07-.3-.15-1.26-.46-2.39-1.47-.88-.79-1.48-1.76-1.65-2.06-.17-.3-.02-.46.13-.6.13-.14.3-.35.45-.52.15-.17.2-.3.3-.5.1-.2.05-.37-.03-.52-.07-.15-.67-1.61-.92-2.2-.24-.58-.49-.5-.67-.51h-.57c-.2 0-.52.07-.79.37-.27.3-1.04 1.02-1.04 2.48s1.06 2.88 1.21 3.07c.15.2 2.1 3.2 5.08 4.49.71.31 1.26.49 1.69.63.71.22 1.36.19 1.87.12.57-.09 1.76-.72 2-1.41.25-.7.25-1.29.18-1.41-.08-.13-.27-.2-.57-.35M12.05 21.79h-.01a9.87 9.87 0 01-5.03-1.38l-.36-.21-3.74.98 1-3.65-.24-.37a9.86 9.86 0 01-1.51-5.26c0-5.45 4.44-9.88 9.89-9.88 2.64 0 5.12 1.03 6.99 2.9a9.83 9.83 0 012.89 6.99c0 5.45-4.44 9.88-9.88 9.88m8.41-18.3A11.82 11.82 0 0012.05 0C5.5 0 .16 5.34.16 11.89c0 2.1.55 4.14 1.59 5.95L.06 24l6.3-1.65a11.88 11.88 0 005.68 1.45h.01c6.55 0 11.89-5.34 11.89-11.89a11.82 11.82 0 00-3.48-8.41z"/></svg>',
+    mail: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>',
+    phone: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 005 5L15 13l5 2v4a2 2 0 01-2 2A16 16 0 013 6a2 2 0 012-2z"/></svg>',
+    money: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/></svg>',
+    clock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+    receipt: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 12h6"/></svg>',
+    star: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"/></svg>'
+};
+
+const ORDER_STATUS = {
+    pending: { label: 'Pendiente de pago', short: 'Pendiente' },
+    confirmed: { label: 'Pagado', short: 'Pagado' },
+    processing: { label: 'Pagado · en preparación', short: 'En preparación' },
+    shipped: { label: 'Listo para entregar', short: 'Listo' },
+    delivered: { label: 'Entregado', short: 'Entregado' },
+    cancelled: { label: 'Cancelado', short: 'Cancelado' }
+};
+const PAID_STATUSES = ['confirmed', 'processing', 'shipped', 'delivered'];
+
+const ROLE_LABEL = { super_admin: 'Super Admin', admin: 'Admin', pending: 'Pendiente' };
+
+// ============================================================
+// Sesión
+// ============================================================
 const AdminAuth = {
     async getActiveProfile() {
-        const { data: { session } } = await supabaseClient.auth.getSession();
-        if (!session) return null;
-        const { data: profile, error } = await supabaseClient
-            .from('profiles').select('*').eq('id', session.user.id).single();
-        if (error || !profile) return null;
-        return profile;
+        try {
+            const { data: { session } } = await supabaseClient.auth.getSession();
+            if (!session) return null;
+            const { data: profile, error } = await supabaseClient
+                .from('profiles').select('*').eq('id', session.user.id).maybeSingle();
+            if (error || !profile || !['admin', 'super_admin'].includes(profile.role)) return null;
+            return profile;
+        } catch (e) {
+            return null;
+        }
     },
 
     async requireAuth() {
         const profile = await this.getActiveProfile();
         if (!profile) {
-            window.location.href = 'index.html';
+            location.replace('index.html');
             return null;
         }
         return profile;
     },
 
     async login(username, password) {
-        if (!username || !password) throw new Error('Ingresa usuario y contraseña');
+        if (!username || !password) throw new Error('Ingresa tu usuario y contraseña.');
 
         const { data: email, error: rpcErr } = await supabaseClient.rpc('email_for_username', { p_username: username });
-        if (rpcErr) throw new Error('Error de conexión con el servidor');
-        if (!email) throw new Error('Usuario no encontrado');
+        if (rpcErr) throw new Error('No pudimos conectar con el servidor. Revisa tu conexión e intenta de nuevo.');
+        if (!email) throw new Error('Usuario o contraseña incorrectos.');
 
-        const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
-        if (error) throw new Error('Usuario o contraseña incorrectos');
+        const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+        if (error) throw new Error('Usuario o contraseña incorrectos.');
+
+        const { data: profile } = await supabaseClient.from('profiles').select('role').eq('id', data.user.id).maybeSingle();
+        if (!profile || profile.role === 'pending') {
+            await supabaseClient.auth.signOut();
+            throw new Error('Tu cuenta todavía no está aprobada. Pídele a un Super Admin que la active.');
+        }
     },
 
     async logout() {
         await supabaseClient.auth.signOut();
-        window.location.href = 'index.html';
+        location.replace('index.html');
     }
 };
 
 // ============================================================
-// Panel (solo se usa dentro de panel.html)
+// Utilidades
 // ============================================================
+const U = {
+    esc(str) {
+        return String(str ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    },
+    money(n) { return '$' + Math.round(Number(n || 0)).toLocaleString('es-CL'); },
+    date(d) { return new Date(d).toLocaleDateString('es-CL', { day: 'numeric', month: 'short', year: 'numeric' }); },
+    dateTime(d) {
+        return new Date(d).toLocaleString('es-CL', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+    },
+    ago(d) {
+        const s = (Date.now() - new Date(d).getTime()) / 1000;
+        if (s < 60) return 'hace un momento';
+        if (s < 3600) return `hace ${Math.floor(s / 60)} min`;
+        if (s < 86400) return `hace ${Math.floor(s / 3600)} h`;
+        if (s < 86400 * 7) { const n = Math.floor(s / 86400); return `hace ${n} día${n === 1 ? '' : 's'}`; }
+        return U.date(d);
+    },
+    img(path) {
+        if (!path) return '../images/products/poleras/placeholder.svg';
+        if (/^(https?:)?\/\//i.test(path) || path.startsWith('blob:') || path.startsWith('data:')) return path;
+        return '../' + path.replace(/^\/+/, '');
+    },
+    isVideo: (url) => /\.(mp4|webm|mov)(\?.*)?$/i.test(url || ''),
+    int(v) { const n = parseInt(String(v).replace(/[^\d-]/g, ''), 10); return isNaN(n) ? null : n; },
+    debounce(fn, ms) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; },
+    slug(s) {
+        return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+            .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+    },
+    initials(s) { return String(s || '?').replace(/[^a-zA-ZÀ-ÿ0-9 ]/g, ' ').trim().split(/\s+/).slice(0, 2).map(w => w[0]).join('') || '?'; },
+    normalize(s) { return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, ''); },
 
-const AdminPanel = {
-    profile: null,
-    products: [],
-    categories: [],
-    productImagesExisting: [],
-    productImagesNewFiles: [],
-    banners: [],
-    sizeGuideRows: [],
-    currentMeasurementRows: [],
-
-    async init(profile) {
-        this.profile = profile;
-        this.renderSidebar();
-        this.bindModals();
-        await this.switchTab('dashboard');
+    // Teléfono chileno -> solo dígitos con 56 (formato que acepta wa.me)
+    waNumber(phone) {
+        let d = String(phone || '').replace(/\D/g, '');
+        if (!d) return '';
+        if (d.length === 9 && d.startsWith('9')) d = '56' + d;
+        if (d.length === 8) d = '569' + d;
+        return d;
+    },
+    waLink(phone, text) {
+        const n = U.waNumber(phone);
+        return n ? `https://wa.me/${n}${text ? '?text=' + encodeURIComponent(text) : ''}` : '';
     },
 
-    isSuperAdmin() {
-        return this.profile.role === 'super_admin';
+    skeleton(rows = 6) {
+        return `<div class="card"><div class="skeleton-rows">${'<div class="skeleton"></div>'.repeat(rows)}</div></div>`;
+    },
+    empty(icon, title, text, action = '') {
+        return `<div class="empty">${ICON[icon] || ''}<h3>${title}</h3>${text ? `<p>${text}</p>` : ''}${action}</div>`;
+    },
+    errorBox(err) {
+        return `<div class="card">${U.empty('alert', 'No pudimos cargar esta sección', U.esc(err?.message || 'Revisa tu conexión e intenta de nuevo.'),
+            '<button class="btn btn-ghost" onclick="Admin.route()">Reintentar</button>')}</div>`;
     },
 
-    // ---------------- Sidebar & tabs ----------------
-
-    renderSidebar() {
-        document.getElementById('userName').textContent = this.profile.name || this.profile.username;
-        document.getElementById('roleBadge').textContent = this.isSuperAdmin() ? 'Super Admin' : 'Admin';
-
-        const superLinks = document.getElementById('superAdminLinks');
-        superLinks.style.display = this.isSuperAdmin() ? 'block' : 'none';
-
-        document.querySelectorAll('.sidebar-link[data-tab]').forEach(link => {
-            link.addEventListener('click', () => this.switchTab(link.dataset.tab));
-        });
-
-        document.getElementById('logoutBtn').addEventListener('click', () => AdminAuth.logout());
+    colorMap: {
+        'negro': '#0B0B0B', 'blanco': '#FFFFFF', 'gris': '#8C8C8C', 'rojo': '#E31837', 'azul': '#1E3A8A',
+        'celeste': '#7DC3E8', 'verde': '#166534', 'verde militar': '#4B5320', 'amarillo': '#EAB308',
+        'naranjo': '#EA580C', 'café': '#5C3A21', 'cafe': '#5C3A21', 'beige': '#D8C3A0', 'rosado': '#F472B6',
+        'morado': '#7C3AED', 'dorado': '#D4AF37', 'plateado': '#C9CCD1', 'crema': '#F2EBD9', 'vino': '#722F37'
     },
+    swatch(name) { return U.colorMap[String(name || '').trim().toLowerCase()] || '#CCCCCC'; }
+};
 
-    async switchTab(tab) {
-        document.querySelectorAll('.sidebar-link').forEach(l => l.classList.toggle('active', l.dataset.tab === tab));
-        document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === 'tab-' + tab));
+// ============================================================
+// Datos compartidos entre secciones (se cargan una vez y se refrescan al guardar)
+// ============================================================
+const Data = {
+    categories: null,
+    config: null,
 
-        const loaders = {
-            dashboard: () => this.loadDashboard(),
-            pedidos: () => this.loadOrders(),
-            inventario: () => this.loadInventory(),
-            productos: () => this.loadProducts(),
-            categorias: () => this.loadCategories(),
-            banners: () => this.loadBanners(),
-            tallas: () => this.loadSizeGuide(),
-            paginas: () => this.loadPages(),
-            config: () => this.loadConfig(),
-            usuarios: () => this.loadUsers()
-        };
-        if (loaders[tab]) await loaders[tab]();
-    },
-
-    toast(message, type = 'success') {
-        const el = document.createElement('div');
-        el.className = `toast ${type}`;
-        el.textContent = message;
-        document.body.appendChild(el);
-        setTimeout(() => el.remove(), 3000);
-    },
-
-    formatPrice(n) {
-        return '$' + Number(n || 0).toLocaleString('es-CL');
-    },
-
-    // Igual que ProductsManager.resolveImagePath del sitio público, pero sin depender de él
-    // (el panel no carga js/products.js, así que resuelve la ruta de forma independiente).
-    // El panel vive en /admin/, así que las rutas locales (images/...) se resuelven desde la carpeta de arriba.
-    resolveImagePath(path, prefix = '../') {
-        if (!path) return '';
-        if (/^https?:\/\//i.test(path)) return path;
-        return prefix + path;
-    },
-
-    escapeHtml(str) {
-        const div = document.createElement('div');
-        div.textContent = str ?? '';
-        return div.innerHTML;
-    },
-
-    // Muestra la preview de logo/banner como <img> o <video> (loop, muteado) según el tipo de archivo
-    setPreviewMedia(elId, url) {
-        const el = document.getElementById(elId);
-        if (!el) return;
-        if (!url) { el.style.display = 'none'; return; }
-
-        const isVideo = /\.(mp4|webm|mov)(\?.*)?$/i.test(url);
-        const wantsTag = isVideo ? 'VIDEO' : 'IMG';
-
-        if (el.tagName !== wantsTag) {
-            const replacement = document.createElement(isVideo ? 'video' : 'img');
-            replacement.id = el.id;
-            replacement.className = el.className;
-            replacement.style.cssText = el.style.cssText;
-            if (isVideo) {
-                replacement.autoplay = true;
-                replacement.loop = true;
-                replacement.muted = true;
-                replacement.playsInline = true;
-            }
-            el.replaceWith(replacement);
-            replacement.src = url;
-            replacement.style.display = 'block';
-        } else {
-            el.src = url;
-            el.style.display = 'block';
+    async categoriesList(force) {
+        if (!this.categories || force) {
+            const { data, error } = await supabaseClient.from('categories').select('*').order('sort_order');
+            if (error) throw error;
+            this.categories = data || [];
         }
+        return this.categories;
+    },
+    catName(id) { return (this.categories || []).find(c => c.id === id)?.name || id; },
+
+    async configRow(force) {
+        if (!this.config || force) {
+            const { data, error } = await supabaseClient.from('config').select('*').eq('id', 1).maybeSingle();
+            if (error) throw error;
+            this.config = data || {};
+        }
+        return this.config;
+    }
+};
+
+// ============================================================
+// Interfaz: avisos, diálogos y editor lateral
+// ============================================================
+const UI = {
+    toast(message, type = 'ok') {
+        const box = document.getElementById('toasts');
+        if (!box) return;
+        const el = document.createElement('div');
+        el.className = 'toast' + (type === 'error' ? ' is-error' : '');
+        el.innerHTML = `${type === 'error' ? ICON.alert : ICON.check}<span>${U.esc(message)}</span>`;
+        box.appendChild(el);
+        setTimeout(() => {
+            el.classList.add('is-leaving');
+            el.addEventListener('animationend', () => el.remove(), { once: true });
+        }, type === 'error' ? 4500 : 2600);
     },
 
-    // Achica y comprime fotos antes de subirlas (máx. 2000px, JPEG 85% o PNG si tiene transparencia).
-    // Una foto de celular de 5-7 MB queda en ~300-500 KB y la tienda carga mucho más rápido.
-    // Videos, GIF y SVG se suben tal cual.
-    async compressImage(file, maxSide = 2000) {
+    // Reemplazo de confirm(): devuelve una promesa true/false
+    confirm({ title, text = '', ok = 'Confirmar', danger = true } = {}) {
+        return new Promise(resolve => {
+            const d = document.getElementById('dialog');
+            document.getElementById('dialogTitle').textContent = title;
+            document.getElementById('dialogText').textContent = text;
+            document.getElementById('dialogIcon').innerHTML = danger ? ICON.trash : ICON.info;
+            document.getElementById('dialogIcon').style.cssText = danger ? '' : 'background:var(--blue-soft);color:var(--blue)';
+            const okBtn = document.getElementById('dialogOk');
+            const cancel = document.getElementById('dialogCancel');
+            okBtn.textContent = ok;
+            okBtn.className = 'btn ' + (danger ? 'btn-red' : 'btn-dark');
+            d.classList.add('is-open');
+            d.setAttribute('aria-hidden', 'false');
+            setTimeout(() => cancel.focus(), 50);
+
+            // Escape cierra solo el diálogo (captura + stopImmediatePropagation para que no cierre también el editor)
+            const onKey = (e) => {
+                if (e.key !== 'Escape') return;
+                e.stopImmediatePropagation();
+                done(false);
+            };
+            const done = (val) => {
+                d.classList.remove('is-open');
+                d.setAttribute('aria-hidden', 'true');
+                okBtn.onclick = cancel.onclick = d.onclick = null;
+                document.removeEventListener('keydown', onKey, true);
+                resolve(val);
+            };
+            okBtn.onclick = () => done(true);
+            cancel.onclick = () => done(false);
+            d.onclick = (e) => { if (e.target === d) done(false); };
+            document.addEventListener('keydown', onKey, true);
+        });
+    },
+
+    sheetState: null,
+
+    // Abre el editor lateral. isDirty() evita cerrar con cambios sin guardar.
+    openSheet({ title, body, foot = '', wide = false, isDirty = null, onOpen = null }) {
+        const sheet = document.getElementById('sheet');
+        document.getElementById('sheetTitle').innerHTML = title;
+        document.getElementById('sheetBody').innerHTML = body;
+        document.getElementById('sheetFoot').innerHTML = foot;
+        document.getElementById('sheetFoot').hidden = !foot;
+        document.getElementById('sheetBody').scrollTop = 0;
+        sheet.classList.toggle('is-wide', wide);
+        sheet.classList.add('is-open');
+        sheet.setAttribute('aria-hidden', 'false');
+        document.getElementById('sheetOverlay').classList.add('is-open');
+        document.body.classList.add('no-scroll');
+        this.sheetState = { isDirty, lastFocus: document.activeElement };
+        onOpen && onOpen(sheet);
+        setTimeout(() => sheet.querySelector('input:not([type=hidden]):not([type=file]):not([type=checkbox]), textarea, select')?.focus({ preventScroll: true }), 80);
+    },
+
+    async closeSheet(force = false) {
+        const sheet = document.getElementById('sheet');
+        if (!sheet.classList.contains('is-open')) return true;
+        if (!force && this.sheetState?.isDirty?.()) {
+            const ok = await this.confirm({ title: '¿Salir sin guardar?', text: 'Tienes cambios que no se han guardado.', ok: 'Salir sin guardar' });
+            if (!ok) return false;
+        }
+        sheet.classList.remove('is-open');
+        sheet.setAttribute('aria-hidden', 'true');
+        document.getElementById('sheetOverlay').classList.remove('is-open');
+        document.body.classList.remove('no-scroll');
+        this.sheetState?.lastFocus?.focus?.({ preventScroll: true });
+        this.sheetState = null;
+        return true;
+    },
+
+    setLoading(btn, on) {
+        if (!btn) return;
+        btn.classList.toggle('is-loading', on);
+        btn.disabled = on;
+    },
+
+    // Serializa los campos con [name] de un contenedor (para detectar cambios sin guardar)
+    snapshot(root) {
+        return JSON.stringify([...root.querySelectorAll('[name]')].map(el =>
+            el.type === 'checkbox' ? el.checked : el.value));
+    }
+};
+
+// ============================================================
+// Subida de imágenes (con compresión automática)
+// ============================================================
+const Uploads = {
+    async compress(file, maxSide = 2000) {
         if (!/^image\/(jpeg|png|webp)$/i.test(file.type) || typeof createImageBitmap !== 'function') return file;
         try {
             const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
@@ -171,1239 +317,181 @@ const AdminPanel = {
             const ctx = canvas.getContext('2d');
             ctx.drawImage(bitmap, 0, 0, w, h);
 
-            // ¿Tiene transparencia? (muestreo de píxeles) -> se mantiene PNG para no perder el fondo transparente
+            // Si tiene transparencia se mantiene PNG para no perder el fondo transparente
             let transparent = false;
             if (file.type !== 'image/jpeg') {
-                const data = ctx.getImageData(0, 0, w, h).data;
-                const step = Math.max(4, Math.floor(data.length / 4 / 20000) * 4);
-                for (let i = 3; i < data.length; i += step) { if (data[i] < 250) { transparent = true; break; } }
+                const px = ctx.getImageData(0, 0, w, h).data;
+                const step = Math.max(4, Math.floor(px.length / 4 / 20000) * 4);
+                for (let i = 3; i < px.length; i += step) { if (px[i] < 250) { transparent = true; break; } }
             }
             const type = transparent ? 'image/png' : 'image/jpeg';
             const blob = await new Promise(r => canvas.toBlob(r, type, 0.85));
             if (!blob || (blob.size >= file.size && scale === 1)) return file;
-            const name = file.name.replace(/\.[^.]+$/, '') + (transparent ? '.png' : '.jpg');
-            return new File([blob], name, { type });
+            return new File([blob], file.name.replace(/\.[^.]+$/, '') + (transparent ? '.png' : '.jpg'), { type });
         } catch (e) {
             console.warn('No se pudo comprimir la imagen, se sube la original:', e);
             return file;
         }
     },
 
-    // Sube un archivo a un bucket público de Supabase Storage y devuelve la URL pública.
-    async uploadImage(bucket, file) {
+    async upload(bucket, file) {
         if (!file) return null;
-        file = await this.compressImage(file);
-        const ext = file.name.split('.').pop();
+        const maxMb = bucket === 'site-assets' ? 50 : 10;
+        file = await this.compress(file);
+        if (file.size > maxMb * 1024 * 1024) throw new Error(`El archivo pesa más de ${maxMb} MB.`);
+        const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
         const path = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
-        const { error } = await supabaseClient.storage.from(bucket).upload(path, file, { upsert: false });
+        const { error } = await supabaseClient.storage.from(bucket).upload(path, file, { upsert: false, cacheControl: '31536000' });
         if (error) throw error;
-        const { data } = supabaseClient.storage.from(bucket).getPublicUrl(path);
-        return data.publicUrl;
-    },
-
-    // ---------------- Dashboard ----------------
-
-    async loadDashboard() {
-        const container = document.getElementById('tab-dashboard');
-        container.innerHTML = '<div class="loading">Cargando estadísticas...</div>';
-
-        const [{ data: orders }, { data: products }] = await Promise.all([
-            supabaseClient.from('orders').select('*').order('created_at', { ascending: false }),
-            supabaseClient.from('products').select('*')
-        ]);
-
-        const allOrders = orders || [];
-        const allProducts = products || [];
-
-        const startOfMonth = new Date();
-        startOfMonth.setDate(1);
-        startOfMonth.setHours(0, 0, 0, 0);
-
-        const salesThisMonth = allOrders
-            .filter(o => new Date(o.created_at) >= startOfMonth && o.status !== 'cancelled')
-            .reduce((sum, o) => sum + Number(o.total), 0);
-
-        const pendingCount = allOrders.filter(o => o.status === 'pending').length;
-        const lowStock = allProducts.filter(p => p.stock <= 5);
-
-        container.innerHTML = `
-            <div class="page-header"><h1>Dashboard</h1></div>
-            <div class="stats-grid">
-                <div class="stat-card">
-                    <div class="label">Ventas del mes</div>
-                    <div class="value">${this.formatPrice(salesThisMonth)}</div>
-                </div>
-                <div class="stat-card">
-                    <div class="label">Pedidos pendientes</div>
-                    <div class="value ${pendingCount > 0 ? 'warning' : ''}">${pendingCount}</div>
-                </div>
-                <div class="stat-card">
-                    <div class="label">Total de pedidos</div>
-                    <div class="value">${allOrders.length}</div>
-                </div>
-                <div class="stat-card">
-                    <div class="label">Productos con stock bajo</div>
-                    <div class="value ${lowStock.length > 0 ? 'danger' : ''}">${lowStock.length}</div>
-                </div>
-            </div>
-            <div class="card">
-                <h3>Últimos pedidos</h3>
-                <div class="table-wrap">
-                    <table>
-                        <thead><tr><th>Pedido</th><th>Cliente</th><th>Total</th><th>Estado</th><th>Fecha</th></tr></thead>
-                        <tbody>
-                            ${allOrders.slice(0, 6).map(o => `
-                                <tr>
-                                    <td>${o.order_number}</td>
-                                    <td>${this.escapeHtml(o.customer_name)}</td>
-                                    <td>${this.formatPrice(o.total)}</td>
-                                    <td><span class="badge ${o.status}">${o.status}</span></td>
-                                    <td>${new Date(o.created_at).toLocaleDateString('es-CL')}</td>
-                                </tr>
-                            `).join('') || '<tr><td colspan="5" class="empty-state">Sin pedidos todavía</td></tr>'}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        `;
-    },
-
-    // ---------------- Pedidos ----------------
-
-    async loadOrders() {
-        const container = document.getElementById('tab-pedidos');
-        container.innerHTML = '<div class="loading">Cargando pedidos...</div>';
-
-        const { data: orders, error } = await supabaseClient.from('orders').select('*').order('created_at', { ascending: false });
-        if (error) { container.innerHTML = `<div class="empty-state">Error cargando pedidos: ${error.message}</div>`; return; }
-
-        const statuses = ['pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled'];
-        const canDelete = this.isSuperAdmin();
-
-        container.innerHTML = `
-            <div class="page-header"><h1>Pedidos</h1></div>
-            ${this.isSuperAdmin() ? '<p style="font-size:12px;color:var(--admin-text-secondary);margin-bottom:16px;">Al marcar un pedido como "confirmed" pasa solo a "processing" (se considera ya en preparación). Despachado/entregado/cancelado siguen siendo manuales.</p>' : ''}
-            <div class="card">
-                <div class="table-wrap">
-                    <table>
-                        <thead><tr><th>Pedido</th><th>Cliente</th><th>Contacto</th><th>Total</th><th>Estado</th><th>Fecha</th>${canDelete ? '<th></th>' : ''}</tr></thead>
-                        <tbody>
-                            ${(orders || []).map(o => `
-                                <tr>
-                                    <td><strong>${o.order_number}</strong></td>
-                                    <td>${this.escapeHtml(o.customer_name)}${o.customer_address ? `<br><span style="color:var(--admin-text-secondary)">📍 ${this.escapeHtml(o.customer_address)}</span>` : ''}${o.note ? `<br><span style="color:var(--admin-text-secondary)">📝 ${this.escapeHtml(o.note)}</span>` : ''}</td>
-                                    <td>${this.escapeHtml(o.customer_email)}<br>${this.escapeHtml(o.customer_phone)}</td>
-                                    <td>${this.formatPrice(o.total)}</td>
-                                    <td>
-                                        <select class="status-select" data-order-id="${o.id}">
-                                            ${statuses.map(s => `<option value="${s}" ${s === o.status ? 'selected' : ''}>${s}</option>`).join('')}
-                                        </select>
-                                    </td>
-                                    <td>${new Date(o.created_at).toLocaleString('es-CL')}</td>
-                                    ${canDelete ? `<td><button class="btn btn-danger btn-sm delete-order-btn" data-id="${o.id}">Eliminar</button></td>` : ''}
-                                </tr>
-                            `).join('') || `<tr><td colspan="${canDelete ? 7 : 6}" class="empty-state">Sin pedidos todavía</td></tr>`}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        `;
-
-        container.querySelectorAll('.status-select').forEach(sel => {
-            sel.addEventListener('change', async () => {
-                const { error } = await supabaseClient.from('orders')
-                    .update({ status: sel.value }).eq('id', sel.dataset.orderId);
-                if (error) { this.toast('No se pudo actualizar el estado: ' + error.message, 'error'); return; }
-                this.toast('Estado actualizado');
-                await this.loadOrders(); // refleja el estado real (el trigger puede haberlo movido a "processing")
-            });
-        });
-
-        container.querySelectorAll('.delete-order-btn').forEach(btn => {
-            btn.addEventListener('click', () => this.deleteOrder(btn.dataset.id));
-        });
-    },
-
-    async deleteOrder(id) {
-        if (!confirm('¿Eliminar este pedido? Esta acción no se puede deshacer.')) return;
-        const { error } = await supabaseClient.from('orders').delete().eq('id', id);
-        if (error) { this.toast('No se pudo eliminar: ' + error.message, 'error'); return; }
-        this.toast('Pedido eliminado');
-        await this.loadOrders();
-    },
-
-    // ---------------- Inventario (admin y super_admin) ----------------
-
-    async loadInventory() {
-        const container = document.getElementById('tab-inventario');
-        container.innerHTML = '<div class="loading">Cargando inventario...</div>';
-
-        const { data: products, error } = await supabaseClient.from('products').select('*').order('name');
-        if (error) { container.innerHTML = `<div class="empty-state">Error: ${error.message}</div>`; return; }
-
-        container.innerHTML = `
-            <div class="page-header"><h1>Inventario</h1></div>
-            <div class="card">
-                <div class="table-wrap">
-                    <table>
-                        <thead><tr><th>Producto</th><th>Categoría</th><th>Precio</th><th>Stock</th><th>Actualizar</th></tr></thead>
-                        <tbody>
-                            ${(products || []).map(p => `
-                                <tr>
-                                    <td>${this.escapeHtml(p.name)}</td>
-                                    <td>${this.escapeHtml(p.category_id)}</td>
-                                    <td>${this.formatPrice(p.price)}</td>
-                                    <td>
-                                        <span class="${p.stock <= 5 ? 'badge low-stock' : ''}">${p.stock}</span>
-                                    </td>
-                                    <td>
-                                        <input type="text" inputmode="numeric" pattern="[0-9]*" value="${p.stock}" data-stock-id="${p.id}" style="width:80px;padding:6px 8px;border:1px solid var(--admin-border);border-radius:6px;">
-                                        <button class="btn btn-secondary btn-sm save-stock-btn" data-stock-id="${p.id}">Guardar</button>
-                                    </td>
-                                </tr>
-                            `).join('') || '<tr><td colspan="5" class="empty-state">Sin productos</td></tr>'}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        `;
-
-        container.querySelectorAll('.save-stock-btn').forEach(btn => {
-            btn.addEventListener('click', async () => {
-                const id = btn.dataset.stockId;
-                const input = container.querySelector(`input[data-stock-id="${id}"]`);
-                const newStock = parseInt(input.value, 10);
-                if (isNaN(newStock) || newStock < 0) { this.toast('Stock inválido', 'error'); return; }
-
-                const { error } = await supabaseClient.from('products').update({ stock: newStock }).eq('id', id);
-                if (error) { this.toast('No se pudo actualizar: ' + error.message, 'error'); }
-                else { this.toast('Stock actualizado'); await this.loadInventory(); }
-            });
-        });
-    },
-
-    // ---------------- Productos (admin y super_admin) ----------------
-
-    async loadProducts() {
-        const container = document.getElementById('tab-productos');
-        container.innerHTML = '<div class="loading">Cargando productos...</div>';
-
-        const [{ data: products }, { data: categories }] = await Promise.all([
-            supabaseClient.from('products').select('*').order('name'),
-            supabaseClient.from('categories').select('*').order('sort_order')
-        ]);
-        this.products = products || [];
-        this.categories = categories || [];
-        this.selectedProductIds = new Set();
-
-        container.innerHTML = `
-            <div class="page-header">
-                <h1>Productos</h1>
-                <button class="btn btn-primary" id="newProductBtn">+ Nuevo producto</button>
-            </div>
-            <div class="card">
-                <div class="toolbar" id="bulkToolbar" style="display:none;">
-                    <span id="bulkCount"></span>
-                    <button type="button" class="btn btn-secondary btn-sm" id="bulkEditBtn">Editar seleccionados</button>
-                    <button type="button" class="btn btn-danger btn-sm" id="bulkDeleteBtn">Eliminar seleccionados</button>
-                </div>
-                <div class="table-wrap">
-                    <table>
-                        <thead><tr><th><input type="checkbox" id="selectAllProducts"></th><th>Nombre</th><th>Categoría</th><th>Precio</th><th>Stock</th><th>Destacado</th><th></th></tr></thead>
-                        <tbody>
-                            ${this.products.map(p => `
-                                <tr>
-                                    <td><input type="checkbox" class="product-select" data-id="${p.id}"></td>
-                                    <td>${this.escapeHtml(p.name)}</td>
-                                    <td>${this.escapeHtml(p.category_id)}</td>
-                                    <td>${this.formatPrice(p.price)}</td>
-                                    <td>${p.stock}</td>
-                                    <td>${p.featured ? '✅' : '—'}</td>
-                                    <td>
-                                        <button class="btn btn-secondary btn-sm edit-product-btn" data-id="${p.id}">Editar</button>
-                                        <button class="btn btn-danger btn-sm delete-product-btn" data-id="${p.id}">Eliminar</button>
-                                    </td>
-                                </tr>
-                            `).join('') || '<tr><td colspan="7" class="empty-state">Sin productos. Crea el primero.</td></tr>'}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        `;
-
-        document.getElementById('newProductBtn').addEventListener('click', () => this.openProductModal());
-
-        document.getElementById('selectAllProducts').addEventListener('change', (e) => {
-            container.querySelectorAll('.product-select').forEach(cb => { cb.checked = e.target.checked; });
-            this.syncProductSelection(container);
-        });
-        container.querySelectorAll('.product-select').forEach(cb => {
-            cb.addEventListener('change', () => this.syncProductSelection(container));
-        });
-        document.getElementById('bulkDeleteBtn').addEventListener('click', () => this.bulkDeleteProducts());
-        document.getElementById('bulkEditBtn').addEventListener('click', () => this.openBulkEditModal());
-
-        container.querySelectorAll('.edit-product-btn').forEach(btn =>
-            btn.addEventListener('click', () => this.openProductModal(btn.dataset.id)));
-        container.querySelectorAll('.delete-product-btn').forEach(btn =>
-            btn.addEventListener('click', () => this.deleteProduct(btn.dataset.id)));
-    },
-
-    openProductModal(id) {
-        if (!this.categories || this.categories.length === 0) {
-            this.toast('Primero crea una categoría (pestaña Categorías, solo Super Admin)', 'error');
-            return;
-        }
-        const product = id ? this.products.find(p => String(p.id) === String(id)) : null;
-        const modal = document.getElementById('productModal');
-        const form = document.getElementById('productForm');
-        form.reset();
-        document.getElementById('productModalTitle').textContent = product ? 'Editar producto' : 'Nuevo producto';
-        document.getElementById('productId').value = product ? product.id : '';
-
-        const catSelect = document.getElementById('productCategory');
-        catSelect.innerHTML = this.categories.map(c => `<option value="${c.id}">${this.escapeHtml(c.name)}</option>`).join('');
-
-        document.getElementById('productImageFile').value = '';
-        document.getElementById('productImageUrlInput').value = '';
-        this.productImagesExisting = product
-            ? ((product.images && product.images.length) ? [...product.images] : (product.image ? [product.image] : []))
-            : [];
-        this.productImagesNewFiles = [];
-        this.renderProductImagesGallery();
-
-        if (product) {
-            document.getElementById('productName').value = product.name;
-            document.getElementById('productCategory').value = product.category_id;
-            document.getElementById('productPrice').value = product.price;
-            document.getElementById('productStock').value = product.stock;
-            document.getElementById('productSizes').value = (product.sizes || []).join(', ');
-            document.getElementById('productColors').value = (product.colors || []).join(', ');
-            document.getElementById('productBadge').value = product.badge || '';
-            document.getElementById('productDescription').value = product.description || '';
-            document.getElementById('productFeatured').checked = !!product.featured;
-        }
-        modal.classList.add('active');
-    },
-
-    // Dibuja las miniaturas de la galería (fotos existentes + nuevas seleccionadas aún no subidas)
-    renderProductImagesGallery() {
-        const container = document.getElementById('productImagesGallery');
-
-        const existingThumbs = this.productImagesExisting.map((url, i) => `
-            <div class="img-thumb">
-                <img src="${this.resolveImagePath(url, '../')}">
-                <button type="button" class="img-thumb-remove" data-kind="existing" data-index="${i}">×</button>
-            </div>
-        `).join('');
-
-        const newThumbs = this.productImagesNewFiles.map((file, i) => `
-            <div class="img-thumb">
-                <img src="${URL.createObjectURL(file)}">
-                <button type="button" class="img-thumb-remove" data-kind="new" data-index="${i}">×</button>
-            </div>
-        `).join('');
-
-        container.innerHTML = (existingThumbs + newThumbs) || '<p class="img-gallery-empty">Sin fotos todavía</p>';
-
-        container.querySelectorAll('.img-thumb-remove').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const idx = parseInt(btn.dataset.index, 10);
-                if (btn.dataset.kind === 'existing') this.productImagesExisting.splice(idx, 1);
-                else this.productImagesNewFiles.splice(idx, 1);
-                this.renderProductImagesGallery();
-            });
-        });
-    },
-
-    async saveProduct(e) {
-        e.preventDefault();
-        const id = document.getElementById('productId').value;
-        const saveBtn = e.target.querySelector('button[type="submit"]');
-        saveBtn.disabled = true;
-        saveBtn.textContent = 'Guardando...';
-
-        try {
-            const price = Number(document.getElementById('productPrice').value.trim());
-            const stock = parseInt(document.getElementById('productStock').value.trim(), 10);
-            if (!document.getElementById('productPrice').value.trim() || isNaN(price) || price < 0) {
-                throw new Error('El precio debe ser un número válido');
-            }
-            if (!document.getElementById('productStock').value.trim() || isNaN(stock) || stock < 0) {
-                throw new Error('El stock debe ser un número válido');
-            }
-
-            const uploadedUrls = [];
-            for (const file of this.productImagesNewFiles) {
-                uploadedUrls.push(await this.uploadImage('product-images', file));
-            }
-            const images = [...this.productImagesExisting, ...uploadedUrls];
-
-            const payload = {
-                name: document.getElementById('productName').value.trim(),
-                category_id: document.getElementById('productCategory').value,
-                price,
-                stock,
-                sizes: document.getElementById('productSizes').value.split(',').map(s => s.trim()).filter(Boolean),
-                colors: document.getElementById('productColors').value.split(',').map(s => s.trim()).filter(Boolean),
-                image: images[0] || null,
-                images,
-                badge: document.getElementById('productBadge').value.trim() || null,
-                description: document.getElementById('productDescription').value.trim(),
-                featured: document.getElementById('productFeatured').checked
-            };
-
-            const { error } = id
-                ? await supabaseClient.from('products').update(payload).eq('id', id)
-                : await supabaseClient.from('products').insert(payload);
-
-            if (error) throw error;
-
-            this.toast('Producto guardado');
-            document.getElementById('productModal').classList.remove('active');
-            await this.loadProducts();
-        } catch (error) {
-            this.toast('Error guardando producto: ' + error.message, 'error');
-        } finally {
-            saveBtn.disabled = false;
-            saveBtn.textContent = 'Guardar';
-        }
-    },
-
-    async deleteProduct(id) {
-        if (!confirm('¿Eliminar este producto? Esta acción no se puede deshacer.')) return;
-        const { error } = await supabaseClient.from('products').delete().eq('id', id);
-        if (error) { this.toast('No se pudo eliminar: ' + error.message, 'error'); return; }
-        this.toast('Producto eliminado');
-        await this.loadProducts();
-    },
-
-    // ---------------- Selección múltiple / acciones en lote ----------------
-
-    syncProductSelection(container) {
-        this.selectedProductIds = new Set(
-            Array.from(container.querySelectorAll('.product-select:checked')).map(cb => cb.dataset.id)
-        );
-        const count = this.selectedProductIds.size;
-        const toolbar = document.getElementById('bulkToolbar');
-        toolbar.style.display = count > 0 ? 'flex' : 'none';
-        document.getElementById('bulkCount').textContent = `${count} seleccionado${count === 1 ? '' : 's'}`;
-    },
-
-    async bulkDeleteProducts() {
-        const ids = Array.from(this.selectedProductIds);
-        if (ids.length === 0) return;
-        if (!confirm(`¿Eliminar ${ids.length} producto(s)? Esta acción no se puede deshacer.`)) return;
-
-        const { error } = await supabaseClient.from('products').delete().in('id', ids);
-        if (error) { this.toast('No se pudo eliminar: ' + error.message, 'error'); return; }
-        this.toast(`${ids.length} producto(s) eliminado(s)`);
-        await this.loadProducts();
-    },
-
-    openBulkEditModal() {
-        if (this.selectedProductIds.size === 0) return;
-        document.getElementById('bulkEditCount').textContent = this.selectedProductIds.size;
-        document.getElementById('bulkEditForm').reset();
-
-        const catSelect = document.getElementById('bulkCategory');
-        catSelect.innerHTML = '<option value="">— Sin cambios —</option>' +
-            this.categories.map(c => `<option value="${c.id}">${this.escapeHtml(c.name)}</option>`).join('');
-
-        document.getElementById('bulkEditModal').classList.add('active');
-    },
-
-    async applyBulkEdit(e) {
-        e.preventDefault();
-        const ids = Array.from(this.selectedProductIds);
-        if (ids.length === 0) return;
-
-        const category = document.getElementById('bulkCategory').value;
-        const featured = document.getElementById('bulkFeatured').value;
-        const stockRaw = document.getElementById('bulkStock').value.trim();
-
-        const payload = {};
-        if (category) payload.category_id = category;
-        if (featured) payload.featured = featured === 'true';
-        if (stockRaw) {
-            const stock = parseInt(stockRaw, 10);
-            if (isNaN(stock) || stock < 0) { this.toast('Stock inválido', 'error'); return; }
-            payload.stock = stock;
-        }
-
-        if (Object.keys(payload).length === 0) {
-            this.toast('No cambiaste ningún campo', 'error');
-            return;
-        }
-
-        const { error } = await supabaseClient.from('products').update(payload).in('id', ids);
-        if (error) { this.toast('Error aplicando cambios: ' + error.message, 'error'); return; }
-
-        this.toast(`${ids.length} producto(s) actualizado(s)`);
-        document.getElementById('bulkEditModal').classList.remove('active');
-        await this.loadProducts();
-    },
-
-    // ---------------- Categorías (solo super_admin) ----------------
-
-    async loadCategories() {
-        if (!this.isSuperAdmin()) return;
-        const container = document.getElementById('tab-categorias');
-        container.innerHTML = '<div class="loading">Cargando categorías...</div>';
-
-        const { data: categories } = await supabaseClient.from('categories').select('*').order('sort_order');
-        this.categories = categories || [];
-
-        container.innerHTML = `
-            <div class="page-header">
-                <h1>Categorías</h1>
-                <button class="btn btn-primary" id="newCategoryBtn">+ Nueva categoría</button>
-            </div>
-            <div class="card">
-                <div class="table-wrap">
-                    <table>
-                        <thead><tr><th></th><th>ID</th><th>Nombre</th><th>Descripción</th><th>Orden</th><th></th></tr></thead>
-                        <tbody>
-                            ${this.categories.map(c => `
-                                <tr>
-                                    <td>${c.image ? `<img src="${this.resolveImagePath(c.image)}" style="width:50px;height:34px;object-fit:cover;border-radius:4px;" onerror="this.style.opacity=0.3">` : '—'}</td>
-                                    <td>${this.escapeHtml(c.id)}</td>
-                                    <td>${this.escapeHtml(c.name)}</td>
-                                    <td>${this.escapeHtml(c.description || '')}</td>
-                                    <td>${c.sort_order}</td>
-                                    <td>
-                                        <button class="btn btn-secondary btn-sm edit-cat-btn" data-id="${c.id}">Editar</button>
-                                        <button class="btn btn-danger btn-sm delete-cat-btn" data-id="${c.id}">Eliminar</button>
-                                    </td>
-                                </tr>
-                            `).join('') || '<tr><td colspan="6" class="empty-state">Sin categorías</td></tr>'}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        `;
-
-        document.getElementById('newCategoryBtn').addEventListener('click', () => this.openCategoryModal());
-        container.querySelectorAll('.edit-cat-btn').forEach(btn =>
-            btn.addEventListener('click', () => this.openCategoryModal(btn.dataset.id)));
-        container.querySelectorAll('.delete-cat-btn').forEach(btn =>
-            btn.addEventListener('click', () => this.deleteCategory(btn.dataset.id)));
-    },
-
-    openCategoryModal(id) {
-        const category = id ? this.categories.find(c => c.id === id) : null;
-        document.getElementById('categoryForm').reset();
-        document.getElementById('categoryModalTitle').textContent = category ? 'Editar categoría' : 'Nueva categoría';
-        document.getElementById('categoryIdOriginal').value = category ? category.id : '';
-        document.getElementById('categoryId').value = category ? category.id : '';
-        document.getElementById('categoryId').disabled = !!category;
-        document.getElementById('categoryName').value = category ? category.name : '';
-        document.getElementById('categoryDescription').value = category ? (category.description || '') : '';
-        document.getElementById('categorySortOrder').value = category ? category.sort_order : (this.categories.length + 1);
-        document.getElementById('categoryImageFile').value = '';
-        document.getElementById('categoryImageUrl').value = category ? (category.image || '') : '';
-        this.updateCategoryImagePreview(category ? category.image : '');
-        document.getElementById('categoryModal').classList.add('active');
-    },
-
-    updateCategoryImagePreview(url) {
-        const preview = document.getElementById('categoryImagePreview');
-        if (url) {
-            preview.src = this.resolveImagePath(url);
-            preview.style.display = 'block';
-        } else {
-            preview.style.display = 'none';
-        }
-    },
-
-    async saveCategory(e) {
-        e.preventDefault();
-        const saveBtn = e.target.querySelector('button[type="submit"]');
-        saveBtn.disabled = true;
-        saveBtn.textContent = 'Guardando...';
-
-        try {
-            const originalId = document.getElementById('categoryIdOriginal').value;
-
-            let imageUrl = document.getElementById('categoryImageUrl').value.trim();
-            const file = document.getElementById('categoryImageFile').files[0];
-            if (file) {
-                imageUrl = await this.uploadImage('site-assets', file);
-            }
-
-            const payload = {
-                id: document.getElementById('categoryId').value.trim().toLowerCase(),
-                name: document.getElementById('categoryName').value.trim(),
-                description: document.getElementById('categoryDescription').value.trim(),
-                image: imageUrl || null,
-                sort_order: parseInt(document.getElementById('categorySortOrder').value, 10) || 0
-            };
-
-            const { error } = originalId
-                ? await supabaseClient.from('categories').update(payload).eq('id', originalId)
-                : await supabaseClient.from('categories').insert(payload);
-
-            if (error) throw error;
-
-            this.toast('Categoría guardada');
-            document.getElementById('categoryModal').classList.remove('active');
-            await this.loadCategories();
-        } catch (error) {
-            this.toast('Error guardando categoría: ' + error.message, 'error');
-        } finally {
-            saveBtn.disabled = false;
-            saveBtn.textContent = 'Guardar';
-        }
-    },
-
-    async deleteCategory(id) {
-        if (!confirm('¿Eliminar esta categoría? Falla si aún tiene productos asociados.')) return;
-        const { error } = await supabaseClient.from('categories').delete().eq('id', id);
-        if (error) { this.toast('No se pudo eliminar: ' + error.message, 'error'); return; }
-        this.toast('Categoría eliminada');
-        await this.loadCategories();
-    },
-
-    // ---------------- Banners del hero (admin y super_admin) ----------------
-
-    async loadBanners() {
-        const container = document.getElementById('tab-banners');
-        container.innerHTML = '<div class="loading">Cargando banners...</div>';
-
-        const [{ data: banners, error }, { data: categories }] = await Promise.all([
-            supabaseClient.from('banners').select('*').order('sort_order'),
-            supabaseClient.from('categories').select('*').order('sort_order')
-        ]);
-        if (error) { container.innerHTML = `<div class="empty-state">Error: ${error.message}</div>`; return; }
-        this.banners = banners || [];
-        this.categories = categories || [];
-
-        container.innerHTML = `
-            <div class="page-header">
-                <h1>Banners del hero</h1>
-                <button class="btn btn-primary" id="newBannerBtn">+ Nuevo banner</button>
-            </div>
-            <p style="font-size:12px;color:var(--admin-text-secondary);margin-bottom:16px;">
-                Si no hay ningún banner activo, la portada muestra el banner único de Configuración. Con uno o más banners activos, la portada se convierte en un carrusel navegable.
-            </p>
-            <div class="card">
-                <div class="table-wrap">
-                    <table>
-                        <thead><tr><th></th><th>Título</th><th>Orden</th><th>Activo</th><th></th></tr></thead>
-                        <tbody>
-                            ${this.banners.map(b => `
-                                <tr>
-                                    <td><img src="${this.resolveImagePath(b.media_url)}" style="width:60px;height:40px;object-fit:cover;border-radius:4px;" onerror="this.style.opacity=0.3"></td>
-                                    <td>${this.escapeHtml(b.title || '(sin título)')}</td>
-                                    <td>${b.sort_order}</td>
-                                    <td>${b.active ? '✅' : '—'}</td>
-                                    <td>
-                                        <button class="btn btn-secondary btn-sm edit-banner-btn" data-id="${b.id}">Editar</button>
-                                        <button class="btn btn-danger btn-sm delete-banner-btn" data-id="${b.id}">Eliminar</button>
-                                    </td>
-                                </tr>
-                            `).join('') || '<tr><td colspan="5" class="empty-state">Sin banners todavía. La portada usa el hero único de Configuración.</td></tr>'}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        `;
-
-        document.getElementById('newBannerBtn').addEventListener('click', () => this.openBannerModal());
-        container.querySelectorAll('.edit-banner-btn').forEach(btn =>
-            btn.addEventListener('click', () => this.openBannerModal(btn.dataset.id)));
-        container.querySelectorAll('.delete-banner-btn').forEach(btn =>
-            btn.addEventListener('click', () => this.deleteBanner(btn.dataset.id)));
-    },
-
-    // Opciones fijas de destino + una por cada categoría real. value = lo que se guarda
-    // en link_url (o "custom" para que el admin escriba una URL a mano).
-    bannerLinkOptions() {
-        const opts = [
-            { value: '#products', label: 'Productos destacados (inicio)' },
-            { value: 'index.html', label: 'Inicio' },
-            { value: 'pages/categoria.html', label: 'Todos los productos' }
-        ];
-        (this.categories || []).forEach(c => {
-            opts.push({ value: `pages/categoria.html?cat=${encodeURIComponent(c.id)}`, label: `Categoría: ${c.name}` });
-        });
-        opts.push({ value: 'custom', label: 'URL personalizada (WhatsApp, externo, etc.)' });
-        return opts;
-    },
-
-    openBannerModal(id) {
-        const banner = id ? this.banners.find(b => String(b.id) === String(id)) : null;
-        document.getElementById('bannerForm').reset();
-        document.getElementById('bannerModalTitle').textContent = banner ? 'Editar banner' : 'Nuevo banner';
-        document.getElementById('bannerId').value = banner ? banner.id : '';
-        document.getElementById('bannerFile').value = '';
-
-        const linkOptions = this.bannerLinkOptions();
-        const linkSelect = document.getElementById('bannerLinkType');
-        linkSelect.innerHTML = linkOptions.map(o => `<option value="${o.value}">${this.escapeHtml(o.label)}</option>`).join('');
-
-        const savedLink = banner ? (banner.link_url || '#products') : '#products';
-        const matchesKnownOption = linkOptions.some(o => o.value !== 'custom' && o.value === savedLink);
-        linkSelect.value = matchesKnownOption ? savedLink : 'custom';
-        document.getElementById('bannerCustomLink').value = matchesKnownOption ? '' : savedLink;
-        this.toggleBannerCustomLink();
-
-        if (banner) {
-            document.getElementById('bannerMediaUrl').value = banner.media_url || '';
-            document.getElementById('bannerTitle').value = banner.title || '';
-            document.getElementById('bannerSubtitle').value = banner.subtitle || '';
-            document.getElementById('bannerSortOrder').value = banner.sort_order;
-            document.getElementById('bannerActive').checked = !!banner.active;
-        } else {
-            document.getElementById('bannerSortOrder').value = this.banners.length + 1;
-            document.getElementById('bannerActive').checked = true;
-        }
-        this.showBannerPreview(banner ? banner.media_url : '');
-        document.getElementById('bannerModal').classList.add('active');
-    },
-
-    toggleBannerCustomLink() {
-        const isCustom = document.getElementById('bannerLinkType').value === 'custom';
-        document.getElementById('bannerCustomLinkField').style.display = isCustom ? 'block' : 'none';
-    },
-
-    showBannerPreview(url, forceVideo) {
-        const img = document.getElementById('bannerImagePreview');
-        const video = document.getElementById('bannerVideoPreview');
-        img.style.display = 'none';
-        video.style.display = 'none';
-        if (!url) return;
-        if (forceVideo || /\.(mp4|webm|mov)(\?.*)?$/i.test(url)) {
-            video.src = url;
-            video.style.display = 'block';
-        } else {
-            img.src = this.resolveImagePath(url);
-            img.style.display = 'block';
-        }
-    },
-
-    async saveBanner(e) {
-        e.preventDefault();
-        const id = document.getElementById('bannerId').value;
-        const saveBtn = e.target.querySelector('button[type="submit"]');
-        saveBtn.disabled = true;
-        saveBtn.textContent = 'Guardando...';
-
-        try {
-            let mediaUrl = document.getElementById('bannerMediaUrl').value.trim();
-            const file = document.getElementById('bannerFile').files[0];
-            if (file) {
-                mediaUrl = await this.uploadImage('site-assets', file);
-            }
-            if (!mediaUrl) throw new Error('Sube una imagen/video o pega una URL');
-
-            const sortOrderRaw = document.getElementById('bannerSortOrder').value.trim();
-            const sortOrder = sortOrderRaw ? parseInt(sortOrderRaw, 10) : 0;
-            if (isNaN(sortOrder)) throw new Error('El orden debe ser un número');
-
-            const linkType = document.getElementById('bannerLinkType').value;
-            const linkUrl = linkType === 'custom'
-                ? document.getElementById('bannerCustomLink').value.trim()
-                : linkType;
-            if (linkType === 'custom' && !linkUrl) throw new Error('Escribe la URL personalizada o elige otro destino');
-
-            const payload = {
-                media_url: mediaUrl,
-                title: document.getElementById('bannerTitle').value.trim() || null,
-                subtitle: document.getElementById('bannerSubtitle').value.trim() || null,
-                link_url: linkUrl,
-                sort_order: sortOrder,
-                active: document.getElementById('bannerActive').checked
-            };
-
-            const { error } = id
-                ? await supabaseClient.from('banners').update(payload).eq('id', id)
-                : await supabaseClient.from('banners').insert(payload);
-
-            if (error) throw error;
-
-            this.toast('Banner guardado');
-            document.getElementById('bannerModal').classList.remove('active');
-            await this.loadBanners();
-        } catch (error) {
-            this.toast('Error guardando banner: ' + error.message, 'error');
-        } finally {
-            saveBtn.disabled = false;
-            saveBtn.textContent = 'Guardar';
-        }
-    },
-
-    async deleteBanner(id) {
-        if (!confirm('¿Eliminar este banner?')) return;
-        const { error } = await supabaseClient.from('banners').delete().eq('id', id);
-        if (error) { this.toast('No se pudo eliminar: ' + error.message, 'error'); return; }
-        this.toast('Banner eliminado');
-        await this.loadBanners();
-    },
-
-    // ---------------- Guía de tallas (admin y super_admin) ----------------
-
-    async loadSizeGuide() {
-        const container = document.getElementById('tab-tallas');
-        container.innerHTML = '<div class="loading">Cargando tallas...</div>';
-
-        const [{ data: sizeGuide, error }, { data: categories }] = await Promise.all([
-            supabaseClient.from('size_guide').select('*').order('category_id').order('sort_order'),
-            supabaseClient.from('categories').select('*').order('sort_order')
-        ]);
-        if (error) { container.innerHTML = `<div class="empty-state">Error: ${error.message}</div>`; return; }
-
-        this.sizeGuideRows = sizeGuide || [];
-        this.categories = categories || [];
-
-        container.innerHTML = `
-            <div class="page-header">
-                <h1>Guía de Tallas</h1>
-                <button class="btn btn-primary" id="newSizeGuideBtn">+ Nueva medida</button>
-            </div>
-            <p style="font-size:12px;color:var(--admin-text-secondary);margin-bottom:16px;">
-                Estas medidas se muestran junto a la talla seleccionada en la ficha de producto (ej. "TALLA: S (48cm)").
-            </p>
-            <div class="card">
-                <div class="table-wrap">
-                    <table>
-                        <thead><tr><th>Categoría</th><th>Talla</th><th>Medida</th><th>Orden</th><th></th></tr></thead>
-                        <tbody>
-                            ${this.sizeGuideRows.map(s => `
-                                <tr>
-                                    <td>${this.escapeHtml(s.category_id)}</td>
-                                    <td>${this.escapeHtml(s.size)}</td>
-                                    <td>${this.escapeHtml(s.measurement)}</td>
-                                    <td>${s.sort_order}</td>
-                                    <td>
-                                        <button class="btn btn-secondary btn-sm edit-size-guide-btn" data-id="${s.id}">Editar</button>
-                                        <button class="btn btn-danger btn-sm delete-size-guide-btn" data-id="${s.id}">Eliminar</button>
-                                    </td>
-                                </tr>
-                            `).join('') || '<tr><td colspan="5" class="empty-state">Sin medidas todavía</td></tr>'}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        `;
-
-        document.getElementById('newSizeGuideBtn').addEventListener('click', () => this.openSizeGuideModal());
-        container.querySelectorAll('.edit-size-guide-btn').forEach(btn =>
-            btn.addEventListener('click', () => this.openSizeGuideModal(btn.dataset.id)));
-        container.querySelectorAll('.delete-size-guide-btn').forEach(btn =>
-            btn.addEventListener('click', () => this.deleteSizeGuide(btn.dataset.id)));
-    },
-
-    openSizeGuideModal(id) {
-        const row = id ? this.sizeGuideRows.find(s => String(s.id) === String(id)) : null;
-        document.getElementById('sizeGuideForm').reset();
-        document.getElementById('sizeGuideModalTitle').textContent = row ? 'Editar medida' : 'Nueva medida';
-        document.getElementById('sizeGuideId').value = row ? row.id : '';
-
-        const catSelect = document.getElementById('sizeGuideCategory');
-        catSelect.innerHTML = this.categories.map(c => `<option value="${c.id}">${this.escapeHtml(c.name)}</option>`).join('');
-
-        if (row) {
-            document.getElementById('sizeGuideCategory').value = row.category_id;
-            document.getElementById('sizeGuideSize').value = row.size;
-            document.getElementById('sizeGuideMeasurement').value = row.measurement;
-            document.getElementById('sizeGuideSortOrder').value = row.sort_order;
-            this.currentMeasurementRows = Object.entries(row.measurements || {}).map(([label, value]) => ({ label, value }));
-        } else {
-            document.getElementById('sizeGuideSortOrder').value = 1;
-            this.currentMeasurementRows = [];
-        }
-        this.renderMeasurementRows();
-        document.getElementById('sizeGuideModal').classList.add('active');
-    },
-
-    renderMeasurementRows() {
-        const container = document.getElementById('sizeGuideMeasurementsList');
-        container.innerHTML = this.currentMeasurementRows.map((row, i) => `
-            <div style="display:flex;gap:8px;margin-bottom:8px;">
-                <input type="text" class="measurement-label" data-index="${i}" placeholder="Largo" value="${this.escapeHtml(row.label)}" style="flex:1;padding:10px;border:1px solid var(--admin-border);border-radius:6px;">
-                <input type="text" class="measurement-value" data-index="${i}" placeholder="67cm" value="${this.escapeHtml(row.value)}" style="flex:1;padding:10px;border:1px solid var(--admin-border);border-radius:6px;">
-                <button type="button" class="btn btn-danger btn-sm remove-measurement-btn" data-index="${i}">×</button>
-            </div>
-        `).join('') || '<p style="font-size:12px;color:var(--admin-text-secondary);">Sin medidas detalladas todavía</p>';
-
-        container.querySelectorAll('.measurement-label').forEach(input => {
-            input.addEventListener('input', (e) => {
-                this.currentMeasurementRows[e.target.dataset.index].label = e.target.value;
-            });
-        });
-        container.querySelectorAll('.measurement-value').forEach(input => {
-            input.addEventListener('input', (e) => {
-                this.currentMeasurementRows[e.target.dataset.index].value = e.target.value;
-            });
-        });
-        container.querySelectorAll('.remove-measurement-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                this.currentMeasurementRows.splice(parseInt(btn.dataset.index, 10), 1);
-                this.renderMeasurementRows();
-            });
-        });
-    },
-
-    async saveSizeGuide(e) {
-        e.preventDefault();
-        const id = document.getElementById('sizeGuideId').value;
-        const saveBtn = e.target.querySelector('button[type="submit"]');
-        saveBtn.disabled = true;
-        saveBtn.textContent = 'Guardando...';
-
-        try {
-            const sortOrderRaw = document.getElementById('sizeGuideSortOrder').value.trim();
-            const sortOrder = sortOrderRaw ? parseInt(sortOrderRaw, 10) : 0;
-            if (isNaN(sortOrder)) throw new Error('El orden debe ser un número');
-
-            const measurements = {};
-            this.currentMeasurementRows.forEach(row => {
-                const label = row.label.trim();
-                const value = row.value.trim();
-                if (label && value) measurements[label] = value;
-            });
-
-            const payload = {
-                category_id: document.getElementById('sizeGuideCategory').value,
-                size: document.getElementById('sizeGuideSize').value.trim(),
-                measurement: document.getElementById('sizeGuideMeasurement').value.trim(),
-                measurements,
-                sort_order: sortOrder
-            };
-
-            const { error } = id
-                ? await supabaseClient.from('size_guide').update(payload).eq('id', id)
-                : await supabaseClient.from('size_guide').insert(payload);
-
-            if (error) throw error;
-
-            this.toast('Medida guardada');
-            document.getElementById('sizeGuideModal').classList.remove('active');
-            await this.loadSizeGuide();
-        } catch (error) {
-            this.toast('Error guardando: ' + error.message, 'error');
-        } finally {
-            saveBtn.disabled = false;
-            saveBtn.textContent = 'Guardar';
-        }
-    },
-
-    async deleteSizeGuide(id) {
-        if (!confirm('¿Eliminar esta medida?')) return;
-        const { error } = await supabaseClient.from('size_guide').delete().eq('id', id);
-        if (error) { this.toast('No se pudo eliminar: ' + error.message, 'error'); return; }
-        this.toast('Medida eliminada');
-        await this.loadSizeGuide();
-    },
-
-    // ---------------- Páginas de contenido (solo super_admin) ----------------
-
-    async loadPages() {
-        if (!this.isSuperAdmin()) return;
-        const container = document.getElementById('tab-paginas');
-        container.innerHTML = '<div class="loading">Cargando páginas...</div>';
-
-        const { data: pages, error } = await supabaseClient.from('pages').select('*').order('slug');
-        if (error) { container.innerHTML = `<div class="empty-state">Error: ${error.message}</div>`; return; }
-
-        container.innerHTML = `
-            <div class="page-header"><h1>Páginas</h1></div>
-            <p style="font-size:12px;color:var(--admin-text-secondary);margin-bottom:16px;">
-                Se ven desde el footer del sitio (Envíos, Devoluciones, Guía de Talles, Contacto).
-                Podés escribir HTML simple: &lt;p&gt;texto&lt;/p&gt;, &lt;strong&gt;negrita&lt;/strong&gt;, &lt;ul&gt;&lt;li&gt;item&lt;/li&gt;&lt;/ul&gt;.
-            </p>
-            ${(pages || []).map(p => `
-                <div class="card">
-                    <h3>${this.escapeHtml(p.title)} <span style="font-weight:400;font-size:12px;color:var(--admin-text-secondary);">(/${this.escapeHtml(p.slug)})</span></h3>
-                    <form class="page-edit-form" data-slug="${this.escapeHtml(p.slug)}">
-                        <div class="field">
-                            <label>Título</label>
-                            <input type="text" class="page-title-input" value="${this.escapeHtml(p.title)}" required>
-                        </div>
-                        <div class="field">
-                            <label>Contenido</label>
-                            <textarea class="page-content-input" rows="6" style="font-family:monospace;">${this.escapeHtml(p.content)}</textarea>
-                        </div>
-                        <button type="submit" class="btn btn-primary btn-sm">Guardar</button>
-                    </form>
-                </div>
-            `).join('') || '<div class="empty-state">Sin páginas todavía</div>'}
-        `;
-
-        container.querySelectorAll('.page-edit-form').forEach(form => {
-            form.addEventListener('submit', (e) => this.savePage(e));
-        });
-    },
-
-    async savePage(e) {
-        e.preventDefault();
-        const form = e.target;
-        const slug = form.dataset.slug;
-        const title = form.querySelector('.page-title-input').value.trim();
-        const content = form.querySelector('.page-content-input').value;
-        const btn = form.querySelector('button[type="submit"]');
-        btn.disabled = true;
-        btn.textContent = 'Guardando...';
-
-        const { error } = await supabaseClient.from('pages').update({ title, content }).eq('slug', slug);
-        if (error) { this.toast('Error guardando: ' + error.message, 'error'); }
-        else { this.toast('Página guardada'); }
-
-        btn.disabled = false;
-        btn.textContent = 'Guardar';
-    },
-
-    // ---------------- Configuración (solo super_admin) ----------------
-
-    async loadConfig() {
-        if (!this.isSuperAdmin()) return;
-        const container = document.getElementById('tab-config');
-        container.innerHTML = '<div class="loading">Cargando configuración...</div>';
-
-        const { data: cfg } = await supabaseClient.from('config').select('*').eq('id', 1).maybeSingle();
-
-        container.innerHTML = `
-            <div class="page-header"><h1>Configuración</h1></div>
-
-            <div class="card">
-                <h3>Imágenes de marca</h3>
-                <div class="form-row-2" style="grid-template-columns: repeat(3, 1fr);">
-                    <div class="field">
-                        <label>Logo</label>
-                        <img id="previewLogo" src="${cfg?.logo_url ? this.escapeHtml(cfg.logo_url) : ''}" style="display:${cfg?.logo_url ? 'block' : 'none'};max-height:60px;margin-bottom:8px;">
-                        <input type="file" id="fileLogo" accept="image/*,video/mp4,video/webm,video/quicktime">
-                        <button type="button" class="btn btn-secondary btn-sm" style="margin-top:8px;" data-asset-upload="logo_url" data-asset-input="fileLogo" data-asset-preview="previewLogo">Subir logo</button>
-                    </div>
-                    <div class="field">
-                        <label>Logo blanco (footer)</label>
-                        <img id="previewLogoWhite" src="${cfg?.logo_white_url ? this.escapeHtml(cfg.logo_white_url) : ''}" style="display:${cfg?.logo_white_url ? 'block' : 'none'};max-height:60px;margin-bottom:8px;background:#222;padding:4px;">
-                        <input type="file" id="fileLogoWhite" accept="image/*,video/mp4,video/webm,video/quicktime">
-                        <button type="button" class="btn btn-secondary btn-sm" style="margin-top:8px;" data-asset-upload="logo_white_url" data-asset-input="fileLogoWhite" data-asset-preview="previewLogoWhite">Subir logo blanco</button>
-                    </div>
-                    <div class="field">
-                        <label>Banner del hero</label>
-                        <img id="previewHero" src="${cfg?.hero_banner_url ? this.escapeHtml(cfg.hero_banner_url) : ''}" style="display:${cfg?.hero_banner_url ? 'block' : 'none'};max-height:60px;margin-bottom:8px;">
-                        <input type="file" id="fileHero" accept="image/*,video/mp4,video/webm,video/quicktime">
-                        <button type="button" class="btn btn-secondary btn-sm" style="margin-top:8px;" data-asset-upload="hero_banner_url" data-asset-input="fileHero" data-asset-preview="previewHero">Subir banner</button>
-                    </div>
-                </div>
-            </div>
-
-            <div class="card">
-                <form id="configForm">
-                    <div class="form-row-2">
-                        <div class="field">
-                            <label>Nombre de la tienda</label>
-                            <input type="text" id="cfgStoreName" value="${this.escapeHtml(cfg?.store_name || '')}" required>
-                        </div>
-                        <div class="field">
-                            <label>WhatsApp de ventas (569XXXXXXXX)</label>
-                            <input type="text" id="cfgWhatsapp" value="${this.escapeHtml(cfg?.whatsapp_number || '')}" placeholder="569XXXXXXXX">
-                        </div>
-                    </div>
-                    <div class="form-row-2">
-                        <div class="field">
-                            <label>Costo de envío</label>
-                            <input type="text" inputmode="numeric" pattern="[0-9]*" id="cfgShipping" value="${cfg?.shipping_cost ?? 5990}" required>
-                        </div>
-                        <div class="field">
-                            <label>Envío gratis desde</label>
-                            <input type="text" inputmode="numeric" pattern="[0-9]*" id="cfgFreeMin" value="${cfg?.free_shipping_min ?? 50000}" required>
-                        </div>
-                    </div>
-                    <div class="form-row-2">
-                        <div class="field">
-                            <label>Título del hero</label>
-                            <input type="text" id="cfgHeroTitle" value="${this.escapeHtml(cfg?.hero_title || '')}">
-                        </div>
-                        <div class="field">
-                            <label>Subtítulo del hero</label>
-                            <input type="text" id="cfgHeroSubtitle" value="${this.escapeHtml(cfg?.hero_subtitle || '')}">
-                        </div>
-                    </div>
-                    <div class="form-row-2">
-                        <div class="field">
-                            <label>Instagram (URL)</label>
-                            <input type="text" id="cfgInstagram" value="${this.escapeHtml(cfg?.social_instagram || '')}">
-                        </div>
-                        <div class="field">
-                            <label>TikTok (URL)</label>
-                            <input type="text" id="cfgTiktok" value="${this.escapeHtml(cfg?.social_tiktok || '')}">
-                        </div>
-                    </div>
-                    <div class="field">
-                        <label>Twitter / X (URL)</label>
-                        <input type="text" id="cfgTwitter" value="${this.escapeHtml(cfg?.social_twitter || '')}">
-                    </div>
-                    <button type="submit" class="btn btn-primary">Guardar configuración</button>
-                </form>
-            </div>
-        `;
-
-        this.setPreviewMedia('previewLogo', cfg?.logo_url);
-        this.setPreviewMedia('previewLogoWhite', cfg?.logo_white_url);
-        this.setPreviewMedia('previewHero', cfg?.hero_banner_url);
-
-        container.querySelectorAll('[data-asset-upload]').forEach(btn => {
-            btn.addEventListener('click', async () => {
-                const column = btn.dataset.assetUpload;
-                const input = document.getElementById(btn.dataset.assetInput);
-                const file = input.files[0];
-                if (!file) { this.toast('Elige un archivo primero', 'error'); return; }
-
-                btn.disabled = true;
-                btn.textContent = 'Subiendo...';
-                try {
-                    const url = await this.uploadImage('site-assets', file);
-                    const { error } = await supabaseClient.from('config').update({ [column]: url }).eq('id', 1);
-                    if (error) throw error;
-                    this.setPreviewMedia(btn.dataset.assetPreview, url);
-                    this.toast('Imagen/video actualizado. Recarga el sitio para verlo aplicado.');
-                } catch (error) {
-                    this.toast('Error subiendo imagen: ' + error.message, 'error');
-                } finally {
-                    btn.disabled = false;
-                    btn.textContent = btn.dataset.assetUpload === 'logo_url' ? 'Subir logo'
-                        : btn.dataset.assetUpload === 'logo_white_url' ? 'Subir logo blanco' : 'Subir banner';
-                }
-            });
-        });
-
-        document.getElementById('configForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const shippingCost = Number(document.getElementById('cfgShipping').value.trim());
-            const freeMin = Number(document.getElementById('cfgFreeMin').value.trim());
-            if (isNaN(shippingCost) || shippingCost < 0 || isNaN(freeMin) || freeMin < 0) {
-                this.toast('Costo de envío y envío gratis deben ser números válidos', 'error');
-                return;
-            }
-            const payload = {
-                store_name: document.getElementById('cfgStoreName').value.trim(),
-                whatsapp_number: document.getElementById('cfgWhatsapp').value.trim() || null,
-                shipping_cost: shippingCost,
-                free_shipping_min: freeMin,
-                hero_title: document.getElementById('cfgHeroTitle').value.trim(),
-                hero_subtitle: document.getElementById('cfgHeroSubtitle').value.trim(),
-                social_instagram: document.getElementById('cfgInstagram').value.trim() || null,
-                social_tiktok: document.getElementById('cfgTiktok').value.trim() || null,
-                social_twitter: document.getElementById('cfgTwitter').value.trim() || null
-            };
-            const { error } = await supabaseClient.from('config').update(payload).eq('id', 1);
-            if (error) { this.toast('Error guardando: ' + error.message, 'error'); return; }
-            this.toast('Configuración guardada');
-        });
-    },
-
-    // ---------------- Usuarios (solo super_admin) ----------------
-
-    async loadUsers() {
-        if (!this.isSuperAdmin()) return;
-        const container = document.getElementById('tab-usuarios');
-        container.innerHTML = '<div class="loading">Cargando usuarios...</div>';
-
-        const { data: users, error } = await supabaseClient.from('profiles').select('*').order('created_at');
-        if (error) { container.innerHTML = `<div class="empty-state">Error: ${error.message}</div>`; return; }
-
-        container.innerHTML = `
-            <div class="page-header"><h1>Usuarios</h1></div>
-            <div class="card">
-                <p style="color:var(--admin-text-secondary);margin-bottom:16px;font-size:13px;">
-                    Para crear una cuenta nueva, agrégala en Supabase Dashboard &gt; Authentication &gt; Users.
-                    Aquí puedes ajustar el nombre visible y el rol de las cuentas existentes.
-                </p>
-                <div class="table-wrap">
-                    <table>
-                        <thead><tr><th>Usuario</th><th>Nombre</th><th>Rol</th><th>Creado</th><th></th></tr></thead>
-                        <tbody>
-                            ${(users || []).map(u => `
-                                <tr>
-                                    <td>${this.escapeHtml(u.username)}</td>
-                                    <td><input type="text" value="${this.escapeHtml(u.name || '')}" data-name-id="${u.id}" style="padding:6px 8px;border:1px solid var(--admin-border);border-radius:6px;"></td>
-                                    <td>
-                                        <select class="status-select" data-role-id="${u.id}" ${u.id === this.profile.id ? 'disabled' : ''}>
-                                            <option value="admin" ${u.role === 'admin' ? 'selected' : ''}>admin</option>
-                                            <option value="super_admin" ${u.role === 'super_admin' ? 'selected' : ''}>super_admin</option>
-                                        </select>
-                                    </td>
-                                    <td>${new Date(u.created_at).toLocaleDateString('es-CL')}</td>
-                                    <td><button class="btn btn-secondary btn-sm save-user-btn" data-id="${u.id}">Guardar</button></td>
-                                </tr>
-                            `).join('')}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        `;
-
-        container.querySelectorAll('.save-user-btn').forEach(btn => {
-            btn.addEventListener('click', async () => {
-                const id = btn.dataset.id;
-                const name = container.querySelector(`input[data-name-id="${id}"]`).value.trim();
-                const roleSelect = container.querySelector(`select[data-role-id="${id}"]`);
-                const role = roleSelect.value;
-
-                const { error } = await supabaseClient.from('profiles').update({ name, role }).eq('id', id);
-                if (error) { this.toast('No se pudo actualizar: ' + error.message, 'error'); }
-                else { this.toast('Usuario actualizado'); }
-            });
-        });
-    },
-
-    // ---------------- Modales: bind ----------------
-
-    bindModals() {
-        document.getElementById('productForm').addEventListener('submit', (e) => this.saveProduct(e));
-        document.getElementById('categoryForm').addEventListener('submit', (e) => this.saveCategory(e));
-
-        document.getElementById('categoryImageFile').addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
-            document.getElementById('categoryImageUrl').value = '';
-            this.updateCategoryImagePreview(URL.createObjectURL(file));
-        });
-
-        document.getElementById('clearCategoryImageBtn').addEventListener('click', () => {
-            document.getElementById('categoryImageFile').value = '';
-            document.getElementById('categoryImageUrl').value = '';
-            this.updateCategoryImagePreview('');
-        });
-        document.getElementById('bulkEditForm').addEventListener('submit', (e) => this.applyBulkEdit(e));
-        document.getElementById('bannerForm').addEventListener('submit', (e) => this.saveBanner(e));
-        document.getElementById('sizeGuideForm').addEventListener('submit', (e) => this.saveSizeGuide(e));
-        document.getElementById('addMeasurementRowBtn').addEventListener('click', () => {
-            this.currentMeasurementRows.push({ label: '', value: '' });
-            this.renderMeasurementRows();
-        });
-        document.getElementById('bannerLinkType').addEventListener('change', () => this.toggleBannerCustomLink());
-
-        document.getElementById('bannerFile').addEventListener('change', (e) => {
-            const file = e.target.files[0];
-            if (!file) return;
-            this.showBannerPreview(URL.createObjectURL(file), file.type.startsWith('video/'));
-        });
-
-        document.getElementById('productImageFile').addEventListener('change', (e) => {
-            const files = Array.from(e.target.files || []);
-            if (files.length === 0) return;
-            this.productImagesNewFiles.push(...files);
-            e.target.value = '';
-            this.renderProductImagesGallery();
-        });
-
-        document.getElementById('addImageUrlBtn').addEventListener('click', () => {
-            const input = document.getElementById('productImageUrlInput');
-            const url = input.value.trim();
-            if (!url) return;
-            this.productImagesExisting.push(url);
-            input.value = '';
-            this.renderProductImagesGallery();
-        });
-
-        document.querySelectorAll('[data-close-modal]').forEach(btn => {
-            btn.addEventListener('click', () => {
-                document.getElementById(btn.dataset.closeModal).classList.remove('active');
-            });
-        });
+        return supabaseClient.storage.from(bucket).getPublicUrl(path).data.publicUrl;
     }
 };
+
+// ============================================================
+// Panel: menú, navegación y secciones
+// ============================================================
+const Views = {};
+
+const Admin = {
+    profile: null,
+    current: null,
+
+    nav: [
+        { id: 'resumen', label: 'Resumen', icon: 'home' },
+        { id: 'pedidos', label: 'Pedidos', icon: 'orders', badge: true },
+        { id: 'inventario', label: 'Inventario', icon: 'stock' },
+        { id: 'productos', label: 'Productos', icon: 'shirt' },
+        { id: 'banners', label: 'Banners', icon: 'image' },
+        { id: 'tallas', label: 'Guía de tallas', icon: 'ruler' },
+        { title: 'Super Admin', superOnly: true },
+        { id: 'categorias', label: 'Categorías', icon: 'folder', superOnly: true },
+        { id: 'paginas', label: 'Páginas', icon: 'page', superOnly: true },
+        { id: 'configuracion', label: 'Configuración', icon: 'settings', superOnly: true },
+        { id: 'usuarios', label: 'Usuarios', icon: 'users', superOnly: true }
+    ],
+
+    isSuper() { return this.profile?.role === 'super_admin'; },
+
+    async init(profile) {
+        this.profile = profile;
+        const name = profile.name || profile.username;
+        document.getElementById('meName').textContent = name;
+        document.getElementById('meRole').textContent = ROLE_LABEL[profile.role] || profile.role;
+        document.getElementById('meAvatar').textContent = U.initials(name);
+
+        document.getElementById('nav').innerHTML = this.nav
+            .filter(i => !i.superOnly || this.isSuper())
+            .map(i => i.title
+                ? `<div class="nav-title">${i.title}</div>`
+                : `<a href="#${i.id}" data-view="${i.id}">${ICON[i.icon]}<span>${i.label}</span>${i.badge ? '<span class="badge-count" id="pendingBadge" hidden></span>' : ''}</a>`)
+            .join('');
+
+        this.bind();
+        this.loadBrand();
+        this.refreshBadge();
+        setInterval(() => this.refreshBadge(), 60000);
+        this.route();
+    },
+
+    bind() {
+        window.addEventListener('hashchange', () => this.route());
+        document.getElementById('logoutBtn').addEventListener('click', async () => {
+            if (await UI.confirm({ title: '¿Cerrar sesión?', ok: 'Cerrar sesión', danger: false })) AdminAuth.logout();
+        });
+        const sidebar = document.getElementById('sidebar');
+        const scrim = document.getElementById('scrim');
+        const toggle = (open) => { sidebar.classList.toggle('is-open', open); scrim.classList.toggle('is-open', open); };
+        document.getElementById('menuBtn').addEventListener('click', () => toggle(true));
+        scrim.addEventListener('click', () => toggle(false));
+        document.getElementById('nav').addEventListener('click', () => toggle(false));
+
+        document.getElementById('sheetOverlay').addEventListener('click', () => UI.closeSheet());
+        document.addEventListener('click', (e) => { if (e.target.closest('[data-sheet-close]')) UI.closeSheet(); });
+        document.addEventListener('keydown', (e) => {
+            if (e.key !== 'Escape') return;
+            if (document.getElementById('dialog').classList.contains('is-open')) return;
+            if (document.getElementById('sheet').classList.contains('is-open')) UI.closeSheet();
+            else toggle(false);
+        });
+
+        // Si la sesión expira en otra pestaña, volver al login
+        supabaseClient.auth.onAuthStateChange((event) => {
+            if (event === 'SIGNED_OUT') location.replace('index.html');
+        });
+
+        window.addEventListener('beforeunload', (e) => {
+            if (UI.sheetState?.isDirty?.() || Views[this.current]?.isDirty?.()) { e.preventDefault(); e.returnValue = ''; }
+        });
+    },
+
+    async loadBrand() {
+        try {
+            const cfg = await Data.configRow();
+            if (cfg.logo_url) {
+                const el = document.getElementById('brandLogo');
+                if (U.isVideo(cfg.logo_url)) {
+                    const v = document.createElement('video');
+                    Object.assign(v, { src: cfg.logo_url, autoplay: true, loop: true, muted: true, playsInline: true });
+                    v.className = 'logo';
+                    el.replaceWith(v);
+                } else {
+                    el.src = cfg.logo_url;
+                }
+            }
+        } catch (e) { /* se queda con el logo por defecto */ }
+    },
+
+    async refreshBadge() {
+        const { count } = await supabaseClient.from('orders').select('id', { count: 'exact', head: true }).eq('status', 'pending');
+        const b = document.getElementById('pendingBadge');
+        if (!b) return;
+        b.hidden = !count;
+        b.textContent = count > 99 ? '99+' : count;
+    },
+
+    async route() {
+        let id = (location.hash || '#resumen').slice(1).split('?')[0];
+        const item = this.nav.find(n => n.id === id);
+        if (!item || (item.superOnly && !this.isSuper()) || !Views[id]) id = 'resumen';
+
+        if (UI.sheetState && !(await UI.closeSheet())) {
+            history.replaceState(null, '', '#' + this.current);
+            return;
+        }
+        // Secciones con formularios propios (Páginas, Configuración) avisan antes de salir con cambios
+        const leaving = Views[this.current];
+        if (this.current && this.current !== id && leaving?.isDirty?.() &&
+            !(await UI.confirm({ title: '¿Salir sin guardar?', text: 'Tienes cambios que no se han guardado en esta sección.', ok: 'Salir sin guardar' }))) {
+            history.replaceState(null, '', '#' + this.current);
+            return;
+        }
+
+        this.current = id;
+        document.querySelectorAll('#nav a').forEach(a => a.classList.toggle('is-active', a.dataset.view === id));
+        const view = document.getElementById('view');
+        view.onclick = null;
+        view.innerHTML = U.skeleton();
+        window.scrollTo(0, 0);
+        try {
+            await Views[id].render(view);
+        } catch (e) {
+            console.error(e);
+            view.innerHTML = U.errorBox(e);
+        }
+        document.title = `${document.getElementById('pageTitle').textContent} | Panel PopFlame`;
+    },
+
+    header(title, sub = '', actions = '') {
+        document.getElementById('pageTitle').textContent = title;
+        document.getElementById('pageSub').textContent = sub;
+        document.getElementById('pageActions').innerHTML = actions;
+    },
+
+    go(hash) {
+        if (location.hash === '#' + hash) this.route();
+        else location.hash = hash;
+    }
+};
+
+// Compatibilidad con la página de login anterior
+const AdminPanel = { init: (p) => Admin.init(p) };

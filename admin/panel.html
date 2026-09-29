@@ -1,289 +1,92 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="es-CL">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Panel Admin | PopFlame</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="css/admin.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>Panel | PopFlame</title>
+    <meta name="robots" content="noindex, nofollow">
+    <meta name="theme-color" content="#0B0B0B">
+    <link rel="icon" href="../images/favicon-32.png" sizes="32x32" type="image/png">
+    <link rel="apple-touch-icon" href="../images/apple-touch-icon.png">
+    <link rel="preconnect" href="https://ysxinhpymvhdnfbdanvn.supabase.co" crossorigin>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@110..125,700..900&family=Inter:wght@400;500;600;700&display=swap">
+    <link rel="stylesheet" href="css/admin.css?v=4">
 </head>
 <body>
-    <div class="admin-layout">
-        <aside class="sidebar">
-            <div class="sidebar-header">
-                <div class="brand">POPFLAME</div>
-                <span class="role-badge" id="roleBadge">...</span>
+    <div class="app">
+        <aside class="sidebar" id="sidebar" aria-label="Menú del panel">
+            <div class="sidebar-brand">
+                <img class="logo" src="../images/logo-sm.png" alt="" id="brandLogo">
+                <div class="display name">PopFlame<small>Panel de administración</small></div>
             </div>
-
-            <nav class="sidebar-nav">
-                <div class="sidebar-link active" data-tab="dashboard">📊 Dashboard</div>
-                <div class="sidebar-link" data-tab="pedidos">🧾 Pedidos</div>
-                <div class="sidebar-link" data-tab="inventario">📦 Inventario</div>
-                <div class="sidebar-link" data-tab="productos">👕 Productos</div>
-                <div class="sidebar-link" data-tab="banners">🖼️ Banners</div>
-                <div class="sidebar-link" data-tab="tallas">📏 Tallas</div>
-
-                <div id="superAdminLinks" style="display:none;">
-                    <div class="sidebar-section-title">Super Admin</div>
-                    <div class="sidebar-link" data-tab="categorias">🗂️ Categorías</div>
-                    <div class="sidebar-link" data-tab="paginas">📄 Páginas</div>
-                    <div class="sidebar-link" data-tab="config">⚙️ Configuración</div>
-                    <div class="sidebar-link" data-tab="usuarios">👤 Usuarios</div>
+            <nav class="nav" id="nav"></nav>
+            <div class="sidebar-foot">
+                <div class="me">
+                    <span class="avatar" id="meAvatar"></span>
+                    <div><strong id="meName"></strong><span id="meRole"></span></div>
                 </div>
-            </nav>
-
-            <div class="sidebar-footer">
-                <div class="user-name" id="userName">...</div>
-                <a href="../index.html" class="btn btn-secondary btn-full" style="margin-bottom:8px;">Ver tienda</a>
-                <button class="btn btn-secondary btn-full" id="logoutBtn">Cerrar sesión</button>
+                <div class="row">
+                    <a class="btn" href="../index.html" target="_blank" rel="noopener">Ver tienda</a>
+                    <button class="btn" id="logoutBtn">Salir</button>
+                </div>
             </div>
         </aside>
+        <div class="scrim" id="scrim"></div>
 
-        <main class="main">
-            <div class="tab-panel active" id="tab-dashboard"></div>
-            <div class="tab-panel" id="tab-pedidos"></div>
-            <div class="tab-panel" id="tab-inventario"></div>
-            <div class="tab-panel" id="tab-productos"></div>
-            <div class="tab-panel" id="tab-categorias"></div>
-            <div class="tab-panel" id="tab-banners"></div>
-            <div class="tab-panel" id="tab-tallas"></div>
-            <div class="tab-panel" id="tab-paginas"></div>
-            <div class="tab-panel" id="tab-config"></div>
-            <div class="tab-panel" id="tab-usuarios"></div>
-        </main>
-    </div>
-
-    <!-- Modal: Producto -->
-    <div class="modal-overlay" id="productModal">
-        <div class="modal">
-            <h3 id="productModalTitle">Nuevo producto</h3>
-            <form id="productForm">
-                <input type="hidden" id="productId">
-                <div class="field">
-                    <label>Nombre</label>
-                    <input type="text" id="productName" required>
+        <div class="main">
+            <header class="topbar">
+                <button class="icon-btn menu-btn" id="menuBtn" aria-label="Abrir menú" aria-controls="sidebar">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 7h18M3 12h18M3 17h12"/></svg>
+                </button>
+                <div class="topbar-title">
+                    <h1 class="display" id="pageTitle">Panel</h1>
+                    <p id="pageSub"></p>
                 </div>
-                <div class="form-row-2">
-                    <div class="field">
-                        <label>Categoría</label>
-                        <select id="productCategory" required></select>
-                    </div>
-                    <div class="field">
-                        <label>Precio (CLP)</label>
-                        <input type="text" inputmode="numeric" pattern="[0-9]*" id="productPrice" placeholder="29990" required>
-                    </div>
-                </div>
-                <div class="form-row-2">
-                    <div class="field">
-                        <label>Stock</label>
-                        <input type="text" inputmode="numeric" pattern="[0-9]*" id="productStock" placeholder="50" required>
-                    </div>
-                    <div class="field">
-                        <label>Badge (opcional)</label>
-                        <input type="text" id="productBadge" placeholder="Nuevo, Oferta...">
-                    </div>
-                </div>
-                <div class="form-row-2">
-                    <div class="field">
-                        <label>Tallas (separadas por coma)</label>
-                        <input type="text" id="productSizes" placeholder="S, M, L, XL">
-                    </div>
-                    <div class="field">
-                        <label>Colores (separados por coma)</label>
-                        <input type="text" id="productColors" placeholder="Negro, Blanco">
-                    </div>
-                </div>
-                <div class="field">
-                    <label>Fotos del producto (puedes subir varias, para distintos ángulos)</label>
-                    <div id="productImagesGallery" class="img-gallery"></div>
-                    <input type="file" id="productImageFile" accept="image/*" multiple>
-                    <p style="font-size:11px;color:var(--admin-text-secondary);margin:8px 0 4px;">La primera foto es la que se ve en el catálogo. O agrega una por URL:</p>
-                    <div style="display:flex;gap:8px;">
-                        <input type="text" id="productImageUrlInput" placeholder="https://..." style="flex:1;">
-                        <button type="button" class="btn btn-secondary btn-sm" id="addImageUrlBtn">Agregar</button>
-                    </div>
-                </div>
-                <div class="field">
-                    <label>Descripción</label>
-                    <textarea id="productDescription" rows="3"></textarea>
-                </div>
-                <div class="field">
-                    <label><input type="checkbox" id="productFeatured" style="width:auto;margin-right:8px;">Producto destacado</label>
-                </div>
-                <div class="modal-actions">
-                    <button type="button" class="btn btn-secondary" data-close-modal="productModal">Cancelar</button>
-                    <button type="submit" class="btn btn-primary">Guardar</button>
-                </div>
-            </form>
+                <div class="topbar-actions" id="pageActions"></div>
+            </header>
+            <main class="content" id="view" tabindex="-1"></main>
         </div>
     </div>
 
-    <!-- Modal: Categoría -->
-    <div class="modal-overlay" id="categoryModal">
-        <div class="modal">
-            <h3 id="categoryModalTitle">Nueva categoría</h3>
-            <form id="categoryForm">
-                <input type="hidden" id="categoryIdOriginal">
-                <div class="field">
-                    <label>ID (slug, ej: poleras)</label>
-                    <input type="text" id="categoryId" required>
-                </div>
-                <div class="field">
-                    <label>Nombre</label>
-                    <input type="text" id="categoryName" required>
-                </div>
-                <div class="field">
-                    <label>Descripción</label>
-                    <input type="text" id="categoryDescription">
-                </div>
-                <div class="field">
-                    <label>Foto de portada (opcional, se ve en la grilla de categorías del inicio)</label>
-                    <img id="categoryImagePreview" style="display:none;max-height:120px;margin-bottom:8px;border-radius:6px;max-width:100%;object-fit:cover;">
-                    <input type="file" id="categoryImageFile" accept="image/*">
-                    <div style="display:flex;gap:8px;margin-top:8px;">
-                        <input type="text" id="categoryImageUrl" placeholder="o pega una URL" style="flex:1;">
-                        <button type="button" class="btn btn-secondary btn-sm" id="clearCategoryImageBtn">Quitar</button>
-                    </div>
-                </div>
-                <div class="field">
-                    <label>Orden</label>
-                    <input type="text" inputmode="numeric" pattern="[0-9]*" id="categorySortOrder">
-                </div>
-                <div class="modal-actions">
-                    <button type="button" class="btn btn-secondary" data-close-modal="categoryModal">Cancelar</button>
-                    <button type="submit" class="btn btn-primary">Guardar</button>
-                </div>
-            </form>
+    <div class="overlay" id="sheetOverlay"></div>
+    <aside class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle" aria-hidden="true">
+        <div class="sheet-head">
+            <h2 class="display" id="sheetTitle"></h2>
+            <button class="icon-btn" data-sheet-close aria-label="Cerrar">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+            </button>
+        </div>
+        <div class="sheet-body" id="sheetBody"></div>
+        <div class="sheet-foot" id="sheetFoot"></div>
+    </aside>
+
+    <div class="dialog" id="dialog" role="alertdialog" aria-modal="true" aria-labelledby="dialogTitle" aria-hidden="true">
+        <div class="dialog-card">
+            <div class="icon" id="dialogIcon"></div>
+            <h3 id="dialogTitle"></h3>
+            <p id="dialogText"></p>
+            <div class="dialog-actions">
+                <button class="btn btn-ghost" id="dialogCancel">Cancelar</button>
+                <button class="btn btn-red" id="dialogOk">Confirmar</button>
+            </div>
         </div>
     </div>
 
-    <!-- Modal: Medida de talla -->
-    <div class="modal-overlay" id="sizeGuideModal">
-        <div class="modal">
-            <h3 id="sizeGuideModalTitle">Nueva medida</h3>
-            <form id="sizeGuideForm">
-                <input type="hidden" id="sizeGuideId">
-                <div class="field">
-                    <label>Categoría</label>
-                    <select id="sizeGuideCategory" required></select>
-                </div>
-                <div class="form-row-2">
-                    <div class="field">
-                        <label>Talla</label>
-                        <input type="text" id="sizeGuideSize" placeholder="S, M, L, XL, 30..." required>
-                    </div>
-                    <div class="field">
-                        <label>Medida corta (se muestra junto a la talla)</label>
-                        <input type="text" id="sizeGuideMeasurement" placeholder="48cm" required>
-                    </div>
-                </div>
-                <div class="field">
-                    <label>Orden</label>
-                    <input type="text" inputmode="numeric" pattern="[0-9]*" id="sizeGuideSortOrder" placeholder="1">
-                </div>
-                <div class="field">
-                    <label>Tabla de medidas detallada (opcional)</label>
-                    <p style="font-size:11px;color:var(--admin-text-secondary);margin-bottom:8px;">
-                        Ej. Largo, Ancho pecho, Largo manga, Ancho hombro. Estas columnas se comparten con todas las tallas de la misma categoría.
-                    </p>
-                    <div id="sizeGuideMeasurementsList"></div>
-                    <button type="button" class="btn btn-secondary btn-sm" id="addMeasurementRowBtn" style="margin-top:8px;">+ Agregar medida</button>
-                </div>
-                <div class="modal-actions">
-                    <button type="button" class="btn btn-secondary" data-close-modal="sizeGuideModal">Cancelar</button>
-                    <button type="submit" class="btn btn-primary">Guardar</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- Modal: Banner -->
-    <div class="modal-overlay" id="bannerModal">
-        <div class="modal">
-            <h3 id="bannerModalTitle">Nuevo banner</h3>
-            <form id="bannerForm">
-                <input type="hidden" id="bannerId">
-                <div class="field">
-                    <label>Imagen o video</label>
-                    <img id="bannerImagePreview" style="display:none;max-height:120px;margin-bottom:8px;border-radius:6px;max-width:100%;object-fit:cover;">
-                    <video id="bannerVideoPreview" style="display:none;max-height:120px;margin-bottom:8px;border-radius:6px;max-width:100%;" muted loop autoplay playsinline></video>
-                    <input type="file" id="bannerFile" accept="image/*,video/mp4,video/webm,video/quicktime">
-                    <p style="font-size:11px;color:var(--admin-text-secondary);margin:6px 0;">o pega una URL manualmente:</p>
-                    <input type="text" id="bannerMediaUrl" placeholder="https://...">
-                </div>
-                <div class="field">
-                    <label>Título (opcional)</label>
-                    <input type="text" id="bannerTitle" placeholder="NUEVA COLECCIÓN">
-                </div>
-                <div class="field">
-                    <label>Subtítulo (opcional)</label>
-                    <input type="text" id="bannerSubtitle" placeholder="Streetwear que quema">
-                </div>
-                <div class="form-row-2">
-                    <div class="field">
-                        <label>Al hacer clic, lleva a...</label>
-                        <select id="bannerLinkType"></select>
-                    </div>
-                    <div class="field" id="bannerCustomLinkField" style="display:none;">
-                        <label>URL personalizada</label>
-                        <input type="text" id="bannerCustomLink" placeholder="https://wa.me/569... o cualquier link">
-                    </div>
-                    <div class="field">
-                        <label>Orden</label>
-                        <input type="text" inputmode="numeric" pattern="[0-9]*" id="bannerSortOrder" placeholder="1">
-                    </div>
-                </div>
-                <div class="field">
-                    <label><input type="checkbox" id="bannerActive" checked style="width:auto;margin-right:8px;">Activo (visible en el sitio)</label>
-                </div>
-                <div class="modal-actions">
-                    <button type="button" class="btn btn-secondary" data-close-modal="bannerModal">Cancelar</button>
-                    <button type="submit" class="btn btn-primary">Guardar</button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- Modal: Edición en lote -->
-    <div class="modal-overlay" id="bulkEditModal">
-        <div class="modal">
-            <h3>Editar <span id="bulkEditCount"></span> productos</h3>
-            <p style="font-size:12px;color:var(--admin-text-secondary);margin-bottom:16px;">
-                Deja un campo en "Sin cambios" o vacío para no modificarlo. Se aplica el mismo valor a todos los productos seleccionados.
-            </p>
-            <form id="bulkEditForm">
-                <div class="field">
-                    <label>Categoría</label>
-                    <select id="bulkCategory"></select>
-                </div>
-                <div class="field">
-                    <label>Destacado</label>
-                    <select id="bulkFeatured">
-                        <option value="">— Sin cambios —</option>
-                        <option value="true">Marcar como destacado</option>
-                        <option value="false">Quitar destacado</option>
-                    </select>
-                </div>
-                <div class="field">
-                    <label>Stock</label>
-                    <input type="text" inputmode="numeric" pattern="[0-9]*" id="bulkStock" placeholder="Dejar vacío para no modificar">
-                </div>
-                <div class="modal-actions">
-                    <button type="button" class="btn btn-secondary" data-close-modal="bulkEditModal">Cancelar</button>
-                    <button type="submit" class="btn btn-primary">Aplicar a seleccionados</button>
-                </div>
-            </form>
-        </div>
-    </div>
+    <div class="toasts" id="toasts" aria-live="polite"></div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="../js/supabaseClient.js"></script>
-    <script src="js/admin.js"></script>
+    <script src="../js/supabaseClient.js?v=4"></script>
+    <script src="js/admin.js?v=4"></script>
+    <script src="js/views-ventas.js?v=4"></script>
+    <script src="js/views-catalogo.js?v=4"></script>
+    <script src="js/views-sitio.js?v=4"></script>
     <script>
-        document.addEventListener('DOMContentLoaded', async () => {
+        (async () => {
             const profile = await AdminAuth.requireAuth();
-            if (profile) await AdminPanel.init(profile);
-        });
+            if (profile) AdminPanel.init(profile);
+        })();
     </script>
 </body>
 </html>

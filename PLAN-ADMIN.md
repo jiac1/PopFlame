@@ -291,15 +291,9 @@ font-family: 'Inter', sans-serif;
 
 ---
 
-## Credenciales por Defecto
+## Credenciales
 
-### Super Admin
-- Usuario: `superadmin`
-- Contraseña: `popflame2026`
-
-### Admin
-- Usuario: `admin`
-- Contraseña: `popflame2026`
+Las cuentas se crean en Supabase (Authentication → Users). No se guardan contraseñas en este repositorio.
 
 ---
 

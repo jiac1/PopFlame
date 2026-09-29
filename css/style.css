@@ -1996,6 +1996,19 @@ video.brand-logo { mix-blend-mode: screen; filter: grayscale(1) contrast(1.9) br
     align-items: center;
     justify-content: center;
 }
+.transfer-box {
+    text-align: left;
+    margin: 0 0 24px;
+    padding: 20px 24px;
+    background: var(--ink);
+    color: #fff;
+}
+.transfer-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.transfer-head strong { font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; }
+.transfer-head .link-arrow { color: #fff; }
+.transfer-box pre { font-family: var(--font-body); font-size: 15px; line-height: 1.7; white-space: pre-wrap; margin: 0 0 12px; }
+.transfer-box p { font-size: 13px; color: rgba(255,255,255,0.7); }
+.transfer-box p strong { color: #fff; }
 .confirm-actions { display: flex; flex-direction: column; gap: 10px; max-width: 380px; margin: 0 auto; }
 
 /* ===== Páginas de ayuda ===== */

@@ -231,7 +231,9 @@ const CartManager = {
             `${customer.email}`,
             customer.note ? `Nota: ${customer.note}` : '',
             '',
-            'Quedo atento/a a los datos para la transferencia.'
+            ProductsManager.config?.transferInfo
+                ? 'Te adjunto el comprobante de la transferencia.'
+                : 'Quedo atento/a a los datos para la transferencia.'
         ].filter((l, i, arr) => !(l === '' && arr[i - 1] === '')).join('\n');
     }
 };

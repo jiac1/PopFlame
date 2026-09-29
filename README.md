@@ -8,14 +8,11 @@ archivos) con un panel de administración con dos roles: **Super Admin** y **Adm
 1. En tu proyecto de [supabase.com](https://supabase.com) → **SQL Editor** → *New query*.
 2. Pega **todo** [`db/schema.sql`](db/schema.sql) y dale **Run**. Crea tablas, seguridad (RLS), funciones,
    categorías y productos iniciales. Se puede volver a correr sin duplicar nada.
-3. **Authentication → Users → Add user** (marca *Auto Confirm User*):
-
-   | Usuario del panel | Email en Supabase | Rol |
-   |---|---|---|
-   | `k1llu4` | `k1llu4@popflame.cl` | `super_admin` |
-   | `ariaspopflame` | `ariaspopflame@popflame.cl` | `admin` |
-
-   El rol se asigna solo (trigger `handle_new_user()`).
+3. **Authentication → Users → Add user → Create new user** (marca *Auto Confirm User*).
+   - La **primera** cuenta que crees queda como **Super Admin**.
+   - Las siguientes quedan **Pendientes** (sin acceso) hasta que un Super Admin les asigne un rol en el panel
+     (Usuarios). Así nadie puede darse acceso solo registrándose con la clave pública del sitio.
+   - El usuario para entrar al panel es lo que va antes de la @ del correo (ej. `admin@popflame.cl` → `admin`).
 
 Si la base ya existía, en vez del schema completo corre solo los scripts nuevos de `db/` que falten
 (ej. [`db/2026-09-26_create_order_rpc.sql`](db/2026-09-26_create_order_rpc.sql), que hace que el
@@ -49,8 +46,12 @@ Abre `http://localhost:8000` (no uses `file://`, Supabase necesita un servidor).
 
 `/admin/` → login con usuario y contraseña → `/admin/panel.html`.
 
-- **Super Admin**: todo (productos, categorías, banners, páginas, tallas, configuración, usuarios).
-- **Admin (dueño)**: pedidos, inventario, productos, banners y tallas.
+- **Super Admin**: todo (además de lo del Admin: categorías, páginas, configuración y usuarios).
+- **Admin**: resumen de ventas, pedidos, inventario, productos, banners y guía de tallas.
+
+Al marcar un pedido como **pagado** el stock se descuenta solo, y se repone si se cancela.
+Los **datos de transferencia** (Configuración → Pagos) se muestran al cliente al confirmar la compra y
+se le envían por WhatsApp desde el pedido con un clic.
 
 Las fotos que subas desde el panel se **comprimen automáticamente** (máx. 2000 px) antes de subirlas.
 

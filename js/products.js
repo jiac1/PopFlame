@@ -88,6 +88,7 @@ const ProductsManager = {
         return {
             currency: cfg.currency,
             whatsappNumber: cfg.whatsapp_number || '',
+            transferInfo: cfg.transfer_info || '',
             shippingCost: Number(cfg.shipping_cost || 0),
             freeShippingMin: Number(cfg.free_shipping_min || 0),
             storeName: cfg.store_name,
