@@ -777,6 +777,10 @@ alter table public.config add column if not exists transfer_info text;
 -- =========================================================
 alter table public.orders add column if not exists stock_applied boolean not null default false;
 
+drop trigger if exists trg_orders_z_apply_stock on public.orders;
+update public.orders set stock_applied = true
+ where status in ('confirmed', 'processing', 'shipped', 'delivered') and not stock_applied;
+
 create or replace function public.orders_apply_stock()
 returns trigger
 language plpgsql security definer set search_path = public as $$
