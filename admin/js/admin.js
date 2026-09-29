@@ -365,6 +365,7 @@ const Admin = {
         { id: 'tallas', label: 'Guía de tallas', icon: 'ruler' },
         { title: 'Super Admin', superOnly: true },
         { id: 'categorias', label: 'Categorías', icon: 'folder', superOnly: true },
+        { id: 'suscriptores', label: 'Suscriptores', icon: 'mail', superOnly: true },
         { id: 'paginas', label: 'Páginas', icon: 'page', superOnly: true },
         { id: 'configuracion', label: 'Configuración', icon: 'settings', superOnly: true },
         { id: 'usuarios', label: 'Usuarios', icon: 'users', superOnly: true }

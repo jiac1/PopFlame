@@ -87,7 +87,15 @@ navegadores descarguen la versión nueva.
 
 ## 6. Correos automáticos (opcional)
 
-El newsletter guarda los correos en `subscribers`. Para enviar correos de bienvenida y de "producto
-nuevo" hay que conectar [Resend](https://resend.com) y desplegar las dos Edge Functions de
-`supabase/functions/` (Supabase → Edge Functions), con los secretos `RESEND_API_KEY` y `FROM_EMAIL`.
-Mientras no verifiques un dominio en Resend, solo llegan al correo con que te registraste.
+El newsletter guarda los correos en `subscribers` (se ven en el panel → Suscriptores). Para enviar el
+correo de bienvenida y el aviso de "nuevo drop":
+
+1. Crea una cuenta en [resend.com](https://resend.com) y una API key.
+2. Supabase → **Edge Functions → Deploy a new function**: crea `welcome-email` y `notify-new-product`
+   pegando los archivos de `supabase/functions/`.
+3. Project Settings → Edge Functions → **Secrets**: `RESEND_API_KEY`, y opcionalmente `FROM_EMAIL`
+   (remitente de un dominio verificado en Resend) y `SITE_URL` (por defecto https://pop-flame.vercel.app).
+
+No hace falta crear un webhook: la base de datos llama sola a `notify-new-product` al crear un producto.
+Ambos correos incluyen el link **Darme de baja** (`pages/baja.html`), que exige la Ley del Consumidor.
+Mientras no verifiques un dominio en Resend, solo llegan al correo con que te registraste en Resend.

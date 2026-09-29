@@ -355,3 +355,71 @@ Views.usuarios = {
         });
     }
 };
+
+// ---------------- Suscriptores del newsletter ----------------
+Views.suscriptores = {
+    query: '',
+
+    async render(view) {
+        Admin.header('Suscriptores', 'Personas inscritas en el club PopFlame (footer de la tienda).',
+            `<button class="btn btn-ghost" id="subsCsv">${ICON.download}<span>Exportar CSV</span></button>`);
+        const { data, error } = await supabaseClient.from('subscribers').select('*').order('subscribed_at', { ascending: false });
+        if (error) throw error;
+        this.subs = data || [];
+        const active = this.subs.filter(s => s.active).length;
+        const monthAgo = Date.now() - 30 * 86400000;
+        const recent = this.subs.filter(s => s.active && new Date(s.subscribed_at).getTime() > monthAgo).length;
+
+        view.innerHTML = `
+            <div class="kpis" style="grid-template-columns:repeat(3,minmax(0,1fr))">
+                <div class="card kpi"><div class="label">${ICON.users}Activos</div><div class="value">${active}</div><div class="sub">Reciben los avisos de productos nuevos</div></div>
+                <div class="card kpi"><div class="label">${ICON.plus}Últimos 30 días</div><div class="value">${recent}</div><div class="sub">Nuevas suscripciones</div></div>
+                <div class="card kpi"><div class="label">${ICON.close}Dados de baja</div><div class="value">${this.subs.length - active}</div><div class="sub">Desde el link de los correos</div></div>
+            </div>
+            <div class="toolbar"><label class="search">${ICON.search}<input type="search" id="subsSearch" placeholder="Buscar correo" value="${U.esc(this.query)}"></label></div>
+            <div class="card" id="subsCard"></div>`;
+
+        document.getElementById('subsSearch').addEventListener('input', U.debounce(e => { this.query = e.target.value; this.renderList(); }, 150));
+        document.getElementById('subsCsv').addEventListener('click', () => this.exportCsv());
+        document.getElementById('subsCard').addEventListener('click', async (e) => {
+            const b = e.target.closest('[data-toggle]');
+            if (!b) return;
+            const s = this.subs.find(x => x.id === +b.dataset.toggle);
+            const { error } = await supabaseClient.from('subscribers').update({ active: !s.active }).eq('id', s.id);
+            if (error) return UI.toast('No se pudo cambiar: ' + error.message, 'error');
+            s.active = !s.active;
+            UI.toast(s.active ? 'Suscripción reactivada' : 'Suscripción desactivada');
+            this.renderList();
+        });
+        this.renderList();
+    },
+
+    renderList() {
+        const q = U.normalize(this.query);
+        const list = this.subs.filter(s => !q || U.normalize(s.email).includes(q));
+        const card = document.getElementById('subsCard');
+        if (!list.length) {
+            card.innerHTML = U.empty('mail', this.subs.length ? 'Sin resultados' : 'Aún no hay suscriptores',
+                this.subs.length ? 'Ningún correo coincide con la búsqueda.' : 'Cuando alguien se una al club desde la tienda, aparecerá aquí.');
+            return;
+        }
+        card.innerHTML = `<div class="table-wrap"><table class="table responsive">
+            <thead><tr><th>Correo</th><th>Estado</th><th>Desde</th><th></th></tr></thead>
+            <tbody>${list.map(s => `<tr>
+                <td class="cell-primary"><strong>${U.esc(s.email)}</strong></td>
+                <td data-label="Estado">${s.active ? '<span class="pill ok">Activo</span>' : '<span class="pill off">De baja</span>'}</td>
+                <td data-label="Desde" class="muted nowrap">${U.date(s.subscribed_at)}</td>
+                <td class="actions"><button class="btn btn-ghost btn-sm" data-toggle="${s.id}">${s.active ? 'Desactivar' : 'Reactivar'}</button></td>
+            </tr>`).join('')}</tbody></table></div>`;
+    },
+
+    exportCsv() {
+        const rows = [['Correo', 'Estado', 'Fecha']].concat(this.subs.map(s => [s.email, s.active ? 'Activo' : 'De baja', new Date(s.subscribed_at).toLocaleDateString('es-CL')]));
+        const csv = '\uFEFF' + rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(';')).join('\n');
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+        a.download = `suscriptores-popflame-${new Date().toISOString().slice(0, 10)}.csv`;
+        a.click();
+        URL.revokeObjectURL(a.href);
+    }
+};

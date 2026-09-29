@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="es-CL">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>Darse de baja | PopFlame</title>
+    <meta name="robots" content="noindex">
+    <meta name="theme-color" content="#0B0B0B">
+    <link rel="icon" href="../images/favicon-32.png" sizes="32x32" type="image/png">
+    <link rel="apple-touch-icon" href="../images/apple-touch-icon.png">
+    <link rel="preconnect" href="https://ysxinhpymvhdnfbdanvn.supabase.co" crossorigin>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@125,700;125,800;125,900&family=Inter:wght@400;500;600;700&display=swap">
+    <link rel="stylesheet" href="../css/style.css?v=8">
+</head>
+<body data-page="unsubscribe">
+    <script src="../js/layout.js?v=8"></script>
+
+    <main id="main" class="page-offset">
+        <div class="container-narrow"><div class="confirm" style="padding-top:64px">
+            <h1 id="bajaTitle">Darse de baja</h1>
+            <p id="bajaText">Vas a dejar de recibir los correos del club PopFlame.</p>
+            <form id="bajaForm" class="confirm-actions" style="margin-top:28px" novalidate>
+                <div class="field" style="text-align:left">
+                    <label for="bajaEmail">Tu correo</label>
+                    <input id="bajaEmail" type="email" autocomplete="email" required>
+                </div>
+                <button type="submit" class="btn btn-dark btn-block" id="bajaBtn">Confirmar baja</button>
+                <a class="btn btn-outline btn-block" href="../index.html">Volver a la tienda</a>
+            </form>
+        </div></div>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2" defer></script>
+    <script src="../js/supabaseClient.js?v=8" defer></script>
+    <script src="../js/products.js?v=8" defer></script>
+    <script src="../js/cart.js?v=8" defer></script>
+    <script src="../js/app.js?v=8" defer></script>
+    <script src="../js/baja.js?v=8" defer></script>
+</body>
+</html>

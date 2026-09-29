@@ -810,6 +810,42 @@ create trigger trg_orders_z_apply_stock
     for each row execute procedure public.orders_apply_stock();
 
 -- =========================================================
+-- Newsletter: darse de baja desde el link de los correos (pages/baja.html).
+-- Solo desactiva la suscripción de ese correo; no expone ningún dato.
+-- =========================================================
+create or replace function public.unsubscribe_newsletter(p_email text)
+returns boolean
+language plpgsql security definer set search_path = public as $$
+begin
+    update public.subscribers set active = false
+     where lower(email) = lower(trim(p_email)) and active;
+    return found;
+end;
+$$;
+
+revoke all on function public.unsubscribe_newsletter(text) from public;
+grant execute on function public.unsubscribe_newsletter(text) to anon, authenticated;
+
+-- Si alguien que se dio de baja se vuelve a suscribir desde la tienda, se reactiva.
+create or replace function public.subscribers_reactivate()
+returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+    new.email := lower(trim(new.email));
+    if exists (select 1 from public.subscribers where email = new.email and not active) then
+        update public.subscribers set active = true, subscribed_at = now() where email = new.email;
+        return null;  -- no inserta un duplicado; la fila existente queda activa
+    end if;
+    return new;
+end;
+$$;
+
+drop trigger if exists trg_subscribers_reactivate on public.subscribers;
+create trigger trg_subscribers_reactivate
+    before insert on public.subscribers
+    for each row execute procedure public.subscribers_reactivate();
+
+-- =========================================================
 -- Fin del schema. Siguiente paso: crear tu cuenta en Authentication > Users > Add user.
 -- La primera cuenta queda como Super Admin; las siguientes quedan pendientes de aprobación.
 -- =========================================================
