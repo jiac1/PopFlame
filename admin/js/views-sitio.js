@@ -3,14 +3,55 @@
 // ============================================================
 
 // ---------------- Páginas ----------------
+Views.supervision = {
+    async render(view) {
+        await Admin.requirePermission('supervision');
+        Admin.header('Supervisión del sistema', 'Accesos, configuración y actividad de roles.',
+            '<a class="btn btn-ghost" href="#resumen">Ver operaciones de la tienda</a>');
+        const [users, cfg, audit] = await Promise.all([
+            PanelData.from('profiles').select('id, role'),
+            Data.configRow(true),
+            PanelData.from('panel_role_audit').select('created_at, actor_id, profile_id, old_role, new_role').order('created_at', { ascending: false }).limit(20)
+        ]);
+        if (users.error) throw users.error;
+        const pending = (users.data || []).filter(u => u.role === 'pending').length;
+        const checks = [
+            ['WhatsApp de ventas', !!cfg.whatsapp_number],
+            ['Datos de transferencia', !!cfg.transfer_info]
+        ];
+        view.innerHTML = `
+            <div class="kpis">
+                <a class="card kpi" href="#usuarios"><div class="label">${ICON.users}Accesos pendientes</div><div class="value">${pending}</div><div class="sub">Revisar cuentas y roles</div></a>
+                <a class="card kpi" href="#configuracion"><div class="label">${ICON.settings}Configuración y pagos</div><div class="value">${checks.filter(c => c[1]).length}/${checks.length}</div><div class="sub">Datos de contacto y transferencia</div></a>
+            </div>
+            <div class="grid-2 mt-16">
+                <div class="card card-body"><h2>Administración general</h2><div class="stack mt-16">
+                    <a class="btn btn-ghost" href="#usuarios">Usuarios y permisos</a>
+                    <a class="btn btn-ghost" href="#configuracion">Configuración técnica y pagos</a>
+                    <a class="btn btn-ghost" href="#paginas">Páginas y contenido legal</a>
+                    <a class="btn btn-ghost" href="#suscriptores">Suscriptores</a>
+                </div></div>
+                <div class="card card-body"><h2>Diagnóstico de configuración</h2>
+                    <p class="muted mt-8">Estas comprobaciones revisan datos de la tienda. Las políticas de seguridad se validan por separado antes de publicar.</p>
+                    ${checks.map(([label, ok]) => `<div class="list-row"><span class="grow">${label}</span><span class="pill ${ok ? 'ok' : 'warn'}">${ok ? 'Configurado' : 'Pendiente'}</span></div>`).join('')}
+                </div>
+            </div>
+            <div class="card mt-16"><div class="card-head"><div><h2>Auditoría de roles</h2><p>Últimos 20 cambios registrados desde la migración de permisos.</p></div></div>
+                ${audit.error ? '<div class="card-body">Auditoría no disponible. Revisa la migración de permisos o la conexión.</div>' :
+                    (audit.data || []).map(a => `<div class="list-row"><div class="grow"><strong>${U.esc(ROLE_LABEL[a.old_role] || 'Cuenta nueva')} → ${U.esc(ROLE_LABEL[a.new_role] || 'Eliminado')}</strong><small>Cuenta: ${U.esc(a.profile_id)} · Autor: ${U.esc(a.actor_id || 'Sistema')}</small></div><span class="muted">${U.dateTime(a.created_at)}</span></div>`).join('') || '<div class="card-body muted">Sin cambios de roles registrados.</div>'}
+            </div>`;
+    }
+};
+
 Views.paginas = {
     pages: [],
     currentSlug: null,
     initial: '',
 
     async render(view) {
+        await Admin.requirePermission('paginas');
         Admin.header('Páginas', 'Textos de ayuda y legales enlazados en el footer de la tienda.');
-        const { data, error } = await supabaseClient.from('pages').select('*').order('title');
+        const { data, error } = await PanelData.from('pages').select('*').order('title');
         if (error) throw error;
         this.pages = data || [];
         if (!this.pages.length) {
@@ -104,7 +145,7 @@ Views.paginas = {
         document.getElementById('pgSave').onclick = async (e) => {
             if (!title.value.trim()) return UI.toast('La página necesita un título', 'error');
             UI.setLoading(e.currentTarget, true);
-            const { data, error } = await supabaseClient.from('pages').update({ title: title.value.trim(), content: ta.value }).eq('slug', p.slug).select().single();
+            const { data, error } = await PanelData.from('pages').update({ title: title.value.trim(), content: ta.value }).eq('slug', p.slug).select().single();
             UI.setLoading(e.currentTarget, false);
             if (error) return UI.toast('No se pudo guardar: ' + error.message, 'error');
             Object.assign(p, data);
@@ -118,6 +159,7 @@ Views.paginas = {
 // ---------------- Configuración ----------------
 Views.configuracion = {
     async render(view) {
+        await Admin.requirePermission('configuracion');
         Admin.header('Configuración', 'Datos de la tienda, pagos, entregas, redes y marca.');
         const cfg = await Data.configRow(true);
         const hasTransfer = 'transfer_info' in cfg;
@@ -224,7 +266,7 @@ Views.configuracion = {
             };
             if (hasTransfer) payload.transfer_info = form.elements.transfer_info.value.trim() || null;
             UI.setLoading(btn, true);
-            const { error } = await supabaseClient.from('config').update(payload).eq('id', 1);
+            const { error } = await PanelData.from('config').update(payload).eq('id', 1);
             UI.setLoading(btn, false);
             if (error) return UI.toast('No se pudo guardar: ' + error.message, 'error');
             Data.config = null;
@@ -243,7 +285,7 @@ Views.configuracion = {
             btn.classList.add('is-loading');
             try {
                 const url = await Uploads.upload('site-assets', input.files[0]);
-                const { error } = await supabaseClient.from('config').update({ [col]: url }).eq('id', 1);
+                const { error } = await PanelData.from('config').update({ [col]: url }).eq('id', 1);
                 if (error) throw error;
                 box.querySelector('.media-preview').outerHTML = this.previewHtml(url, col === 'logo_url');
                 Data.config = null;
@@ -279,8 +321,9 @@ Views.configuracion = {
 // ---------------- Usuarios ----------------
 Views.usuarios = {
     async render(view) {
+        await Admin.requirePermission('usuarios');
         Admin.header('Usuarios', 'Quién puede entrar al panel y con qué permisos.');
-        const { data, error } = await supabaseClient.from('profiles').select('*').order('created_at');
+        const { data, error } = await PanelData.from('profiles').select('*').order('created_at');
         if (error) throw error;
         const users = data || [];
         const pending = users.filter(u => u.role === 'pending');
@@ -312,8 +355,8 @@ Views.usuarios = {
                 <div class="card card-body">
                     <h3 class="strong mb-16">Qué puede hacer cada rol</h3>
                     <dl class="kv">
-                        <dt>Super Admin</dt><dd>Todo: además de lo del Admin, categorías, páginas, configuración y usuarios.</dd>
-                        <dt>Admin</dt><dd>Pedidos, inventario, productos, banners y guía de tallas.</dd>
+                        <dt>Super Admin</dt><dd>Todo: operaciones, supervisión, páginas, configuración, pagos y usuarios.</dd>
+                        <dt>Admin</dt><dd>Pedidos, inventario, productos, categorías, banners y guía de tallas.</dd>
                         <dt>Pendiente</dt><dd>Sin acceso. Así queda toda cuenta nueva hasta que la apruebes.</dd>
                     </dl>
                 </div>
@@ -341,7 +384,7 @@ Views.usuarios = {
             UI.setLoading(btn, true);
             const payload = { name: name || u.username };
             if (id !== Admin.profile.id) payload.role = role;
-            const { error } = await supabaseClient.from('profiles').update(payload).eq('id', id);
+            const { error } = await PanelData.from('profiles').update(payload).eq('id', id);
             UI.setLoading(btn, false);
             if (error) return UI.toast('No se pudo guardar: ' + error.message, 'error');
             Object.assign(u, payload);
@@ -361,9 +404,10 @@ Views.suscriptores = {
     query: '',
 
     async render(view) {
+        await Admin.requirePermission('suscriptores');
         Admin.header('Suscriptores', 'Personas inscritas en el club PopFlame (footer de la tienda).',
             `<button class="btn btn-ghost" id="subsCsv">${ICON.download}<span>Exportar CSV</span></button>`);
-        const { data, error } = await supabaseClient.from('subscribers').select('*').order('subscribed_at', { ascending: false });
+        const { data, error } = await PanelData.from('subscribers').select('*').order('subscribed_at', { ascending: false });
         if (error) throw error;
         this.subs = data || [];
         const active = this.subs.filter(s => s.active).length;
@@ -385,7 +429,7 @@ Views.suscriptores = {
             const b = e.target.closest('[data-toggle]');
             if (!b) return;
             const s = this.subs.find(x => x.id === +b.dataset.toggle);
-            const { error } = await supabaseClient.from('subscribers').update({ active: !s.active }).eq('id', s.id);
+            const { error } = await PanelData.from('subscribers').update({ active: !s.active }).eq('id', s.id);
             if (error) return UI.toast('No se pudo cambiar: ' + error.message, 'error');
             s.active = !s.active;
             UI.toast(s.active ? 'Suscripción reactivada' : 'Suscripción desactivada');

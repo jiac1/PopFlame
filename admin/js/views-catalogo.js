@@ -55,10 +55,11 @@ Views.productos = {
     selected: new Set(),
 
     async render(view) {
+        await Admin.requirePermission('productos');
         Admin.header('Productos', 'Crea, edita y organiza el catálogo de la tienda.',
             `<button class="btn btn-dark keep-label" id="newProduct">${ICON.plus}<span>Nuevo producto</span></button>`);
         const [{ data, error }, cats] = await Promise.all([
-            supabaseClient.from('products').select('*').order('id', { ascending: false }),
+            PanelData.from('products').select('*').order('id', { ascending: false }),
             Data.categoriesList(true)
         ]);
         if (error) throw error;
@@ -172,7 +173,7 @@ Views.productos = {
         const src = p || copyFrom || {};
         const cats = Data.categories || [];
         if (!cats.length) {
-            UI.toast(Admin.isSuper() ? 'Primero crea una categoría en Categorías' : 'Pide a un Super Admin que cree una categoría primero', 'error');
+            UI.toast('Primero crea una categoría en Categorías', 'error');
             return;
         }
         this.photos = (src.images && src.images.length ? src.images : (src.image ? [src.image] : [])).map(url => ({ url }));
@@ -376,8 +377,8 @@ Views.productos = {
                 featured: document.getElementById('pFeatured').checked
             };
             const { error } = existing
-                ? await supabaseClient.from('products').update(payload).eq('id', existing.id)
-                : await supabaseClient.from('products').insert(payload);
+                ? await PanelData.from('products').update(payload).eq('id', existing.id)
+                : await PanelData.from('products').insert(payload);
             if (error) {
                 if (error.code === '23505') { err('name', 'Ya existe un producto con ese nombre.'); throw new Error('Ya existe un producto con ese nombre'); }
                 throw error;
@@ -405,7 +406,7 @@ Views.productos = {
             ok: one ? 'Eliminar producto' : 'Eliminar productos'
         });
         if (!ok) return;
-        const { error } = await supabaseClient.from('products').delete().in('id', list.map(p => p.id));
+        const { error } = await PanelData.from('products').delete().in('id', list.map(p => p.id));
         if (error) { UI.toast('No se pudo eliminar: ' + error.message, 'error'); return; }
         if (fromSheet) await UI.closeSheet(true);
         UI.toast(one ? 'Producto eliminado' : `${list.length} productos eliminados`);
@@ -436,7 +437,7 @@ Views.productos = {
                 if (priceRaw) { const pr = U.int(priceRaw); if (!pr || pr <= 0) return UI.toast('Precio inválido', 'error'); payload.price = pr; }
                 if (!Object.keys(payload).length) return UI.toast('No cambiaste ningún campo', 'error');
                 UI.setLoading(e.currentTarget, true);
-                const { error } = await supabaseClient.from('products').update(payload).in('id', ids);
+                const { error } = await PanelData.from('products').update(payload).in('id', ids);
                 UI.setLoading(e.currentTarget, false);
                 if (error) return UI.toast('No se pudo aplicar: ' + error.message, 'error');
                 await UI.closeSheet(true);
@@ -450,11 +451,12 @@ Views.productos = {
 // ---------------- Categorías (Super Admin) ----------------
 Views.categorias = {
     async render(view) {
+        await Admin.requirePermission('categorias');
         Admin.header('Categorías', 'Ordenan el menú de la tienda. Las que no tienen productos se ocultan solas.',
             `<button class="btn btn-dark keep-label" id="newCat">${ICON.plus}<span>Nueva categoría</span></button>`);
         const [cats, { data: prods }] = await Promise.all([
             Data.categoriesList(true),
-            supabaseClient.from('products').select('category_id')
+            PanelData.from('products').select('category_id')
         ]);
         this.counts = {};
         (prods || []).forEach(p => { this.counts[p.category_id] = (this.counts[p.category_id] || 0) + 1; });
@@ -497,7 +499,7 @@ Views.categorias = {
         const cats = [...Data.categories];
         const j = i + dir;
         [cats[i], cats[j]] = [cats[j], cats[i]];
-        const updates = cats.map((c, n) => supabaseClient.from('categories').update({ sort_order: n + 1 }).eq('id', c.id));
+        const updates = cats.map((c, n) => PanelData.from('categories').update({ sort_order: n + 1 }).eq('id', c.id));
         const res = await Promise.all(updates);
         const bad = res.find(r => r.error);
         if (bad) return UI.toast('No se pudo reordenar: ' + bad.error.message, 'error');
@@ -510,7 +512,7 @@ Views.categorias = {
         if (n) return UI.toast(`No se puede eliminar: tiene ${n} producto${n === 1 ? '' : 's'}. Muévelos a otra categoría primero.`, 'error');
         const ok = await UI.confirm({ title: `¿Eliminar la categoría "${Data.catName(id)}"?`, text: 'También se borra su guía de tallas.', ok: 'Eliminar' });
         if (!ok) return;
-        const { error } = await supabaseClient.from('categories').delete().eq('id', id);
+        const { error } = await PanelData.from('categories').delete().eq('id', id);
         if (error) return UI.toast('No se pudo eliminar: ' + error.message, 'error');
         UI.toast('Categoría eliminada');
         Admin.route();
@@ -562,8 +564,8 @@ Views.categorias = {
                         const image = imgFile ? await Uploads.upload('site-assets', imgFile) : (imgUrl || null);
                         const payload = { name: nm, description: document.getElementById('cDesc').value.trim() || null, image };
                         const { error } = c
-                            ? await supabaseClient.from('categories').update(payload).eq('id', c.id)
-                            : await supabaseClient.from('categories').insert({ ...payload, id, sort_order: (Data.categories?.length || 0) + 1 });
+                            ? await PanelData.from('categories').update(payload).eq('id', c.id)
+                            : await PanelData.from('categories').insert({ ...payload, id, sort_order: (Data.categories?.length || 0) + 1 });
                         if (error) throw error.code === '23505' ? new Error('Ya existe una categoría con esa dirección') : error;
                         await UI.closeSheet(true);
                         UI.toast('Categoría guardada');
@@ -583,10 +585,11 @@ Views.categorias = {
 // ---------------- Banners ----------------
 Views.banners = {
     async render(view) {
+        await Admin.requirePermission('banners');
         Admin.header('Banners', 'Las imágenes grandes del inicio. Con 2 o más activos se muestran como carrusel.',
             `<button class="btn btn-dark keep-label" id="newBanner">${ICON.plus}<span>Nuevo banner</span></button>`);
         const [{ data, error }] = await Promise.all([
-            supabaseClient.from('banners').select('*').order('sort_order'),
+            PanelData.from('banners').select('*').order('sort_order'),
             Data.categoriesList()
         ]);
         if (error) throw error;
@@ -627,7 +630,7 @@ Views.banners = {
         });
         grid.addEventListener('change', async (e) => {
             if (!e.target.dataset.toggle) return;
-            const { error } = await supabaseClient.from('banners').update({ active: e.target.checked }).eq('id', +e.target.dataset.toggle);
+            const { error } = await PanelData.from('banners').update({ active: e.target.checked }).eq('id', +e.target.dataset.toggle);
             if (error) { e.target.checked = !e.target.checked; return UI.toast('No se pudo cambiar: ' + error.message, 'error'); }
             e.target.closest('.banner-card').classList.toggle('is-off', !e.target.checked);
             UI.toast(e.target.checked ? 'Banner visible en la tienda' : 'Banner oculto');
@@ -716,8 +719,8 @@ Views.banners = {
                             active: document.getElementById('bActive').checked
                         };
                         const { error } = b
-                            ? await supabaseClient.from('banners').update(payload).eq('id', b.id)
-                            : await supabaseClient.from('banners').insert({ ...payload, sort_order: this.banners.length + 1 });
+                            ? await PanelData.from('banners').update(payload).eq('id', b.id)
+                            : await PanelData.from('banners').insert({ ...payload, sort_order: this.banners.length + 1 });
                         if (error) throw error;
                         await UI.closeSheet(true);
                         UI.toast('Banner guardado');
@@ -737,7 +740,7 @@ Views.banners = {
         const list = [...this.banners];
         const j = i + dir;
         [list[i], list[j]] = [list[j], list[i]];
-        const res = await Promise.all(list.map((b, n) => supabaseClient.from('banners').update({ sort_order: n + 1 }).eq('id', b.id)));
+        const res = await Promise.all(list.map((b, n) => PanelData.from('banners').update({ sort_order: n + 1 }).eq('id', b.id)));
         const bad = res.find(r => r.error);
         if (bad) return UI.toast('No se pudo reordenar: ' + bad.error.message, 'error');
         Admin.route();
@@ -746,7 +749,7 @@ Views.banners = {
     async remove(id, fromSheet) {
         const ok = await UI.confirm({ title: '¿Eliminar este banner?', text: 'Si solo quieres ocultarlo por un tiempo, desactívalo con el interruptor.', ok: 'Eliminar' });
         if (!ok) return;
-        const { error } = await supabaseClient.from('banners').delete().eq('id', id);
+        const { error } = await PanelData.from('banners').delete().eq('id', id);
         if (error) return UI.toast('No se pudo eliminar: ' + error.message, 'error');
         if (fromSheet) await UI.closeSheet(true);
         UI.toast('Banner eliminado');
@@ -757,10 +760,11 @@ Views.banners = {
 // ---------------- Guía de tallas ----------------
 Views.tallas = {
     async render(view) {
+        await Admin.requirePermission('tallas');
         Admin.header('Guía de tallas', 'Las medidas se muestran en la ficha de producto y en la página "Guía de tallas".',
             `<button class="btn btn-dark keep-label" id="newSize">${ICON.plus}<span>Nueva talla</span></button>`);
         const [{ data, error }, cats] = await Promise.all([
-            supabaseClient.from('size_guide').select('*').order('sort_order'),
+            PanelData.from('size_guide').select('*').order('sort_order'),
             Data.categoriesList(true)
         ]);
         if (error) throw error;
@@ -857,8 +861,8 @@ Views.tallas = {
                     };
                     UI.setLoading(e.currentTarget, true);
                     const { error } = r
-                        ? await supabaseClient.from('size_guide').update(payload).eq('id', r.id)
-                        : await supabaseClient.from('size_guide').insert(payload);
+                        ? await PanelData.from('size_guide').update(payload).eq('id', r.id)
+                        : await PanelData.from('size_guide').insert(payload);
                     UI.setLoading(e.currentTarget, false);
                     if (error) return UI.toast(error.code === '23505' ? 'Esa talla ya existe en esta categoría' : 'No se pudo guardar: ' + error.message, 'error');
                     await UI.closeSheet(true);
@@ -874,7 +878,7 @@ Views.tallas = {
         const r = this.rows.find(x => x.id === id);
         const ok = await UI.confirm({ title: `¿Eliminar la talla ${r?.size || ''}?`, text: 'Se quita de la guía de tallas de su categoría.', ok: 'Eliminar' });
         if (!ok) return;
-        const { error } = await supabaseClient.from('size_guide').delete().eq('id', id);
+        const { error } = await PanelData.from('size_guide').delete().eq('id', id);
         if (error) return UI.toast('No se pudo eliminar: ' + error.message, 'error');
         UI.toast('Talla eliminada');
         Admin.route();

@@ -3,13 +3,19 @@
 Sitio e-commerce estático (HTML/CSS/JS, sin build) conectado a **Supabase** (base de datos, login y
 archivos) con un panel de administración con dos roles: **Super Admin** y **Admin** (dueño).
 
+**Fase 1 de autorización:** ver [implementación, migraciones aisladas, pruebas y reversión](docs/phase1-rbac.md).
+En bases existentes no vuelvas a ejecutar `schema.sql`: revisa las migraciones de noviembre en staging.
+Tras aplicarlas, todas las cuentas nuevas quedan `pending`, incluida la primera; el bootstrap de
+Super Admin se realiza manualmente por el dueño del proyecto. No hay despliegue automático de SQL.
+
 ## 1. Configurar Supabase
 
 1. En tu proyecto de [supabase.com](https://supabase.com) → **SQL Editor** → *New query*.
 2. Pega **todo** [`db/schema.sql`](db/schema.sql) y dale **Run**. Crea tablas, seguridad (RLS), funciones,
    categorías y productos iniciales. Se puede volver a correr sin duplicar nada.
 3. **Authentication → Users → Add user → Create new user** (marca *Auto Confirm User*).
-   - La **primera** cuenta que crees queda como **Super Admin**.
+   - En el schema histórico, la **primera** cuenta queda como **Super Admin**. La migración de Fase 1
+     elimina ese ascenso automático y exige bootstrap manual del dueño (ver documento anterior).
    - Las siguientes quedan **Pendientes** (sin acceso) hasta que un Super Admin les asigne un rol en el panel
      (Usuarios). Así nadie puede darse acceso solo registrándose con la clave pública del sitio.
    - El usuario para entrar al panel es lo que va antes de la @ del correo (ej. `admin@popflame.cl` → `admin`).
@@ -46,8 +52,9 @@ Abre `http://localhost:8000` (no uses `file://`, Supabase necesita un servidor).
 
 `/admin/` → login con usuario y contraseña → `/admin/panel.html`.
 
-- **Super Admin**: todo (además de lo del Admin: categorías, páginas, configuración y usuarios).
-- **Admin**: resumen de ventas, pedidos, inventario, productos, banners y guía de tallas.
+- **Super Admin**: supervisión y auditoría de roles, configuración, pagos, páginas, usuarios y
+  todas las operaciones del Admin. Solo este rol puede eliminar pedidos definitivamente.
+- **Admin**: resumen de ventas, pedidos, inventario, productos, categorías, banners y guía de tallas.
 
 Al marcar un pedido como **pagado** el stock se descuenta solo, y se repone si se cancela.
 Los **datos de transferencia** (Configuración → Pagos) se muestran al cliente al confirmar la compra y

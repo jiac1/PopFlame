@@ -195,7 +195,7 @@ const Checkout = {
         try {
             const order = await this.createOrder(customer, items);
 
-            const text = CartManager.generateWhatsAppText(customer, order.order_number, items);
+            const text = CartManager.generateWhatsAppText(customer, order.order_number, items, order.total);
             const link = CartManager.whatsappLink(text);
 
             this.saveProfile(profile);
@@ -206,7 +206,6 @@ const Checkout = {
             if (win && link) win.location.href = link;
             else if (win) win.close();
         } catch (err) {
-            console.error('Error creando el pedido:', err);
             if (win) win.close();
             UI.toast(err.userMessage || 'No pudimos registrar tu pedido. Revisa tu conexión e intenta de nuevo.', 'error');
             if (err.userMessage) ProductsManager.load(() => CartManager.sync());
@@ -216,36 +215,26 @@ const Checkout = {
     },
 
     // Crea el pedido con la función segura del servidor (recalcula precios y valida stock).
-    // Si esa función todavía no está instalada en Supabase, guarda el pedido con un insert simple.
+    // Requiere la migración del RPC antes de publicar esta versión del checkout.
     async createOrder(customer, items) {
         const { data, error } = await supabaseClient.rpc('create_order', {
             p_customer: customer,
             p_items: items.map(i => ({ productId: i.productId, quantity: i.quantity, size: i.size, color: i.color }))
         });
-        if (!error) return Array.isArray(data) ? data[0] : data;
-
-        const missingFn = error.code === 'PGRST202' || /could not find the function/i.test(error.message || '');
-        if (!missingFn) {
-            const e = new Error(error.message);
-            e.userMessage = /stock|existe|vacío|pedidos|minuto/i.test(error.message) ? error.message : null;
-            throw e;
+        if (!error) {
+            const order = Array.isArray(data) ? data[0] : data;
+            if (!order?.order_number || !Number.isFinite(Number(order.total)) || Number(order.total) < 0) {
+                throw new Error('Respuesta de pedido inválida.');
+            }
+            return order;
         }
 
-        const { error: insertError } = await supabaseClient.from('orders').insert({
-            customer_name: customer.name,
-            customer_email: customer.email,
-            customer_phone: customer.phone,
-            customer_address: customer.meetingPoint || null,
-            note: customer.note || null,
-            items,
-            subtotal: CartManager.getSubtotal(),
-            shipping: CartManager.getShipping(),
-            total: CartManager.getTotal(),
-            status: 'pending',
-            payment_method: 'transfer'
-        });
-        if (insertError) throw insertError;
-        return { order_number: '', total: CartManager.getTotal() };
+        const missingFn = error.code === 'PGRST202' || /could not find the function/i.test(error.message || '');
+        const e = new Error('No se pudo registrar el pedido.');
+        e.userMessage = missingFn
+            ? 'No podemos registrar pedidos en este momento. Intenta más tarde o contáctanos por WhatsApp.'
+            : (/stock|existe|vacío|pedidos|minuto/i.test(error.message || '') ? error.message : null);
+        throw e;
     },
 
     renderConfirmation(order, customer, link) {

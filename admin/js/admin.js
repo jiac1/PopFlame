@@ -60,11 +60,14 @@ const ROLE_LABEL = { super_admin: 'Super Admin', admin: 'Admin', pending: 'Pendi
 const AdminAuth = {
     async getActiveProfile() {
         try {
-            const { data: { session } } = await supabaseClient.auth.getSession();
-            if (!session) return null;
+            // getSession obtiene el JWT vigente; getUser comprueba la identidad con Auth.
+            const { data: { session }, error: sessionError } = await supabaseClient.auth.getSession();
+            if (sessionError || !session) return null;
+            const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
+            if (userError || !user || user.id !== session.user.id) return null;
             const { data: profile, error } = await supabaseClient
-                .from('profiles').select('*').eq('id', session.user.id).maybeSingle();
-            if (error || !profile || !['admin', 'super_admin'].includes(profile.role)) return null;
+                .from('profiles').select('id, username, name, role, created_at').eq('id', user.id).maybeSingle();
+            if (error || !profile || profile.id !== user.id || !AdminPermissions.can(profile.role, 'resumen')) return null;
             return profile;
         } catch (e) {
             return null;
@@ -87,18 +90,23 @@ const AdminAuth = {
         if (rpcErr) throw new Error('No pudimos conectar con el servidor. Revisa tu conexión e intenta de nuevo.');
         if (!email) throw new Error('Usuario o contraseña incorrectos.');
 
-        const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+        const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
         if (error) throw new Error('Usuario o contraseña incorrectos.');
 
-        const { data: profile } = await supabaseClient.from('profiles').select('role').eq('id', data.user.id).maybeSingle();
-        if (!profile || profile.role === 'pending') {
-            await supabaseClient.auth.signOut();
+        const profile = await this.getActiveProfile();
+        if (!profile) {
+            await supabaseClient.auth.signOut({ scope: 'local' });
             throw new Error('Tu cuenta todavía no está aprobada. Pídele a un Super Admin que la active.');
         }
     },
 
     async logout() {
-        await supabaseClient.auth.signOut();
+        Admin.clearAccess();
+        const { error } = await supabaseClient.auth.signOut({ scope: 'local' });
+        if (error) {
+            UI.toast('No se pudo cerrar la sesión. Reintenta con conexión.', 'error');
+            return;
+        }
         location.replace('index.html');
     }
 };
@@ -180,7 +188,7 @@ const Data = {
 
     async categoriesList(force) {
         if (!this.categories || force) {
-            const { data, error } = await supabaseClient.from('categories').select('*').order('sort_order');
+            const { data, error } = await PanelData.from('categories').select('*').order('sort_order');
             if (error) throw error;
             this.categories = data || [];
         }
@@ -190,7 +198,7 @@ const Data = {
 
     async configRow(force) {
         if (!this.config || force) {
-            const { data, error } = await supabaseClient.from('config').select('*').eq('id', 1).maybeSingle();
+            const { data, error } = await PanelData.from('config').select('*').eq('id', 1).maybeSingle();
             if (error) throw error;
             this.config = data || {};
         }
@@ -336,11 +344,14 @@ const Uploads = {
 
     async upload(bucket, file) {
         if (!file) return null;
+        if (!['product-images', 'site-assets'].includes(bucket)) throw new Error('Destino no permitido.');
+        await Admin.requirePermission('media');
         const maxMb = bucket === 'site-assets' ? 50 : 10;
         file = await this.compress(file);
         if (file.size > maxMb * 1024 * 1024) throw new Error(`El archivo pesa más de ${maxMb} MB.`);
         const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
         const path = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+        await Admin.requirePermission('media');
         const { error } = await supabaseClient.storage.from(bucket).upload(path, file, { upsert: false, cacheControl: '31536000' });
         if (error) throw error;
         return supabaseClient.storage.from(bucket).getPublicUrl(path).data.publicUrl;
@@ -357,41 +368,113 @@ const Admin = {
     current: null,
 
     nav: [
+        { id: 'supervision', label: 'Supervisión', icon: 'settings' },
         { id: 'resumen', label: 'Resumen', icon: 'home' },
         { id: 'pedidos', label: 'Pedidos', icon: 'orders', badge: true },
         { id: 'inventario', label: 'Inventario', icon: 'stock' },
         { id: 'productos', label: 'Productos', icon: 'shirt' },
+        { id: 'categorias', label: 'Categorías', icon: 'folder' },
         { id: 'banners', label: 'Banners', icon: 'image' },
         { id: 'tallas', label: 'Guía de tallas', icon: 'ruler' },
-        { title: 'Super Admin', superOnly: true },
-        { id: 'categorias', label: 'Categorías', icon: 'folder', superOnly: true },
-        { id: 'suscriptores', label: 'Suscriptores', icon: 'mail', superOnly: true },
-        { id: 'paginas', label: 'Páginas', icon: 'page', superOnly: true },
-        { id: 'configuracion', label: 'Configuración', icon: 'settings', superOnly: true },
-        { id: 'usuarios', label: 'Usuarios', icon: 'users', superOnly: true }
+        { title: 'Super Admin', permission: 'supervision' },
+        { id: 'suscriptores', label: 'Suscriptores', icon: 'mail' },
+        { id: 'paginas', label: 'Páginas', icon: 'page' },
+        { id: 'configuracion', label: 'Configuración', icon: 'settings' },
+        { id: 'usuarios', label: 'Usuarios', icon: 'users' }
     ],
 
-    isSuper() { return this.profile?.role === 'super_admin'; },
+    can(permission) { return AdminPermissions.can(this.profile?.role, permission); },
+    isSuper() { return this.can('supervision'); },
+
+    // No se almacena el rol en JWT ni localStorage: profiles se lee nuevamente.
+    async refreshAccess() {
+        if (this.accessCheck) return this.accessCheck;
+        const epoch = this.accessEpoch || 0;
+        this.accessCheck = (async () => {
+            const profile = await AdminAuth.getActiveProfile();
+            if (epoch !== (this.accessEpoch || 0)) return null;
+            if (!profile) {
+                this.clearAccess();
+                location.replace('index.html');
+                return null;
+            }
+            const changed = this.profile && (this.profile.role !== profile.role || this.profile.id !== profile.id);
+            if (changed) this.clearAccess();
+            this.profile = profile;
+            this.renderIdentity();
+            if (changed) {
+                UI.toast('Tus permisos cambiaron. Se actualizó el panel.');
+                // Fuera del chequeo actual para no esperar una promesa que depende de sí misma.
+                setTimeout(() => this.route(), 0);
+            }
+            return profile;
+        })();
+        try { return await this.accessCheck; }
+        finally { this.accessCheck = null; }
+    },
+
+    async requirePermission(permission) {
+        const profile = await this.refreshAccess();
+        if (!profile || !AdminPermissions.can(profile.role, permission)) throw new Error('No tienes permiso para esta operación.');
+        return profile;
+    },
+
+    clearAccess() {
+        this.accessEpoch = (this.accessEpoch || 0) + 1;
+        this.routeVersion = (this.routeVersion || 0) + 1;
+        this.profile = null;
+        this.navRole = null;
+        this.current = null;
+        this.lastPending = null;
+        Data.config = Data.categories = null;
+        for (const section of Object.values(Views)) {
+            for (const key of ['orders', 'products', 'pages', 'subs', 'rows', 'banners', 'photos', 'lastPaid']) {
+                if (key in section) section[key] = [];
+            }
+            section.selected?.clear?.();
+        }
+        UI.closeSheet(true);
+        document.getElementById('dialogCancel')?.click();
+        for (const id of ['view', 'nav', 'pageActions', 'sheetBody', 'sheetFoot', 'sheetTitle', 'meName', 'meRole', 'meAvatar']) {
+            const el = document.getElementById(id);
+            if (el) el.replaceChildren();
+        }
+        document.getElementById('pageTitle').textContent = 'Verificando acceso';
+        document.getElementById('pageSub').textContent = '';
+        document.title = 'Panel | PopFlame';
+    },
 
     async init(profile) {
         this.profile = profile;
+        this.renderIdentity();
+        this.bind();
+        this.loadBrand();
+        this.refreshBadge();
+        setInterval(() => this.refreshBadge(), 60000);
+        setInterval(() => this.refreshAccess(), 30000);
+        this.route();
+    },
+
+    renderIdentity() {
+        const profile = this.profile;
+        if (!profile) return;
         const name = profile.name || profile.username;
         document.getElementById('meName').textContent = name;
         document.getElementById('meRole').textContent = ROLE_LABEL[profile.role] || profile.role;
         document.getElementById('meAvatar').textContent = U.initials(name);
 
-        document.getElementById('nav').innerHTML = this.nav
-            .filter(i => !i.superOnly || this.isSuper())
-            .map(i => i.title
-                ? `<div class="nav-title">${i.title}</div>`
-                : `<a href="#${i.id}" data-view="${i.id}">${ICON[i.icon]}<span>${i.label}</span>${i.badge ? '<span class="badge-count" id="pendingBadge" hidden></span>' : ''}</a>`)
-            .join('');
+        if (this.navRole !== profile.role) {
+            this.navRole = profile.role;
+            document.getElementById('nav').innerHTML = this.nav
+                .filter(i => this.can(i.permission || i.id))
+                .map(i => i.title
+                    ? `<div class="nav-title">${i.title}</div>`
+                    : `<a href="#${i.id}" data-view="${i.id}">${ICON[i.icon]}<span>${i.label}</span>${i.badge ? '<span class="badge-count" id="pendingBadge" hidden></span>' : ''}</a>`)
+                .join('');
+        }
 
-        this.bind();
-        this.loadBrand();
-        this.refreshBadge();
-        setInterval(() => this.refreshBadge(), 60000);
-        this.route();
+        document.querySelectorAll('#nav a').forEach(a => a.classList.toggle('is-active', a.dataset.view === this.current));
+        document.getElementById('panelExperience').textContent = this.isSuper() ? 'Supervisión del sistema' : 'Operaciones de la tienda';
     },
 
     bind() {
@@ -417,7 +500,16 @@ const Admin = {
 
         // Si la sesión expira en otra pestaña, volver al login
         supabaseClient.auth.onAuthStateChange((event) => {
-            if (event === 'SIGNED_OUT') location.replace('index.html');
+            if (event === 'SIGNED_OUT') {
+                this.clearAccess();
+                location.replace('index.html');
+            } else if (['SIGNED_IN', 'TOKEN_REFRESHED', 'USER_UPDATED'].includes(event)) {
+                setTimeout(() => this.refreshAccess(), 0);
+            }
+        });
+        window.addEventListener('focus', () => this.refreshAccess());
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden) this.refreshAccess();
         });
 
         window.addEventListener('beforeunload', (e) => {
@@ -447,7 +539,7 @@ const Admin = {
     // Contador de pedidos por pagar (se revisa cada minuto). Si llega uno nuevo con el panel
     // abierto, avisa con un mensaje y con el número en la pestaña del navegador.
     async refreshBadge() {
-        const { count, error } = await supabaseClient.from('orders').select('id', { count: 'exact', head: true }).eq('status', 'pending');
+        const { count, error } = await PanelData.from('orders').select('id', { count: 'exact', head: true }).eq('status', 'pending');
         if (error) return;
         const b = document.getElementById('pendingBadge');
         if (b) {
@@ -465,9 +557,16 @@ const Admin = {
     },
 
     async route() {
-        let id = (location.hash || '#resumen').slice(1).split('?')[0];
+        if (!(await this.refreshAccess())) return;
+        const version = this.routeVersion = (this.routeVersion || 0) + 1;
+        const home = AdminPermissions.home(this.profile.role);
+        let id = (location.hash || '#' + home).slice(1).split('?')[0];
         const item = this.nav.find(n => n.id === id);
-        if (!item || (item.superOnly && !this.isSuper()) || !Views[id]) id = 'resumen';
+        if (!item || !this.can(id) || !Views[id]) {
+            id = home;
+            history.replaceState(null, '', '#' + id);
+            UI.toast('Sección no disponible para tu rol.', 'error');
+        }
 
         if (UI.sheetState && !(await UI.closeSheet())) {
             history.replaceState(null, '', '#' + this.current);
@@ -481,18 +580,21 @@ const Admin = {
             return;
         }
 
+        if (version !== this.routeVersion) return;
         this.current = id;
         document.querySelectorAll('#nav a').forEach(a => a.classList.toggle('is-active', a.dataset.view === id));
-        const view = document.getElementById('view');
-        view.onclick = null;
+        // Un render anterior conserva solo su contenedor desconectado al navegar.
+        const view = document.createElement('div');
+        document.getElementById('view').replaceChildren(view);
         view.innerHTML = U.skeleton();
         window.scrollTo(0, 0);
         try {
             await Views[id].render(view);
         } catch (e) {
-            console.error(e);
+            if (version !== this.routeVersion) return;
             view.innerHTML = U.errorBox(e);
         }
+        if (version !== this.routeVersion) return;
         document.title = `${this.lastPending ? `(${this.lastPending}) ` : ''}${document.getElementById('pageTitle').textContent} | Panel PopFlame`;
     },
 

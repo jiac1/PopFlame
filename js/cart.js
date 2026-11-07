@@ -210,7 +210,7 @@ const CartManager = {
         return `https://wa.me/${n}${text ? `?text=${encodeURIComponent(text)}` : ''}`;
     },
 
-    generateWhatsAppText(customer, orderNumber, items = this.cart) {
+    generateWhatsAppText(customer, orderNumber, items = this.cart, confirmedTotal = null) {
         const subtotal = items.reduce((t, i) => t + i.price * i.quantity, 0);
         const lines = items.map((i, n) =>
             `${n + 1}. ${i.name}${this.variantLabel(i) ? ` (${this.variantLabel(i).replace(' · ', ', ')})` : ''} x${i.quantity} — ${this.formatPrice(i.price * i.quantity)}`
@@ -222,7 +222,7 @@ const CartManager = {
             '*Productos:*',
             lines,
             '',
-            `*Total:* ${this.formatPrice(subtotal + this.getShipping())}`,
+            `*Total:* ${this.formatPrice(confirmedTotal ?? (subtotal + this.getShipping()))}`,
             `*Entrega:* ${customer.meetingPoint ? `Metro ${customer.meetingPoint}` : 'Metro de Santiago (a coordinar)'}`,
             '',
             '*Mis datos:*',

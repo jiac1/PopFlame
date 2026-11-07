@@ -7,17 +7,18 @@ const LOW_STOCK = 3;
 // ---------------- Resumen ----------------
 Views.resumen = {
     async render(view) {
+        await Admin.requirePermission('resumen');
         const hour = new Date().getHours();
         const hello = hour < 12 ? 'Buenos días' : hour < 20 ? 'Buenas tardes' : 'Buenas noches';
         const first = (Admin.profile.name || Admin.profile.username).split(' ')[0];
-        Admin.header('Resumen', `${hello}, ${first}. Esto es lo que está pasando en la tienda.`,
+        Admin.header('Operaciones de la tienda', `${hello}, ${first}. Revisa ventas, pedidos y catálogo.`,
             `<a class="btn btn-ghost" href="../index.html" target="_blank" rel="noopener">${ICON.external}<span>Ver tienda</span></a>`);
 
         const since = new Date();
         since.setDate(since.getDate() - 60);
         const [o, p, cfg] = await Promise.all([
-            supabaseClient.from('orders').select('id, order_number, customer_name, total, status, created_at, items').gte('created_at', since.toISOString()).order('created_at', { ascending: false }),
-            supabaseClient.from('products').select('id, name, stock, image, category_id').order('stock'),
+            PanelData.from('orders').select('id, order_number, customer_name, total, status, created_at, items').gte('created_at', since.toISOString()).order('created_at', { ascending: false }),
+            PanelData.from('products').select('id, name, stock, image, category_id').order('stock'),
             Data.configRow(true).catch(() => ({}))
         ]);
         if (o.error) throw o.error;
@@ -42,9 +43,9 @@ Views.resumen = {
 
         // Tareas de configuración pendientes
         const todo = [];
-        if (!cfg.whatsapp_number) todo.push(['configuracion', 'Agrega el WhatsApp de ventas para recibir los pedidos']);
+        if (Admin.isSuper() && !cfg.whatsapp_number) todo.push(['configuracion', 'Agrega el WhatsApp de ventas para recibir los pedidos']);
         if (Admin.isSuper() && 'transfer_info' in cfg && !cfg.transfer_info) todo.push(['configuracion', 'Agrega tus datos de transferencia (se envían al cliente con un clic)']);
-        if (!('transfer_info' in cfg)) todo.push(['configuracion', 'Falta correr el SQL db/2026-09-29_panel.sql en Supabase (stock automático y datos de pago)']);
+        if (Admin.isSuper() && !('transfer_info' in cfg)) todo.push(['configuracion', 'Revisar la configuración de pagos y stock automático']);
 
         view.innerHTML = `
             ${todo.length ? `<div class="callout is-warn">${ICON.alert}<div><strong>Pendientes de configuración</strong><ol>${todo.map(([v, t]) =>
@@ -203,13 +204,14 @@ Views.pedidos = {
     ],
 
     async render(view) {
+        await Admin.requirePermission('pedidos');
         const params = new URLSearchParams(location.hash.split('?')[1] || '');
         if (params.get('estado')) this.filter = params.get('estado');
 
         Admin.header('Pedidos', 'Confirma pagos, coordina entregas y habla con tus clientes.',
             `<button class="btn btn-ghost" id="exportCsv">${ICON.download}<span>Exportar CSV</span></button>`);
 
-        const { data, error } = await supabaseClient.from('orders').select('*').order('created_at', { ascending: false });
+        const { data, error } = await PanelData.from('orders').select('*').order('created_at', { ascending: false });
         if (error) throw error;
         this.orders = data || [];
 
@@ -354,7 +356,7 @@ Views.pedidos = {
                     `<option value="${k}" ${k === o.status ? 'selected' : ''}>${v.label}</option>`).join('')}</select>
             </div>`;
 
-        const foot = Admin.isSuper()
+        const foot = Admin.can('pedidos.eliminar')
             ? `<button class="btn btn-danger" id="deleteOrder">${ICON.trash}Eliminar</button><div class="spacer"></div><button class="btn btn-ghost" data-sheet-close>Cerrar</button>`
             : `<div class="spacer"></div><button class="btn btn-ghost" data-sheet-close>Cerrar</button>`;
 
@@ -376,7 +378,7 @@ Views.pedidos = {
             if (!ok) { this.open(o.id); return; }
         }
         UI.setLoading(btn, true);
-        const { data, error } = await supabaseClient.from('orders').update({ status }).eq('id', o.id).select().single();
+        const { data, error } = await PanelData.from('orders').update({ status }).eq('id', o.id).select().single();
         UI.setLoading(btn, false);
         if (error) { UI.toast('No se pudo cambiar el estado: ' + error.message, 'error'); return; }
         Object.assign(o, data);
@@ -389,7 +391,7 @@ Views.pedidos = {
     async remove(o) {
         const ok = await UI.confirm({ title: `¿Eliminar ${o.order_number}?`, text: 'Se borra para siempre. Si solo no se concretó, mejor márcalo como cancelado.', ok: 'Eliminar pedido' });
         if (!ok) return;
-        const { error } = await supabaseClient.from('orders').delete().eq('id', o.id);
+        const { error } = await PanelData.from('orders').delete().eq('id', o.id);
         if (error) { UI.toast('No se pudo eliminar: ' + error.message, 'error'); return; }
         this.orders = this.orders.filter(x => x.id !== o.id);
         await UI.closeSheet(true);
@@ -426,9 +428,10 @@ Views.inventario = {
     query: '',
 
     async render(view) {
+        await Admin.requirePermission('inventario');
         Admin.header('Inventario', 'Ajusta el stock rápido. Los cambios se guardan solos.');
         const [{ data, error }] = await Promise.all([
-            supabaseClient.from('products').select('id, name, price, stock, image, category_id, sizes').order('name'),
+            PanelData.from('products').select('id, name, price, stock, image, category_id, sizes').order('name'),
             Data.categoriesList()
         ]);
         if (error) throw error;
@@ -515,7 +518,7 @@ Views.inventario = {
         const stepper = input.closest('.stepper');
         if (stock === null || stock < 0) { UI.toast('El stock debe ser un número desde 0', 'error'); return; }
         stepper.classList.add('is-saving');
-        const { error } = await supabaseClient.from('products').update({ stock }).eq('id', id);
+        const { error } = await PanelData.from('products').update({ stock }).eq('id', id);
         stepper.classList.remove('is-saving');
         if (error) { UI.toast('No se pudo guardar el stock: ' + error.message, 'error'); return; }
         const p = this.products.find(x => x.id === id);
