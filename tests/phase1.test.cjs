@@ -232,7 +232,10 @@ test('media uploads remain available to both roles and are rejected after revoca
 });
 
 function checkoutHarness(response) {
+    const storage = new Map();
     const ctx = vm.createContext({
+        crypto: require('node:crypto').webcrypto,
+        localStorage: { getItem: k => storage.get(k) ?? null, setItem: (k, v) => storage.set(k, v), removeItem: k => storage.delete(k) },
         supabaseClient: { rpc: async (name, args) => { ctx.sent = { name, args }; return response; }, from() { throw new Error('Direct insert forbidden'); } }
     });
     const source = fs.readFileSync('js/checkout.js', 'utf8').replace('Checkout.init();', '');
@@ -253,7 +256,8 @@ test('missing/failed RPC never falls back to direct orders insertion; malformed 
         { error: { code: 'PGRST202', message: 'missing' } },
         { error: { code: 'P0001', message: 'stock insuficiente' } },
         { error: null, data: [] },
-        { error: null, data: [{ order_number: 'x', total: 'invalid' }] }
+        ...[null, undefined, '', ' ', -1, '-1', 'invalid', NaN, Infinity, true, [], {}]
+            .map(total => ({ error: null, data: [{ order_number: 'x', total }] }))
     ]) {
         const { checkout } = checkoutHarness(response);
         await assert.rejects(() => checkout.createOrder({}, []));

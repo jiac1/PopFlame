@@ -1,7 +1,7 @@
 // Carrito (localStorage) + mensaje de WhatsApp del pedido.
 const CartManager = {
     cart: [],
-    storageKey: 'popflame_cart',
+    storageKey: typeof PopFlameEnvironment === 'undefined' ? 'popflame_cart:unconfigured' : PopFlameEnvironment.storageKey('popflame_cart'),
 
     init() {
         try {

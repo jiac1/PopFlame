@@ -8,6 +8,7 @@ from pathlib import Path
 import subprocess
 import tempfile
 import time
+import json
 from concurrent.futures import ThreadPoolExecutor
 from threading import Barrier
 
@@ -74,12 +75,28 @@ try:
     created = True
     run(dbname, shim + tables + helpers + triggers + policies + roles
         + '\nalter table public.orders add column stock_applied boolean not null default false;\n' + stock + grants)
-    for name in ['2026-11-07_phase1_rbac.sql', '2026-11-07_checkout_rpc.sql']:
+    stock_definitions = run(dbname, "select pg_get_functiondef('public.orders_apply_stock()'::regprocedure), pg_get_functiondef('public.orders_auto_processing()'::regprocedure);")
+    for name in ['2026-11-07_phase1_rbac.sql', '2026-11-07_checkout_rpc.sql',
+                 '2026-11-07_security_orders_media.sql', '2026-11-07_security_checkout.sql',
+                 '2026-11-07_security_environment.sql']:
         sql = Path('db', name).read_text(encoding='utf-8')
         run(dbname, sql)
         run(dbname, sql)  # Verify repeat application is harmless.
+    assert stock_definitions == run(dbname, "select pg_get_functiondef('public.orders_apply_stock()'::regprocedure), pg_get_functiondef('public.orders_auto_processing()'::regprocedure);")
+    print('PASS: commercial stock/status function definitions unchanged.')
     run(dbname, Path('db/2026-11-07_phase1_verify.sql').read_text(encoding='utf-8'))
-    result = run(dbname, Path('tests/phase1-rls.sql').read_text(encoding='utf-8'))
+    run(dbname, Path('db/2026-11-07_security_verify.sql').read_text(encoding='utf-8'))
+    # Prove an inherited UPDATE grant aborts the whole incremental migration.
+    run(dbname, 'create role pf_security_inherited nologin; grant update(total) on public.orders to pf_security_inherited; grant pf_security_inherited to authenticated;')
+    try:
+        run(dbname, Path('db/2026-11-07_security_orders_media.sql').read_text(encoding='utf-8'))
+        raise AssertionError('Inherited financial UPDATE was not detected')
+    except RuntimeError as error:
+        assert 'UPDATE heredado no permitido' in str(error), error
+    finally:
+        run(dbname, 'revoke pf_security_inherited from authenticated; revoke update(total) on public.orders from pf_security_inherited; drop role pf_security_inherited;')
+    print('PASS: inherited financial UPDATE aborts migration; existing protected schema retained.')
+    result = run(dbname, Path('tests/security-rls.sql').read_text(encoding='utf-8'))
     checks = [line.split('NOTICE:', 1)[1].strip() for line in result.splitlines() if 'NOTICE:  PASS:' in line]
     print('\n'.join(checks))
     print(f'{len(checks)} RLS/checkout checks passed.')
@@ -105,6 +122,56 @@ try:
         outcomes = sorted(pool.map(demote, ['race1', 'race2']))
     assert outcomes == ['denied', 'success'], outcomes
     print('PASS: concurrent demotions leave one Super Admin.')
+
+    # Only in this disposable DB: replace the inner creator with a tiny order
+    # fixture writer. Exercise the REAL ledger/wrapper concurrently, without
+    # creating products or bypassing live catalog/pricing rules anywhere else.
+    run(dbname, """
+        create or replace function public.create_order_validated_internal(p_customer jsonb,p_items jsonb)
+        returns table(order_number text,total numeric) language plpgsql security definer set search_path = '' as $$
+        declare receipt public.orders%rowtype;
+        begin
+            insert into public.orders(customer_name,customer_email,customer_phone,items,subtotal,total)
+            values ('Synthetic receipt','local@example.invalid','900000000','[]',1234,1234) returning * into receipt;
+            if p_customer->>'note' = 'force-fail' then raise exception 'Synthetic transaction failure'; end if;
+            perform pg_sleep(0.1);
+            return query select receipt.order_number, receipt.total;
+        end $$;
+    """)
+    key = '00000000-0000-4000-8000-000000000099'
+    payload = json.dumps({'idempotencyKey': key, 'name': 'Local test'})
+    query = f"set role anon; select row_to_json(r) from public.create_order('{payload}'::jsonb, '[]') r;"
+    barrier = Barrier(2)
+    def replay(_):
+        barrier.wait(timeout=10)
+        return run(dbname, query)
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        receipts = list(pool.map(replay, [0, 1]))
+    assert receipts[0] == receipts[1], receipts
+    assert run(dbname, query) == receipts[0]
+    def metrics():
+        output = run(dbname, "select json_build_array((select count(*) from public.orders), (select count(*) from public.order_requests), (select count(*) from public.products));")
+        return json.loads(next(line.strip() for line in output.splitlines() if line.strip().startswith('[')))
+    assert metrics() == [1, 1, 0], metrics()
+    print('PASS: concurrent and sequential retries create exactly one synthetic order and return same receipt.')
+    try:
+        run(dbname, query.replace('Local test', 'Changed intent'))
+        raise AssertionError('Reused key with changed payload accepted')
+    except RuntimeError as error:
+        assert 'corresponde a otros datos' in str(error), error
+    print('PASS: same key with changed payload rejected.')
+    failed_payload = json.dumps({'idempotencyKey': '00000000-0000-4000-8000-000000000098', 'note': 'force-fail'})
+    try:
+        run(dbname, f"set role anon; select * from public.create_order('{failed_payload}'::jsonb, '[]');")
+        raise AssertionError('Failed core unexpectedly succeeded')
+    except RuntimeError as error:
+        assert 'Synthetic transaction failure' in str(error), error
+    assert metrics() == [1, 1, 0]
+    print('PASS: failed inner creator rolls back both order and ledger atomically.')
+    run(dbname, 'delete from public.orders;')
+    assert run(dbname, query) == receipts[0]
+    assert metrics() == [0, 1, 0]
+    print('PASS: retained ledger prevents recreation after permanent order deletion; zero products created.')
     print('SQL suite passed, including migration idempotency.')
 finally:
     if created:

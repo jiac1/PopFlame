@@ -133,6 +133,7 @@ const U = {
     },
     img(path) {
         if (!path) return '../images/products/poleras/placeholder.svg';
+        if (typeof PopFlameEnvironment !== 'undefined' && !PopFlameEnvironment.allowsAsset(path)) return '../images/products/poleras/placeholder.svg';
         if (/^(https?:)?\/\//i.test(path) || path.startsWith('blob:') || path.startsWith('data:')) return path;
         return '../' + path.replace(/^\/+/, '');
     },

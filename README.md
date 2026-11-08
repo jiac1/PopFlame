@@ -4,6 +4,7 @@ Sitio e-commerce estático (HTML/CSS/JS, sin build) conectado a **Supabase** (ba
 archivos) con un panel de administración con dos roles: **Super Admin** y **Admin** (dueño).
 
 **Fase 1 de autorización:** ver [implementación, migraciones aisladas, pruebas y reversión](docs/phase1-rbac.md).
+**Correcciones antes de staging:** [pedidos, imágenes, idempotencia y aislamiento](docs/security-before-staging.md).
 En bases existentes no vuelvas a ejecutar `schema.sql`: revisa las migraciones de noviembre en staging.
 Tras aplicarlas, todas las cuentas nuevas quedan `pending`, incluida la primera; el bootstrap de
 Super Admin se realiza manualmente por el dueño del proyecto. No hay despliegue automático de SQL.
@@ -46,7 +47,9 @@ cambia la URL de `og:image` en los `<head>` de las páginas (es la imagen que ap
 python -m http.server 8000
 ```
 
-Abre `http://localhost:8000` (no uses `file://`, Supabase necesita un servidor).
+Ese comando sirve solo los archivos: fuera del dominio productivo el backend queda sin configurar.
+Para pruebas conectadas usa [el servidor local de staging](docs/security-before-staging.md), que rechaza
+producción e inyecta URL/clave pública del proyecto aislado. No uses `file://` ni claves service_role.
 
 ## 4. Panel de administración
 

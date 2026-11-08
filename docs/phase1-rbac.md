@@ -1,5 +1,7 @@
 # PopFlame: Fase 1
 
+**Actualización antes de staging:** [correcciones de pedidos, imágenes, idempotencia y entornos](security-before-staging.md). Sus instrucciones de conexión, secuencia SQL, pruebas y reversión son las actuales. Este documento conserva el contexto de la primera implementación. El runner actual no crea productos; los resultados de 71 checks que aparecen abajo son históricos.
+
 Rama: `feature/phase1-rbac`. HTML/CSS/JavaScript vanilla, Supabase Auth y JWT existentes. No se ha aplicado SQL a Supabase, usado cuentas reales, hecho push ni desplegado. `db/schema.sql` y las migraciones históricas se conservan intactos.
 
 ## Revisión inicial y decisiones
@@ -51,7 +53,7 @@ Al navegar, ejecutar consultas, recuperar foco/visibilidad, renovar la sesión y
 4. Aplicar `2026-11-07_phase1_rbac.sql` en staging. Agrega permisos CRUD operativos, guards **RESTRICTIVE** que limitan policies permisivas heredadas, y auditoría. No desactiva RLS ni modifica filas comerciales. Toda cuenta nueva queda `pending`. La recuperación del primer Super Admin es manual por el dueño en SQL Editor, con el UUID previamente comprobado. No hay ascenso automático por registro ni cambio del propio rol desde la API.
 5. Aplicar `2026-11-07_checkout_rpc.sql` en staging. Conserva firma y salida `order_number,total`; valida cliente/carrito/cantidades antes de sumar stock, toma nombres/precios del catálogo y costos desde config. Serializa el límite de pedidos para evitar bypass concurrente. No reserva stock: conserva descuento al pagar y reposición al cancelar. En la misma transacción retira `orders_insert_public`, revoca INSERT y agrega guard restrictivo. El propietario del RPC debe tener capacidad de insertar bajo SECURITY DEFINER (comprobar que no está sujeto a FORCE RLS).
 6. Ejecutar consultas de verificación otra vez y pruebas de cuentas/Storage/checkout indicadas abajo. Los scripts son transaccionales e idempotentes; un error debe abortar la transacción completa. No continuar tras un error.
-7. Servir esta rama en local o un entorno de preview **conectado a staging**. `js/supabaseClient.js` sigue apuntando al proyecto existente: para probar contra staging usar una copia local de ese archivo con URL/clave pública de staging y revertir ese cambio antes de revisar el diff. No colocar una service key en el frontend. Publicar/mergear solo tras validación humana y autorización correspondiente.
+7. Usar el servidor de staging descrito en `security-before-staging.md`: inyecta la configuración en memoria y bloquea producción. No editar el cliente para pegar credenciales ni abrir la app local con backend productivo. No colocar una service key en el frontend. Publicar/mergear solo tras validación humana y autorización correspondiente.
 
 Storage mantiene buckets, rutas y lectura pública. Ambos roles pueden gestionar fotos operativas. Los archivos de esos buckets referenciados por `config.logo_url`, `logo_white_url` y `hero_banner_url` quedan reservados a Super Admin para impedir que un Admin cambie configuración técnica sobrescribiendo/borrando el archivo. Se contempla la forma de URL pública que produce el uploader actual; revisar referencias legacy, codificación de rutas y posibles URLs firmadas/transformadas en el inventario previo.
 

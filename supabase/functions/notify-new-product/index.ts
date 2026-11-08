@@ -64,6 +64,9 @@ function template(site: string, p: Product, email: string) {
 
 Deno.serve(async (req: Request) => {
     if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
+    if (Deno.env.get('POPFLAME_ENV') !== 'production' || Deno.env.get('POPFLAME_NOTIFICATIONS_ENABLED') !== 'true') {
+        return json({ skipped: true }, 200);
+    }
 
     try {
         const payload = await req.json();

@@ -7,7 +7,7 @@ const ProductsManager = {
     config: {},
     sizeGuide: [],
     loaded: false,
-    cacheKey: 'pf_store_cache',
+    cacheKey: typeof PopFlameEnvironment === 'undefined' ? 'pf_store_cache:unconfigured' : PopFlameEnvironment.storageKey('pf_store_cache'),
     cacheMaxAgeMs: 1000 * 60 * 60 * 24,
 
     // Llama a onData(data, { fresh }) una vez con el cache (si existe) y otra con los datos
@@ -164,6 +164,7 @@ const ProductsManager = {
     // desde la raíz del sitio, sin importar en qué carpeta esté la página.
     resolveImagePath(path) {
         if (!path) return PF.url('images/products/poleras/placeholder.svg');
+        if (typeof PopFlameEnvironment !== 'undefined' && !PopFlameEnvironment.allowsAsset(path)) return PF.url('images/products/poleras/placeholder.svg');
         if (/^(https?:)?\/\//i.test(path) || path.startsWith('data:')) return path;
         return PF.url(path);
     },

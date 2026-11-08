@@ -1,3 +1,5 @@
+-- SUITE HISTÓRICA: crea fixtures de catálogo. NO ejecutar en esta etapa.
+-- El runner actual usa security-rls.sql y no crea productos.
 -- SOLO base desechable/staging sin integraciones externas. Fixtures ficticios.
 -- run-sql-tests.py crea la base local y aplica solo DDL extraído + migraciones.
 begin;

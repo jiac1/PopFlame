@@ -1,7 +1,7 @@
 # Mantiene activo el proyecto de Supabase.
 # En el plan gratis, Supabase pausa el proyecto tras ~7 días sin actividad y la tienda queda sin productos.
 # Esta tarea hace una consulta mínima (1 producto) todos los días; no modifica ningún dato.
-# Usa la clave pública (la misma que ya está en js/supabaseClient.js), así que no necesita secretos.
+# Usa la clave pública (la misma que ya está en js/runtime-config.js), así que no necesita secretos.
 name: Mantener Supabase activo
 
 on:
@@ -11,6 +11,8 @@ on:
 
 jobs:
   ping:
+    # Nunca consultar producción desde un dispatch de una rama de pruebas.
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

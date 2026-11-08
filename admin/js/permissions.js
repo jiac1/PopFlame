@@ -30,9 +30,11 @@ const AdminPermissions = (() => {
 const PanelData = {
     from(table) {
         let operation = 'select';
+        let invalidOrderUpdate = false;
         const wrap = builder => new Proxy(builder, {
             get(target, key) {
                 if (key === 'then') return (resolve, reject) => Promise.resolve().then(async () => {
+                    if (invalidOrderUpdate) return { data: null, count: null, error: { code: '42501', message: 'Solo se permite cambiar el estado del pedido.' } };
                     const permission = AdminPermissions.forTable(table, operation);
                     try {
                         await Admin.requirePermission(permission);
@@ -50,6 +52,9 @@ const PanelData = {
                 if (typeof value !== 'function') return value;
                 return (...args) => {
                     if (['insert', 'upsert', 'update', 'delete'].includes(key)) operation = key;
+                    if (table === 'orders' && key === 'update') {
+                        invalidOrderUpdate = !args[0] || Object.keys(args[0]).some(column => column !== 'status');
+                    }
                     const result = value.apply(target, args);
                     return result && typeof result.then === 'function' ? wrap(result) : result;
                 };

@@ -1,7 +1,8 @@
 // Checkout: valida los datos, guarda el pedido en Supabase y lo envía por WhatsApp.
 const Checkout = {
     submitting: false,
-    profileKey: 'pf_customer',
+    profileKey: typeof PopFlameEnvironment === 'undefined' ? 'pf_customer:unconfigured' : PopFlameEnvironment.storageKey('pf_customer'),
+    attemptKey: typeof PopFlameEnvironment === 'undefined' ? 'pf_order_attempt_v1:unconfigured' : PopFlameEnvironment.storageKey('pf_order_attempt_v1'),
 
     stations: [
         'San Pablo', 'Neptuno', 'Pajaritos', 'Las Rejas', 'Ecuador', 'San Alberto Hurtado', 'Universidad de Santiago', 'Estación Central',
@@ -44,6 +45,7 @@ const Checkout = {
         document.addEventListener('pf:cart', () => this.renderSummary());
 
         Site.start({ render: () => this.renderSummary() });
+        this.renderRecovery();
     },
 
     fillStations() {
@@ -199,16 +201,15 @@ const Checkout = {
             const link = CartManager.whatsappLink(text);
 
             this.saveProfile(profile);
-            CartManager.clearCart();
-            this.done = true;
-            this.renderConfirmation(order, customer, link);
+            this.finishOrder(order, customer, items, link);
 
             if (win && link) win.location.href = link;
             else if (win) win.close();
         } catch (err) {
             if (win) win.close();
             UI.toast(err.userMessage || 'No pudimos registrar tu pedido. Revisa tu conexión e intenta de nuevo.', 'error');
-            if (err.userMessage) ProductsManager.load(() => CartManager.sync());
+            if (err.refreshCart) ProductsManager.load(() => CartManager.sync());
+            this.renderRecovery();
             this.setLoading(false);
             this.submitting = false;
         }
@@ -217,24 +218,100 @@ const Checkout = {
     // Crea el pedido con la función segura del servidor (recalcula precios y valida stock).
     // Requiere la migración del RPC antes de publicar esta versión del checkout.
     async createOrder(customer, items) {
+        const prepare = () => this.prepareAttempt(customer, items);
+        const attempt = typeof navigator !== 'undefined' && navigator.locks
+            ? await navigator.locks.request(this.attemptKey, prepare) : prepare();
         const { data, error } = await supabaseClient.rpc('create_order', {
-            p_customer: customer,
-            p_items: items.map(i => ({ productId: i.productId, quantity: i.quantity, size: i.size, color: i.color }))
+            p_customer: { ...attempt.customer, idempotencyKey: attempt.key },
+            p_items: this.orderItems(attempt.items)
         });
         if (!error) {
             const order = Array.isArray(data) ? data[0] : data;
-            if (!order?.order_number || !Number.isFinite(Number(order.total)) || Number(order.total) < 0) {
+            const total = order?.total;
+            const numeric = typeof total === 'number' || (typeof total === 'string' && /^\d+(?:\.\d+)?$/.test(total));
+            if (typeof order?.order_number !== 'string' || !order.order_number.trim()
+                || !numeric || !Number.isFinite(Number(total)) || Number(total) < 0) {
                 throw new Error('Respuesta de pedido inválida.');
             }
             return order;
         }
 
         const missingFn = error.code === 'PGRST202' || /could not find the function/i.test(error.message || '');
+        // P0001 es un rechazo de negocio dentro de una transacción abortada.
+        // Una respuesta perdida/5xx/timeout conserva siempre el intento.
+        if (error.code === 'P0001') localStorage.removeItem(this.attemptKey);
         const e = new Error('No se pudo registrar el pedido.');
+        e.refreshCart = error.code === 'P0001';
         e.userMessage = missingFn
             ? 'No podemos registrar pedidos en este momento. Intenta más tarde o contáctanos por WhatsApp.'
             : (/stock|existe|vacío|pedidos|minuto/i.test(error.message || '') ? error.message : null);
         throw e;
+    },
+
+    orderItems(items) {
+        return items.map(i => ({ productId: i.productId, quantity: i.quantity, size: i.size, color: i.color }));
+    },
+
+    readAttempt() {
+        const raw = localStorage.getItem(this.attemptKey);
+        if (!raw) return null;
+        const attempt = JSON.parse(raw);
+        if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(attempt?.key || '')
+            || typeof attempt.customer !== 'object' || !attempt.customer || !Array.isArray(attempt.items)) {
+            throw new Error('No se pudo recuperar el intento de pedido.');
+        }
+        return attempt;
+    },
+
+    prepareAttempt(customer, items) {
+        const signature = (c, i) => JSON.stringify({ customer: c, items: this.orderItems(i) });
+        const saved = this.readAttempt();
+        if (saved) {
+            if (signature(saved.customer, saved.items) !== signature(customer, items)) {
+                const error = new Error('Hay un intento de pedido pendiente.');
+                error.userMessage = 'Primero usa “Recuperar pedido anterior” para confirmar el intento pendiente.';
+                throw error;
+            }
+            return saved;
+        }
+        const attempt = { key: crypto.randomUUID(), customer, items };
+        // Persistir ANTES de enviar. Si el navegador no permite almacenamiento,
+        // fallar sin crear un pedido que después no pueda recuperarse.
+        localStorage.setItem(this.attemptKey, JSON.stringify(attempt));
+        return attempt;
+    },
+
+    finishOrder(order, customer, items, link) {
+        this.done = true;
+        try { this.renderConfirmation(order, customer, link); }
+        catch (error) { this.done = false; throw error; }
+        // Recuperar un intento anterior no debe vaciar un carrito nuevo/distinto.
+        if (JSON.stringify(this.orderItems(CartManager.getItems())) === JSON.stringify(this.orderItems(items))) CartManager.clearCart();
+        localStorage.removeItem(this.attemptKey);
+        this.renderRecovery();
+    },
+
+    renderRecovery() {
+        const box = document.getElementById('orderRecovery');
+        if (!box) return;
+        let attempt;
+        try { attempt = this.readAttempt(); }
+        catch { box.hidden = false; box.textContent = 'No pudimos recuperar el intento anterior. Conserva el carrito y contáctanos antes de volver a comprar.'; return; }
+        box.hidden = !attempt;
+        if (!attempt) { box.replaceChildren(); return; }
+        box.innerHTML = '<p>Hay un intento de pedido pendiente de confirmar. Puedes recuperarlo sin volver a crearlo.</p><button type="button" class="btn btn-outline" id="recoverOrder">Recuperar pedido anterior</button>';
+        document.getElementById('recoverOrder').onclick = async () => {
+            if (this.submitting) return;
+            this.submitting = true;
+            try {
+                const order = await this.createOrder(attempt.customer, attempt.items);
+                const link = CartManager.whatsappLink(CartManager.generateWhatsAppText(attempt.customer, order.order_number, attempt.items, order.total));
+                this.finishOrder(order, attempt.customer, attempt.items, link);
+            } catch (error) {
+                UI.toast(error.userMessage || 'No pudimos confirmar el pedido anterior. Reintenta con conexión.', 'error');
+                this.renderRecovery();
+            } finally { this.submitting = false; }
+        };
     },
 
     renderConfirmation(order, customer, link) {
