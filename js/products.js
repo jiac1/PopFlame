@@ -187,6 +187,7 @@ const ProductsManager = {
 
     stockState(product) {
         if (product.status === 'a_pedido') return 'order';
+        if (product.status === 'pocas') return 'pocas';
         if (product.stock <= 0) return 'out';
         if (product.stock <= 3) return 'low';
         return 'in';
@@ -289,7 +290,8 @@ const ProductsManager = {
         if (stock === 'order') tags.push('<span class="tag tag-warn">A Pedido</span>');
         else if (stock === 'out') tags.push('<span class="tag tag-dark">Agotado</span>');
         else if (product.badge) tags.push(`<span class="tag ${/oferta|sale|limitad/i.test(product.badge) ? 'tag-red' : ''}">${PF.escape(product.badge)}</span>`);
-        if (stock === 'low') tags.push('<span class="tag tag-red">Últimas unidades</span>');
+        if (stock === 'pocas') tags.push('<span class="tag tag-red">Pocas unidades</span>');
+        else if (stock === 'low') tags.push('<span class="tag tag-red">Últimas unidades</span>');
 
         const sizes = (product.sizes || []).filter(s => s && s.toLowerCase() !== 'única');
         const quick = stock !== 'out' && sizes.length

@@ -109,7 +109,7 @@ const Home = {
         const rail = document.getElementById('newRail');
         if (!rail) return;
         const products = [...store.products]
-            .sort((a, b) => (b.stock > 0) - (a.stock > 0) || b.id - a.id)
+            .sort((a, b) => ((b.stock > 0 || b.status === 'a_pedido') - (a.stock > 0 || a.status === 'a_pedido')) || b.id - a.id)
             .slice(0, 8);
         if (!products.length) {
             rail.innerHTML = '';
@@ -150,7 +150,7 @@ const Home = {
 
     renderFeatured(store) {
         const section = document.getElementById('destacados');
-        const featured = store.products.filter(p => p.featured && p.stock > 0);
+        const featured = store.products.filter(p => p.featured && (p.stock > 0 || p.status === 'a_pedido'));
         // Con pocos productos esta sección solo repetiría "Lo nuevo": se muestra cuando aporta.
         if (!section || store.products.length <= 8 || featured.length < 4) { if (section) section.hidden = true; return; }
         section.hidden = false;

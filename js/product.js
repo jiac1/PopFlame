@@ -71,9 +71,11 @@ const Product = {
         const text = {
             in: 'En stock, listo para entrega',
             low: `¡Últimas ${this.product.stock} unidades!`,
-            out: 'Agotado por ahora'
+            out: 'Agotado por ahora',
+            order: 'A Pedido — lo preparamos bajo encargo',
+            pocas: `¡Pocas unidades! Quedan ${this.product.stock}`
         }[state];
-        el.innerHTML = `<span class="pdp-stock ${state === 'low' ? 'is-low' : state === 'out' ? 'is-out' : ''}">${text}</span>`;
+        el.innerHTML = `<span class="pdp-stock ${state === 'low' || state === 'pocas' ? 'is-low' : state === 'out' ? 'is-out' : state === 'order' ? 'is-order' : ''}">${text}</span>`;
     },
 
     // ===== Galería =====
@@ -123,7 +125,7 @@ const Product = {
         const onlyOneSize = sizes.length === 1 && /^[úu]nica$/i.test(sizes[0].trim());
         const sizeBlock = document.getElementById('sizeBlock');
         sizeBlock.hidden = sizes.length === 0 || onlyOneSize;
-        const soldOut = p.stock <= 0;
+        const soldOut = p.stock <= 0 && p.status !== 'a_pedido';
         document.getElementById('sizeOptions').innerHTML = sizes.map(s => `
             <button type="button" class="size${s === this.size ? ' is-active' : ''}" role="radio" aria-checked="${s === this.size}"
                     data-size="${PF.escape(s)}" ${soldOut ? 'disabled' : ''}>${PF.escape(s)}</button>`).join('');
@@ -144,7 +146,11 @@ const Product = {
 
     renderWhatsapp() {
         const a = document.getElementById('pdpWhatsapp');
-        const link = CartManager.whatsappLink(`Hola PopFlame! Tengo una consulta sobre ${this.product.name}: ${location.href}`);
+        const isOrder = this.product?.status === 'a_pedido';
+        const msg = isOrder
+            ? `Hola PopFlame! Quiero consultar por el "${this.product.name}" (está A Pedido). ¿Cuánto tarda y cómo lo pago?`
+            : `Hola PopFlame! Tengo una consulta sobre ${this.product.name}: ${location.href}`;
+        const link = CartManager.whatsappLink(msg);
         a.hidden = !link;
         if (link) {
             a.href = link;
@@ -156,7 +162,7 @@ const Product = {
         const p = this.product;
         const same = ProductsManager.getProductsByCategory(p.category).filter(x => x.id !== p.id);
         const others = ProductsManager.getAllProducts().filter(x => x.id !== p.id && x.category !== p.category);
-        const list = [...same, ...others].filter(x => x.stock > 0).slice(0, 8);
+        const list = [...same, ...others].filter(x => x.stock > 0 || x.status === 'a_pedido').slice(0, 8);
         const section = document.getElementById('related');
         section.hidden = list.length === 0;
         if (list.length) ProductsManager.renderProducts('relatedRail', list);
@@ -182,7 +188,7 @@ const Product = {
                 '@type': 'Offer',
                 priceCurrency: 'CLP',
                 price: p.price,
-                availability: p.stock > 0 ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
+                availability: (p.stock > 0 || p.status === 'a_pedido') ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
                 url: location.href
             }
         });
@@ -191,8 +197,9 @@ const Product = {
     // ===== Estado del botón y cantidad =====
     updateBuyState() {
         const p = this.product;
-        const soldOut = p.stock <= 0;
-        const available = Math.max(0, p.stock - CartManager.quantityOf(p.id));
+        const isOrder = p.status === 'a_pedido';
+        const soldOut = p.stock <= 0 && !isOrder;
+        const available = isOrder ? 99 : Math.max(0, p.stock - CartManager.quantityOf(p.id));
         if (this.qty > Math.max(1, available)) this.qty = Math.max(1, available);
 
         document.getElementById('qtyValue').textContent = this.qty;

@@ -25,7 +25,7 @@ const CartManager = {
                 item.price = p.price; item.name = p.name; item.image = p.image;
                 changed = true;
             }
-            if (item.quantity > p.stock) { item.quantity = p.stock; changed = true; }
+            if (p.status !== 'a_pedido' && item.quantity > p.stock) { item.quantity = p.stock; changed = true; }
             return true;
         });
         if (changed) this.save();
@@ -34,7 +34,9 @@ const CartManager = {
 
     maxFor(productId) {
         const p = ProductsManager.getProductById(productId);
-        return p ? Math.max(0, p.stock) : 99;
+        if (!p) return 99;
+        if (p.status === 'a_pedido') return 99;
+        return Math.max(0, p.stock);
     },
 
     quantityOf(productId) {

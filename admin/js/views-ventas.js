@@ -435,7 +435,7 @@ Views.inventario = {
         this.products = data || [];
 
         view.innerHTML = `
-            <div class="callout">${ICON.info}<div>El stock baja solo cuando marcas un pedido como <strong>pagado</strong>, y vuelve si lo cancelas. Aquí puedes corregir el stock a mano y también cambiar el estado del producto (Disponible / Agotado / A Pedido) desde la sección <strong>Productos</strong>.</div></div>
+            <div class="callout">${ICON.info}<div>El stock baja solo cuando marcas un pedido como <strong>pagado</strong>, y vuelve si lo cancelas. Aquí puedes corregir el stock a mano y también cambiar el estado del producto (Disponible / Agotado / A Pedido / Pocas Unidades) desde esta misma tabla.</div></div>
             <div class="toolbar">
                 <div class="chips" id="invChips"></div>
                 <div class="spacer"></div>
@@ -456,16 +456,25 @@ Views.inventario = {
             input.value = Math.max(0, (U.int(input.value) || 0) + Number(b.dataset.step));
             this.queueSave(input);
         });
-        card.addEventListener('input', (e) => { if (e.target.matches('[data-stock]')) this.queueSave(e.target); });
+        card.addEventListener('change', (e) => {
+            if (e.target.matches('[data-status]')) {
+                const id = +e.target.dataset.status;
+                const status = e.target.value;
+                this.queueStatusSave(id, status);
+            } else if (e.target.matches('[data-stock]')) {
+                this.queueSave(e.target);
+            }
+        });
         this.renderList();
     },
 
     renderList() {
         const filters = [
             ['all', 'Todos', () => true],
-            ['low', 'Poco stock', p => p.stock > 0 && p.stock <= LOW_STOCK && p.status !== 'a_pedido'],
-            ['out', 'Agotados', p => p.stock <= 0 && p.status !== 'a_pedido'],
-            ['pedido', 'A Pedido', p => p.status === 'a_pedido']
+            ['low', 'Poco stock', p => p.stock > 0 && p.stock <= LOW_STOCK && p.status !== 'a_pedido' && p.status !== 'pocas'],
+            ['out', 'Agotados', p => p.stock <= 0 && p.status !== 'a_pedido' && p.status !== 'pocas'],
+            ['pedido', 'A Pedido', p => p.status === 'a_pedido'],
+            ['pocas', 'Pocas Unidades', p => p.status === 'pocas']
         ];
         document.getElementById('invChips').innerHTML = filters.map(([id, label, fn]) =>
             `<button class="chip${this.filter === id ? ' is-active' : ''}" data-filter="${id}">${label}<span class="count">${this.products.filter(fn).length}</span></button>`).join('');
@@ -486,9 +495,16 @@ Views.inventario = {
                     <tr>
                         <td class="cell-primary"><div class="cell-main"><img class="thumb" src="${U.img(p.image)}" alt="" loading="lazy"><div><strong>${U.esc(p.name)}</strong><small>${U.esc(Data.catName(p.category_id))}</small></div></div></td>
                         <td data-label="Precio" class="num">${U.money(p.price)}</td>
-                        <td data-label="Estado" data-state="${p.id}">${this.state(p)}</td>
+                        <td data-label="Estado" data-state="${p.id}">
+                            <select class="input status-select" data-status="${p.id}" style="height:32px;padding:2px 6px;font-size:12px;border-radius:4px">
+                                <option value="disponible" ${p.status === 'disponible' ? 'selected' : ''}>Disponible</option>
+                                <option value="agotado" ${p.status === 'agotado' ? 'selected' : ''}>Agotado</option>
+                                <option value="a_pedido" ${p.status === 'a_pedido' ? 'selected' : ''}>A Pedido</option>
+                                <option value="pocas" ${p.status === 'pocas' ? 'selected' : ''}>Pocas Unidades</option>
+                            </select>
+                        </td>
                         <td data-label="Stock" class="text-right">
-                            ${p.status === 'a_pedido'
+                            ${p.status === 'a_pedido' || p.status === 'pocas'
                                 ? '<span class="muted">—</span>'
                                 : `<div class="stepper" data-stepper="${p.id}">
                                     <button type="button" data-step="-1" aria-label="Restar uno">−</button>
@@ -502,6 +518,7 @@ Views.inventario = {
 
     state(p) {
         if (p.status === 'a_pedido') return '<span class="pill warn">A Pedido</span>';
+        if (p.status === 'pocas') return '<span class="pill warn">Pocas Unidades</span>';
         if (p.stock <= 0) return '<span class="pill bad">Agotado</span>';
         if (p.stock <= LOW_STOCK) return '<span class="pill warn">Poco stock</span>';
         return '<span class="pill ok">Disponible</span>';
@@ -525,9 +542,24 @@ Views.inventario = {
         const p = this.products.find(x => x.id === id);
         if (p) p.stock = stock;
         const cell = document.querySelector(`[data-state="${id}"]`);
-        if (cell) cell.innerHTML = this.state(stock);
+        if (cell) cell.innerHTML = this.state(p);
         stepper.classList.add('is-saved');
         setTimeout(() => stepper.classList.remove('is-saved'), 1200);
         UI.toast(`Stock de ${p?.name || 'producto'}: ${stock}`);
+    },
+
+    queueStatusSave(id, status) {
+        clearTimeout(this.timers[id]);
+        this.timers[id] = setTimeout(() => this.saveStatus(id, status), 600);
+    },
+
+    async saveStatus(id, status) {
+        const { error } = await supabaseClient.from('products').update({ status }).eq('id', id);
+        if (error) { UI.toast('No se pudo guardar el estado: ' + error.message, 'error'); return; }
+        const p = this.products.find(x => x.id === id);
+        if (p) p.status = status;
+        const cell = document.querySelector(`[data-state="${id}"]`);
+        if (cell) cell.innerHTML = this.state(p);
+        UI.toast(`Estado de ${p?.name || 'producto'}: ${status}`);
     }
 };

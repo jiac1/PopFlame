@@ -83,7 +83,7 @@ const Category = {
         if (size) products = products.filter(p => p.sizes.includes(size));
         if (color) products = products.filter(p => p.colors.includes(color));
 
-        const inStock = (p) => (p.stock > 0 ? 1 : 0);
+        const inStock = (p) => ((p.stock > 0 || p.status === 'a_pedido') ? 1 : 0);
         const sorters = {
             featured: (a, b) => inStock(b) - inStock(a) || b.featured - a.featured || b.id - a.id,
             new: (a, b) => b.id - a.id,
