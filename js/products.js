@@ -7,7 +7,7 @@ const ProductsManager = {
     config: {},
     sizeGuide: [],
     loaded: false,
-    cacheKey: 'pf_store_cache',
+    cacheKey: 'pf_store_cache_v2',
     cacheMaxAgeMs: 1000 * 60 * 60 * 24,
 
     // Llama a onData(data, { fresh }) una vez con el cache (si existe) y otra con los datos

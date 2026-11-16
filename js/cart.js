@@ -45,15 +45,16 @@ const CartManager = {
 
     // Devuelve true si se agregó. Respeta el stock total del producto (entre todas sus variantes).
     addToCart(product, size, color, quantity = 1) {
-        // Productos "A Pedido": no hay límite de stock (se hacen por encargo)
-        if (product.status !== 'a_pedido') {
-            const available = product.stock - this.quantityOf(product.id);
-            if (available <= 0) {
-                UI.toast('Ya tienes en el carrito todo el stock disponible', 'error');
-                return false;
-            }
+        // Productos "A Pedido": se hacen por encargo, sin límite de stock.
+        const isOrder = product.status === 'a_pedido';
+        const available = isOrder ? quantity : product.stock - this.quantityOf(product.id);
+
+        if (!isOrder && available <= 0) {
+            UI.toast('Ya tienes en el carrito todo el stock disponible', 'error');
+            return false;
         }
-        const qty = product.status === 'a_pedido' ? quantity : Math.min(quantity, available);
+
+        const qty = isOrder ? quantity : Math.min(quantity, available);
 
         const existing = this.cart.find(i => i.productId === product.id && i.size === size && i.color === color);
         if (existing) {

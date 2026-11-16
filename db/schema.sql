@@ -644,7 +644,8 @@ begin
         raise exception 'Hay muchos pedidos en este momento. Intenta de nuevo en un minuto.';
     end if;
 
-    -- Stock: suma de cantidades por producto (un mismo producto puede venir en varias tallas)
+    -- Stock: suma de cantidades por producto (un mismo producto puede venir en varias tallas).
+    -- Los productos con estado 'a_pedido' se aceptan siempre (se hacen por encargo).
     perform 1
     from (
         select (i->>'productId')::bigint as pid, sum((i->>'quantity')::int) as qty
@@ -652,7 +653,8 @@ begin
         group by 1
     ) t
     join public.products p on p.id = t.pid
-    where t.qty > p.stock;
+    where t.qty > p.stock
+      and (p.status is null or p.status <> 'a_pedido');
     if found then raise exception 'Uno de los productos ya no tiene stock suficiente'; end if;
 
     for v_item in select * from jsonb_array_elements(p_items) loop
