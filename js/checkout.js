@@ -255,12 +255,23 @@ const Checkout = {
         const transfer = ProductsManager.config.transferInfo;
         const metro = `Coordinamos la entrega en la estación de Metro${customer.meetingPoint ? ` <strong>${PF.escape(customer.meetingPoint)}</strong>` : ''} o el envío a tu región.`;
 
+        // Detectar si hay productos "A Pedido" en el pedido
+        const items = order.items || [];
+        const hasOrderItems = items.some(i => {
+            const p = ProductsManager.getProductById(i.productId);
+            return p?.status === 'a_pedido';
+        });
+
         // Con datos de transferencia configurados el cliente puede pagar altiro; si no, se los mandamos por WhatsApp.
         const intro = transfer
             ? `Gracias, ${first}. Transfiere el total a la cuenta de abajo y envíanos el comprobante por WhatsApp para confirmar tu compra.`
             : link
                 ? `Gracias, ${first}. Para completar tu compra, envíanos el pedido por WhatsApp y te compartimos los datos de transferencia.`
                 : `Gracias, ${first}. Te contactaremos por WhatsApp o correo para coordinar el pago y la entrega.`;
+
+        const orderNote = hasOrderItems
+            ? `<p class="muted is-warn" style="margin-top:12px">⚠️ <strong>Productos A Pedido:</strong> algunos productos de tu pedido se hacen por encargo. Te contactaremos para coordinar los tiempos de entrega.</p>`
+            : '';
         const steps = transfer
             ? ['Transfiere el total a la cuenta de abajo.', `Envíanos el pedido y el comprobante por WhatsApp${link ? '' : ' (te escribiremos nosotros)'}.`, metro]
             : [`Envía tu pedido por WhatsApp${link ? '' : ' (te escribiremos nosotros)'}.`, 'Te enviamos los datos de transferencia. Tu pedido queda reservado por 24 horas.', metro];
@@ -271,6 +282,7 @@ const Checkout = {
                 <h1>¡Pedido recibido!</h1>
                 ${order.order_number ? `<div class="confirm-number">${PF.escape(order.order_number)}</div>` : ''}
                 <p>${intro}</p>
+                ${orderNote}
                 ${transfer ? `
                 <div class="transfer-box" style="margin-top:28px">
                     <div class="transfer-head"><strong>Datos para transferir</strong><button type="button" class="link-arrow" id="copyTransfer">Copiar</button></div>

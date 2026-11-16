@@ -12,7 +12,8 @@ create table if not exists public.profiles (
     id          uuid primary key references auth.users(id) on delete cascade,
     username    text not null unique,
     name        text,
-    role        text not null check (role in ('super_admin', 'admin')),
+    role        text not null default 'admin' check (role in ('admin', 'super_admin')),
+    status      text not null default 'pending' check (status in ('active', 'pending')),
     created_at  timestamptz not null default now()
 );
 
@@ -140,7 +141,7 @@ alter table public.size_guide add column if not exists measurements jsonb not nu
 create or replace function public.current_role_name()
 returns text
 language sql stable security definer set search_path = public as $$
-    select role from public.profiles where id = auth.uid();
+    select role from public.profiles where id = auth.uid() and status = 'active';
 $$;
 
 create or replace function public.is_admin()
@@ -790,16 +791,20 @@ declare
 begin
     if v_paid and not old.stock_applied then
         for v_item in select * from jsonb_array_elements(new.items) loop
+            -- Solo descuenta stock si el producto NO es "A Pedido"
             update public.products
                set stock = greatest(0, stock - coalesce((v_item->>'quantity')::int, 0))
-             where id = (v_item->>'productId')::bigint;
+             where id = (v_item->>'productId')::bigint
+               and (status is null or status <> 'a_pedido');
         end loop;
         new.stock_applied := true;
     elsif new.status = 'cancelled' and old.stock_applied then
         for v_item in select * from jsonb_array_elements(new.items) loop
+            -- Solo repone stock si el producto NO es "A Pedido"
             update public.products
                set stock = stock + coalesce((v_item->>'quantity')::int, 0)
-             where id = (v_item->>'productId')::bigint;
+             where id = (v_item->>'productId')::bigint
+               and (status is null or status <> 'a_pedido');
         end loop;
         new.stock_applied := false;
     end if;

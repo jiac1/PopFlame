@@ -20,7 +20,7 @@ const CartManager = {
         let changed = false;
         this.cart = this.cart.filter(item => {
             const p = ProductsManager.getProductById(item.productId);
-            if (!p || p.stock <= 0) { changed = true; return false; }
+            if (!p || (p.stock <= 0 && p.status !== 'a_pedido')) { changed = true; return false; }
             if (item.price !== p.price || item.name !== p.name || item.image !== p.image) {
                 item.price = p.price; item.name = p.name; item.image = p.image;
                 changed = true;
@@ -43,12 +43,15 @@ const CartManager = {
 
     // Devuelve true si se agregó. Respeta el stock total del producto (entre todas sus variantes).
     addToCart(product, size, color, quantity = 1) {
-        const available = product.stock - this.quantityOf(product.id);
-        if (available <= 0) {
-            UI.toast('Ya tienes en el carrito todo el stock disponible', 'error');
-            return false;
+        // Productos "A Pedido": no hay límite de stock (se hacen por encargo)
+        if (product.status !== 'a_pedido') {
+            const available = product.stock - this.quantityOf(product.id);
+            if (available <= 0) {
+                UI.toast('Ya tienes en el carrito todo el stock disponible', 'error');
+                return false;
+            }
         }
-        const qty = Math.min(quantity, available);
+        const qty = product.status === 'a_pedido' ? quantity : Math.min(quantity, available);
 
         const existing = this.cart.find(i => i.productId === product.id && i.size === size && i.color === color);
         if (existing) {
@@ -212,15 +215,27 @@ const CartManager = {
 
     generateWhatsAppText(customer, orderNumber, items = this.cart) {
         const subtotal = items.reduce((t, i) => t + i.price * i.quantity, 0);
-        const lines = items.map((i, n) =>
+        const orderItems = [];
+        const normalItems = [];
+        items.forEach(i => {
+            const p = ProductsManager.getProductById(i.productId);
+            if (p?.status === 'a_pedido') orderItems.push(i);
+            else normalItems.push(i);
+        });
+
+        const normalLines = normalItems.map((i, n) =>
             `${n + 1}. ${i.name}${this.variantLabel(i) ? ` (${this.variantLabel(i).replace(' · ', ', ')})` : ''} x${i.quantity} — ${this.formatPrice(i.price * i.quantity)}`
         ).join('\n');
 
-        return [
+        const orderLines = orderItems.map((i, n) =>
+            `${n + 1}. ${i.name}${this.variantLabel(i) ? ` (${this.variantLabel(i).replace(' · ', ', ')})` : ''} x${i.quantity} — ${this.formatPrice(i.price * i.quantity)} (A PEDIDO - se hace por encargo)`
+        ).join('\n');
+
+        const parts = [
             `Hola PopFlame! Quiero confirmar mi pedido${orderNumber ? ` *${orderNumber}*` : ''}`,
             '',
             '*Productos:*',
-            lines,
+            normalLines,
             '',
             `*Total:* ${this.formatPrice(subtotal + this.getShipping())}`,
             `*Entrega:* ${customer.meetingPoint ? `Metro ${customer.meetingPoint}` : 'Metro de Santiago (a coordinar)'}`,
@@ -229,12 +244,27 @@ const CartManager = {
             `${customer.name}`,
             `${customer.phone}`,
             `${customer.email}`,
-            customer.note ? `Nota: ${customer.note}` : '',
+            customer.note ? `Nota: ${customer.note}` : ''
+        ];
+
+        if (orderLines) {
+            parts.push(
+                '',
+                '*Productos A Pedido (se hacen por encargo):*',
+                orderLines,
+                '',
+                'Los productos marcados como "A Pedido" no tienen stock inmediato. Te contactaremos para coordinar los tiempos de entrega.'
+            );
+        }
+
+        parts.push(
             '',
             ProductsManager.config?.transferInfo
                 ? 'Te adjunto el comprobante de la transferencia.'
                 : 'Quedo atento/a a los datos para la transferencia.'
-        ].filter((l, i, arr) => !(l === '' && arr[i - 1] === '')).join('\n');
+        );
+
+        return parts.filter((l, i, arr) => !(l === '' && arr[i - 1] === '')).join('\n');
     }
 };
 

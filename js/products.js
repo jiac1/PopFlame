@@ -78,6 +78,7 @@ const ProductsManager = {
             description: p.description || '',
             featured: !!p.featured,
             stock: Number(p.stock ?? 0),
+            status: p.status || 'disponible',
             badge: p.badge || '',
             createdAt: p.created_at
         };
@@ -185,6 +186,7 @@ const ProductsManager = {
     },
 
     stockState(product) {
+        if (product.status === 'a_pedido') return 'order';
         if (product.stock <= 0) return 'out';
         if (product.stock <= 3) return 'low';
         return 'in';
@@ -284,7 +286,8 @@ const ProductsManager = {
         const stock = this.stockState(product);
 
         const tags = [];
-        if (stock === 'out') tags.push('<span class="tag tag-dark">Agotado</span>');
+        if (stock === 'order') tags.push('<span class="tag tag-warn">A Pedido</span>');
+        else if (stock === 'out') tags.push('<span class="tag tag-dark">Agotado</span>');
         else if (product.badge) tags.push(`<span class="tag ${/oferta|sale|limitad/i.test(product.badge) ? 'tag-red' : ''}">${PF.escape(product.badge)}</span>`);
         if (stock === 'low') tags.push('<span class="tag tag-red">Últimas unidades</span>');
 

@@ -111,6 +111,12 @@ Views.productos = {
         return this.products.filter(p => (!this.cat || p.category_id === this.cat) && (!q || U.normalize(p.name + ' ' + (p.description || '')).includes(q)));
     },
 
+    productState(p) {
+        const st = p.status || 'disponible';
+        const labels = { disponible: '<span class="pill ok">Disponible</span>', agotado: '<span class="pill bad">Agotado</span>', a_pedido: '<span class="pill warn">A Pedido</span>' };
+        return labels[st] || labels.disponible;
+    },
+
     renderList() {
         const list = this.visible();
         const card = document.getElementById('prodCard');
@@ -126,7 +132,7 @@ Views.productos = {
             <div class="table-wrap"><table class="table responsive">
                 <thead><tr>
                     <th class="w-check"><label class="check"><input type="checkbox" id="checkAll" ${allOn ? 'checked' : ''} aria-label="Seleccionar todos"></label></th>
-                    <th>Producto</th><th class="num">Precio</th><th class="num">Stock</th><th>Tallas</th><th></th>
+                    <th>Producto</th><th class="num">Precio</th><th class="num">Stock</th><th>Estado</th><th>Tallas</th><th></th>
                 </tr></thead>
                 <tbody>${list.map(p => `
                     <tr class="is-clickable" data-product="${p.id}">
@@ -138,6 +144,7 @@ Views.productos = {
                         </div></td>
                         <td data-label="Precio" class="num strong">${U.money(p.price)}</td>
                         <td data-label="Stock" class="num"><span class="${p.stock <= 0 ? 'red strong' : p.stock <= LOW_STOCK ? 'strong' : ''}">${p.stock <= 0 ? 'Agotado' : p.stock}</span></td>
+                        <td data-label="Estado" class="num strong">${this.productState(p)}</td>
                         <td data-label="Tallas"><span class="muted">${U.esc((p.sizes || []).join(', ') || '—')}</span></td>
                         <td class="actions">
                             <a class="icon-btn" href="../pages/producto.html?id=${p.id}" target="_blank" rel="noopener" title="Ver en la tienda" onclick="event.stopPropagation()">${ICON.external}</a>
@@ -205,6 +212,7 @@ Views.productos = {
                             <span class="error" data-err="price"></span>
                         </div>
                         <div class="field"><label for="pStock">Stock disponible</label><input id="pStock" name="stock" type="number" inputmode="numeric" min="0" value="${src.stock ?? ''}" placeholder="10"><span class="error" data-err="stock"></span></div>
+                        <div class="field"><label for="pStatus">Estado del producto</label><select id="pStatus" name="status"><option value="disponible" ${src.status === 'disponible' ? 'selected' : ''}>Disponible</option><option value="agotado" ${src.status === 'agotado' ? 'selected' : ''}>Agotado</option><option value="a_pedido" ${src.status === 'a_pedido' ? 'selected' : ''}>A Pedido</option></select><span class="hint">"A Pedido": no muestra stock y se aceptan encargos.</span></div>
                         <div class="field"><label for="pBadge">Etiqueta en la foto</label>
                             <select id="pBadge" name="badge">
                                 <option value="">Sin etiqueta</option>
@@ -341,6 +349,7 @@ Views.productos = {
         const name = document.getElementById('pName').value.trim();
         const price = U.int(document.getElementById('pPrice').value);
         const stock = U.int(document.getElementById('pStock').value);
+        const status = document.getElementById('pStatus').value;
         let bad = false;
         if (name.length < 2) { err('name', 'Escribe el nombre del producto.'); bad = true; }
         if (!price || price <= 0) { err('price', 'Ingresa un precio mayor a $0.'); bad = true; }
@@ -367,6 +376,7 @@ Views.productos = {
                 category_id: document.getElementById('pCat').value,
                 price,
                 stock,
+                status,
                 sizes,
                 colors: ChipPicker.values(document.getElementById('pColors')),
                 image: images[0] || null,

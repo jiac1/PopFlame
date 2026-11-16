@@ -428,14 +428,14 @@ Views.inventario = {
     async render(view) {
         Admin.header('Inventario', 'Ajusta el stock rápido. Los cambios se guardan solos.');
         const [{ data, error }] = await Promise.all([
-            supabaseClient.from('products').select('id, name, price, stock, image, category_id, sizes').order('name'),
+            supabaseClient.from('products').select('id, name, price, stock, status, image, category_id, sizes').order('name'),
             Data.categoriesList()
         ]);
         if (error) throw error;
         this.products = data || [];
 
         view.innerHTML = `
-            <div class="callout">${ICON.info}<div>El stock baja solo cuando marcas un pedido como <strong>pagado</strong>, y vuelve si lo cancelas. Aquí puedes corregirlo a mano (por ejemplo, si vendiste en persona).</div></div>
+            <div class="callout">${ICON.info}<div>El stock baja solo cuando marcas un pedido como <strong>pagado</strong>, y vuelve si lo cancelas. Aquí puedes corregir el stock a mano y también cambiar el estado del producto (Disponible / Agotado / A Pedido) desde la sección <strong>Productos</strong>.</div></div>
             <div class="toolbar">
                 <div class="chips" id="invChips"></div>
                 <div class="spacer"></div>
@@ -463,8 +463,9 @@ Views.inventario = {
     renderList() {
         const filters = [
             ['all', 'Todos', () => true],
-            ['low', 'Poco stock', p => p.stock > 0 && p.stock <= LOW_STOCK],
-            ['out', 'Agotados', p => p.stock <= 0]
+            ['low', 'Poco stock', p => p.stock > 0 && p.stock <= LOW_STOCK && p.status !== 'a_pedido'],
+            ['out', 'Agotados', p => p.stock <= 0 && p.status !== 'a_pedido'],
+            ['pedido', 'A Pedido', p => p.status === 'a_pedido']
         ];
         document.getElementById('invChips').innerHTML = filters.map(([id, label, fn]) =>
             `<button class="chip${this.filter === id ? ' is-active' : ''}" data-filter="${id}">${label}<span class="count">${this.products.filter(fn).length}</span></button>`).join('');
@@ -485,21 +486,24 @@ Views.inventario = {
                     <tr>
                         <td class="cell-primary"><div class="cell-main"><img class="thumb" src="${U.img(p.image)}" alt="" loading="lazy"><div><strong>${U.esc(p.name)}</strong><small>${U.esc(Data.catName(p.category_id))}</small></div></div></td>
                         <td data-label="Precio" class="num">${U.money(p.price)}</td>
-                        <td data-label="Estado" data-state="${p.id}">${this.state(p.stock)}</td>
+                        <td data-label="Estado" data-state="${p.id}">${this.state(p)}</td>
                         <td data-label="Stock" class="text-right">
-                            <div class="stepper" data-stepper="${p.id}">
-                                <button type="button" data-step="-1" aria-label="Restar uno">−</button>
-                                <input type="number" inputmode="numeric" min="0" value="${p.stock}" data-stock="${p.id}" aria-label="Stock de ${U.esc(p.name)}">
-                                <button type="button" data-step="1" aria-label="Sumar uno">+</button>
-                            </div>
+                            ${p.status === 'a_pedido'
+                                ? '<span class="muted">—</span>'
+                                : `<div class="stepper" data-stepper="${p.id}">
+                                    <button type="button" data-step="-1" aria-label="Restar uno">−</button>
+                                    <input type="number" inputmode="numeric" min="0" value="${p.stock}" data-stock="${p.id}" aria-label="Stock de ${U.esc(p.name)}">
+                                    <button type="button" data-step="1" aria-label="Sumar uno">+</button>
+                                </div>`}
                         </td>
                     </tr>`).join('')}</tbody>
             </table></div>`;
     },
 
-    state(stock) {
-        if (stock <= 0) return '<span class="pill bad">Agotado</span>';
-        if (stock <= LOW_STOCK) return '<span class="pill warn">Poco stock</span>';
+    state(p) {
+        if (p.status === 'a_pedido') return '<span class="pill warn">A Pedido</span>';
+        if (p.stock <= 0) return '<span class="pill bad">Agotado</span>';
+        if (p.stock <= LOW_STOCK) return '<span class="pill warn">Poco stock</span>';
         return '<span class="pill ok">Disponible</span>';
     },
 
