@@ -255,11 +255,15 @@ const Checkout = {
         const transfer = ProductsManager.config.transferInfo;
         const metro = `Coordinamos la entrega en la estación de Metro${customer.meetingPoint ? ` <strong>${PF.escape(customer.meetingPoint)}</strong>` : ''} o el envío a tu región.`;
 
-        // Detectar si hay productos "A Pedido" en el pedido
+        // Detectar si hay productos "A Pedido" (encargo) o "Pocas Unidades" en el pedido
         const items = order.items || [];
         const hasOrderItems = items.some(i => {
             const p = ProductsManager.getProductById(i.productId);
             return p?.status === 'a_pedido';
+        });
+        const hasFewItems = items.some(i => {
+            const p = ProductsManager.getProductById(i.productId);
+            return p?.status === 'pocas';
         });
 
         // Con datos de transferencia configurados el cliente puede pagar altiro; si no, se los mandamos por WhatsApp.
@@ -271,7 +275,9 @@ const Checkout = {
 
         const orderNote = hasOrderItems
             ? `<p class="muted is-warn" style="margin-top:12px">⚠️ <strong>Productos A Pedido:</strong> algunos productos de tu pedido se hacen por encargo. Te contactaremos para coordinar los tiempos de entrega.</p>`
-            : '';
+            : hasFewItems
+                ? `<p class="muted is-warn" style="margin-top:12px">⚠️ <strong>Últimas unidades:</strong> algunos productos de tu pedido tienen pocas unidades disponibles. Te confirmamos el stock al confirmar el pedido.</p>`
+                : '';
         const steps = transfer
             ? ['Transfiere el total a la cuenta de abajo.', `Envíanos el pedido y el comprobante por WhatsApp${link ? '' : ' (te escribiremos nosotros)'}.`, metro]
             : [`Envía tu pedido por WhatsApp${link ? '' : ' (te escribiremos nosotros)'}.`, 'Te enviamos los datos de transferencia. Tu pedido queda reservado por 24 horas.', metro];

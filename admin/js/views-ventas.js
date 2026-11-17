@@ -504,7 +504,7 @@ Views.inventario = {
                             </select>
                         </td>
                         <td data-label="Stock" class="text-right">
-                            ${p.status === 'a_pedido' || p.status === 'pocas'
+                            ${p.status === 'a_pedido'
                                 ? '<span class="muted">—</span>'
                                 : `<div class="stepper" data-stepper="${p.id}">
                                     <button type="button" data-step="-1" aria-label="Restar uno">−</button>

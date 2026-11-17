@@ -37,10 +37,19 @@ create table if not exists public.products (
     description  text,
     featured     boolean not null default false,
     stock        int not null default 0 check (stock >= 0),
+    -- Estado manual del producto:
+    --   'disponible' = en stock normal
+    --   'agotado'    = sin stock, no se puede comprar
+    --   'a_pedido'   = se hace por encargo (no muestra stock, no descuenta stock)
+    --   'pocas'      = quedan pocas unidades (sí descuenta stock)
+    status        text not null default 'disponible' check (status in ('disponible', 'agotado', 'a_pedido', 'pocas')),
     badge        text,
     created_at   timestamptz not null default now(),
     updated_at   timestamptz not null default now()
 );
+
+-- Los productos que ya existían quedan con su estado inicial coherente.
+update public.products set status = 'agotado' where stock <= 0 and status = 'disponible';
 
 create sequence if not exists public.order_number_seq start 1;
 
@@ -793,7 +802,7 @@ declare
 begin
     if v_paid and not old.stock_applied then
         for v_item in select * from jsonb_array_elements(new.items) loop
-            -- Solo descuenta stock si el producto NO es "A Pedido"
+            -- Solo descuenta stock si el producto NO es "A Pedido" (se hace por encargo).
             update public.products
                set stock = greatest(0, stock - coalesce((v_item->>'quantity')::int, 0))
              where id = (v_item->>'productId')::bigint
@@ -802,7 +811,7 @@ begin
         new.stock_applied := true;
     elsif new.status = 'cancelled' and old.stock_applied then
         for v_item in select * from jsonb_array_elements(new.items) loop
-            -- Solo repone stock si el producto NO es "A Pedido"
+            -- Solo repone stock si el producto NO es "A Pedido".
             update public.products
                set stock = stock + coalesce((v_item->>'quantity')::int, 0)
              where id = (v_item->>'productId')::bigint

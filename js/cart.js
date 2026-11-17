@@ -45,7 +45,8 @@ const CartManager = {
 
     // Devuelve true si se agregó. Respeta el stock total del producto (entre todas sus variantes).
     addToCart(product, size, color, quantity = 1) {
-        // Productos "A Pedido": se hacen por encargo, sin límite de stock.
+        // Solo los productos "A Pedido" se hacen por encargo y no tienen límite de stock.
+        // "Pocas Unidades" sí tiene stock real y lo respeta como cualquier otro producto.
         const isOrder = product.status === 'a_pedido';
         const available = isOrder ? quantity : product.stock - this.quantityOf(product.id);
 

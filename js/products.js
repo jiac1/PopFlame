@@ -187,8 +187,8 @@ const ProductsManager = {
 
     stockState(product) {
         if (product.status === 'a_pedido') return 'order';
-        if (product.status === 'pocas') return 'pocas';
         if (product.stock <= 0) return 'out';
+        if (product.status === 'pocas') return 'pocas';
         if (product.stock <= 3) return 'low';
         return 'in';
     },
