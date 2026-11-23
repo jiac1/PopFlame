@@ -84,7 +84,7 @@ js/
   supabaseClient.js       Cliente Supabase
   products.js             Datos (con caché local), tarjetas de producto, guía de tallas
   cart.js                 Carrito (localStorage), validación de stock, mensaje de WhatsApp
-  app.js                  Núcleo común (menús, búsqueda, newsletter, animaciones)
+  app.js                  Núcleo común (menús, búsqueda, redes, animaciones)
   home.js / category.js / product.js / checkout.js / info.js   Lógica de cada página
 admin/                    Panel de administración
 db/                       schema.sql + scripts de cambios
@@ -103,17 +103,12 @@ node --test tests/*.cjs
 Revisan permisos del panel, la lógica de la tienda (stock, estados, mensaje de WhatsApp) y que
 `db/schema.sql` mantenga las protecciones de seguridad de los scripts de `db/`.
 
-## 6. Correos automáticos (opcional)
+## 6. Instagram en el pie de página
 
-El newsletter guarda los correos en `subscribers` (se ven en el panel → Suscriptores). Para enviar el
-correo de bienvenida y el aviso de "nuevo drop":
+El pie de página invita a seguir la cuenta de Instagram, con el link de **Configuración → Redes**.
+Si ese campo está vacío, el bloque no se muestra.
 
-1. Crea una cuenta en [resend.com](https://resend.com) y una API key.
-2. Supabase → **Edge Functions → Deploy a new function**: crea `welcome-email` y `notify-new-product`
-   pegando los archivos de `supabase/functions/`.
-3. Project Settings → Edge Functions → **Secrets**: `RESEND_API_KEY`, y opcionalmente `FROM_EMAIL`
-   (remitente de un dominio verificado en Resend) y `SITE_URL` (por defecto https://pop-flame.vercel.app).
-
-No hace falta crear un webhook: la base de datos llama sola a `notify-new-product` al crear un producto.
-Ambos correos incluyen el link **Darme de baja** (`pages/baja.html`), que exige la Ley del Consumidor.
-Mientras no verifiques un dominio en Resend, solo llegan al correo con que te registraste en Resend.
+Antes había un formulario de newsletter. Se quitó porque sin dominio propio los correos no llegan a
+los clientes. Los correos que ya se habían guardado siguen en el panel (**Suscriptores**), y las
+Edge Functions de correo siguen en `supabase/functions/` por si más adelante se activa con un dominio
+(requieren `RESEND_API_KEY` y un dominio verificado en Resend).
