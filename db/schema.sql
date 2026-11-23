@@ -118,13 +118,15 @@ create table if not exists public.pages (
     updated_at   timestamptz not null default now()
 );
 
--- Suscriptores del newsletter (footer "ÚNETE AL CLUB POPFLAME"). Reciben el correo de
--- bienvenida al suscribirse y el aviso de "producto nuevo" (ver supabase/functions/).
+-- Suscriptores del newsletter. La tienda ya no tiene formulario (el footer invita a seguir en
+-- Instagram); la tabla se conserva con los correos guardados y para las Edge Functions de
+-- supabase/functions/. unsubscribe_token es el código secreto del link "Darme de baja".
 create table if not exists public.subscribers (
-    id             bigint generated always as identity primary key,
-    email          text not null unique,
-    active         boolean not null default true,
-    subscribed_at  timestamptz not null default now()
+    id                bigint generated always as identity primary key,
+    email             text not null unique,
+    active            boolean not null default true,
+    subscribed_at     timestamptz not null default now(),
+    unsubscribe_token uuid not null default gen_random_uuid()
 );
 
 -- Medida real de cada talla por categoría (ej. poleras/S = "48cm"). Se muestra junto a la
@@ -523,11 +525,10 @@ drop policy if exists "pages_write_super_admin" on public.pages;
 create policy "pages_write_super_admin" on public.pages
     for all using (public.is_super_admin()) with check (public.is_super_admin());
 
--- subscribers: cualquiera (incluso anónimo) puede suscribirse; solo super_admin puede
--- ver/editar/borrar la lista. Las Edge Functions usan la service_role key (no RLS).
+-- subscribers: nadie inserta desde la API (la tienda ya no tiene formulario); solo super_admin
+-- puede ver/editar/borrar la lista. Las Edge Functions usan la service_role key (no RLS).
 drop policy if exists "subscribers_insert_public" on public.subscribers;
-create policy "subscribers_insert_public" on public.subscribers
-    for insert with check (true);
+revoke insert on table public.subscribers from anon, authenticated;
 
 drop policy if exists "subscribers_manage_super_admin" on public.subscribers;
 create policy "subscribers_manage_super_admin" on public.subscribers
@@ -1114,18 +1115,33 @@ grant execute on function public.create_order(jsonb, jsonb) to anon, authenticat
 -- ---------------------------------------------------------
 -- 9. NEWSLETTER
 -- ---------------------------------------------------------
-create or replace function public.unsubscribe_newsletter(p_email text)
-returns boolean
+-- Link "Darme de baja" de los correos: pages/baja.html?t=<unsubscribe_token>.
+-- Sin el código secreto no se puede dar de baja a nadie (antes bastaba con escribir el correo).
+alter table public.subscribers
+    add column if not exists unsubscribe_token uuid not null default gen_random_uuid();
+create unique index if not exists subscribers_unsubscribe_token_key
+    on public.subscribers (unsubscribe_token);
+
+drop function if exists public.unsubscribe_newsletter(text);
+
+create or replace function public.unsubscribe_with_token(p_token uuid)
+returns text
 language plpgsql security definer set search_path = public, pg_temp as $$
+declare
+    v_email text;
 begin
+    if p_token is null then return null; end if;
     update public.subscribers set active = false
-     where lower(email) = lower(trim(p_email)) and active;
-    return found;
+     where unsubscribe_token = p_token
+    returning email into v_email;
+    if v_email is null then return null; end if;
+    -- "ana.perez@gmail.com" -> "a***@gmail.com"
+    return left(v_email, 1) || '***' || substring(v_email from position('@' in v_email));
 end;
 $$;
 
-revoke all on function public.unsubscribe_newsletter(text) from public;
-grant execute on function public.unsubscribe_newsletter(text) to anon, authenticated;
+revoke all on function public.unsubscribe_with_token(uuid) from public;
+grant execute on function public.unsubscribe_with_token(uuid) to anon, authenticated;
 
 -- Si alguien que se dio de baja se vuelve a suscribir desde la tienda, se reactiva.
 create or replace function public.subscribers_reactivate()

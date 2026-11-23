@@ -19,7 +19,9 @@ archivos) con un panel de administración con dos roles: **Super Admin** y **Adm
 
 Si la base ya existía, en vez del schema completo corre solo los scripts nuevos de `db/` que falten, en
 orden de fecha. El último es [`db/2026-11-23_correcciones.sql`](db/2026-11-23_correcciones.sql)
-(los productos *Agotado* ya no se pueden comprar y el login no revela correos de cuentas pendientes).
+(los productos *Agotado* ya no se pueden comprar y el login no revela correos de cuentas pendientes)
+y luego [`db/2026-11-24_baja_con_codigo.sql`](db/2026-11-24_baja_con_codigo.sql) (link de baja del
+newsletter con código secreto).
 
 La URL del proyecto y la clave pública (`sb_publishable_...`) están en
 [`js/supabaseClient.js`](js/supabaseClient.js): es seguro tenerlas en el frontend, todo el acceso lo
@@ -114,4 +116,6 @@ Si ese campo está vacío, el bloque no se muestra.
 Antes había un formulario de newsletter. Se quitó porque sin dominio propio los correos no llegan a
 los clientes. Los correos que ya se habían guardado siguen en el panel (**Suscriptores**), y las
 Edge Functions de correo siguen en `supabase/functions/` por si más adelante se activa con un dominio
-(requieren `RESEND_API_KEY` y un dominio verificado en Resend).
+(requieren `RESEND_API_KEY` y un dominio verificado en Resend). Sus correos traen el link
+**Darme de baja** con un código secreto por suscriptor (`pages/baja.html?t=...`): sin ese código no
+se puede dar de baja a otra persona.
