@@ -317,8 +317,8 @@ Views.usuarios = {
                 <div class="card card-body">
                     <h3 class="strong mb-16">Qué puede hacer cada rol</h3>
                     <dl class="kv">
-                        <dt>Super Admin</dt><dd>Todo: además de lo del Admin, categorías, páginas, configuración y usuarios.</dd>
-                        <dt>Admin</dt><dd>Pedidos, inventario, productos, banners y guía de tallas.</dd>
+                        <dt>Super Admin</dt><dd>Todo: además de lo del Admin, suscriptores, páginas, configuración y usuarios.</dd>
+                        <dt>Admin</dt><dd>Pedidos, inventario, productos, banners, guía de tallas y categorías.</dd>
                         <dt>Acceso pendiente</dt><dd>Sin acceso, tenga el rol que tenga. Así queda toda cuenta nueva hasta que la actives.</dd>
                     </dl>
                 </div>
