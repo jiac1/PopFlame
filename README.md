@@ -64,6 +64,9 @@ se le envían por WhatsApp desde el pedido con un clic.
 
 Las fotos que subas desde el panel se **comprimen automáticamente** (máx. 2000 px) antes de subirlas.
 
+Cada persona puede cambiar su propia contraseña desde el panel: botón **Cambiar contraseña** en el
+menú lateral (pide la contraseña actual).
+
 Para recuperar una contraseña olvidada: SQL Editor →
 `update auth.users set encrypted_password = extensions.crypt('NUEVA', extensions.gen_salt('bf')) where email = '...';`
 

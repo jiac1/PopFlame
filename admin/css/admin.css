@@ -421,6 +421,7 @@ img, video, svg { display: block; max-width: 100%; }
 .sidebar-foot .row { display: flex; gap: 6px; }
 .sidebar-foot .btn { flex: 1; height: 36px; font-size: 12px; background: var(--ink-2); color: rgba(255,255,255,0.85); border-color: var(--ink-3); }
 .sidebar-foot .btn:hover { background: var(--ink-3); color: #fff; }
+.sidebar-foot .btn-password { display: flex; width: 100%; margin-bottom: 6px; }
 
 .main {
     flex: 1;

@@ -36,3 +36,12 @@ test('unknown roles and inactive statuses are denied', () => {
     assert.equal(Access.canAccess({ role: 'admin', status: 'disabled' }), false);
     assert.equal(Access.canAccess(null), false);
 });
+
+test('password change rules', () => {
+    assert.equal(Access.passwordProblem('', 'nuevaClave1', 'nuevaClave1'), 'Escribe tu contraseña actual.');
+    assert.match(Access.passwordProblem('vieja', 'corta', 'corta'), /al menos 8/);
+    assert.match(Access.passwordProblem('vieja', 'x'.repeat(73), 'x'.repeat(73)), /máximo 72/);
+    assert.match(Access.passwordProblem('mismaClave1', 'mismaClave1', 'mismaClave1'), /distinta/);
+    assert.match(Access.passwordProblem('vieja', 'nuevaClave1', 'nuevaClave2'), /no coinciden/);
+    assert.equal(Access.passwordProblem('vieja', 'nuevaClave1', 'nuevaClave1'), '');
+});

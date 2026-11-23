@@ -104,6 +104,30 @@ const AdminAuth = {
         }
     },
 
+    // Cambia la contraseña de la cuenta con sesión abierta. Primero confirma la contraseña actual
+    // (así nadie puede cambiarla desde un computador que quedó con la sesión abierta).
+    async changePassword(current, next) {
+        const { data: { session } } = await supabaseClient.auth.getSession();
+        const email = session?.user?.email;
+        if (!email) throw new Error('Tu sesión expiró. Vuelve a iniciar sesión.');
+
+        const { error: checkError } = await supabaseClient.auth.signInWithPassword({ email, password: current });
+        if (checkError) {
+            const e = new Error('La contraseña actual no es correcta.');
+            e.field = 'current';
+            throw e;
+        }
+
+        const { error } = await supabaseClient.auth.updateUser({ password: next });
+        if (error) {
+            const msg = error.message || '';
+            if (/different from the old|same_password/i.test(msg + error.code)) throw Object.assign(new Error('La contraseña nueva debe ser distinta a la actual.'), { field: 'next' });
+            if (/at least|weak|short/i.test(msg)) throw Object.assign(new Error('La contraseña nueva es muy débil. Usa al menos 8 caracteres, mezclando letras y números.'), { field: 'next' });
+            if (/reauthenticat|nonce/i.test(msg)) throw new Error('Por seguridad, cierra sesión, vuelve a entrar e inténtalo de nuevo.');
+            throw new Error('No se pudo cambiar la contraseña: ' + msg);
+        }
+    },
+
     async logout() {
         await supabaseClient.auth.signOut();
         location.replace('index.html');
@@ -403,12 +427,16 @@ const Admin = {
 
     bind() {
         window.addEventListener('hashchange', () => this.route());
-        document.getElementById('logoutBtn').addEventListener('click', async () => {
-            if (await UI.confirm({ title: '¿Cerrar sesión?', ok: 'Cerrar sesión', danger: false })) AdminAuth.logout();
-        });
         const sidebar = document.getElementById('sidebar');
         const scrim = document.getElementById('scrim');
         const toggle = (open) => { sidebar.classList.toggle('is-open', open); scrim.classList.toggle('is-open', open); };
+        document.getElementById('passwordBtn').addEventListener('click', () => {
+            toggle(false);
+            this.openPasswordSheet();
+        });
+        document.getElementById('logoutBtn').addEventListener('click', async () => {
+            if (await UI.confirm({ title: '¿Cerrar sesión?', ok: 'Cerrar sesión', danger: false })) AdminAuth.logout();
+        });
         document.getElementById('menuBtn').addEventListener('click', () => toggle(true));
         scrim.addEventListener('click', () => toggle(false));
         document.getElementById('nav').addEventListener('click', () => toggle(false));
@@ -429,6 +457,65 @@ const Admin = {
 
         window.addEventListener('beforeunload', (e) => {
             if (UI.sheetState?.isDirty?.() || Views[this.current]?.isDirty?.()) { e.preventDefault(); e.returnValue = ''; }
+        });
+    },
+
+    // Editor lateral "Cambiar contraseña" (botón del menú lateral).
+    openPasswordSheet() {
+        const field = (id, label, autocomplete, hint = '') => `
+            <div class="field"><label for="${id}">${label}</label>
+                <input id="${id}" type="password" autocomplete="${autocomplete}" maxlength="72" required>
+                ${hint ? `<span class="hint">${hint}</span>` : ''}<span class="error" data-err="${id}"></span></div>`;
+        UI.openSheet({
+            title: 'Cambiar contraseña',
+            body: `<form id="passwordForm" novalidate>
+                    <p class="muted mb-16">Cambia la contraseña con la que entras al panel como <strong>${U.esc(this.profile.username)}</strong>.</p>
+                    ${field('pwCurrent', 'Contraseña actual', 'current-password')}
+                    ${field('pwNext', 'Contraseña nueva', 'new-password', 'Mínimo 8 caracteres. Mezcla letras y números.')}
+                    ${field('pwRepeat', 'Repite la contraseña nueva', 'new-password')}
+                    <label class="check mt-8" style="gap:8px;font-size:13px;cursor:pointer"><input type="checkbox" id="pwShow"><span>Mostrar contraseñas</span></label>
+                </form>`,
+            foot: `<div class="spacer"></div><button class="btn btn-ghost" data-sheet-close>Cancelar</button><button class="btn btn-dark" id="pwSave">Guardar contraseña</button>`,
+            isDirty: () => ['pwCurrent', 'pwNext', 'pwRepeat'].some(id => document.getElementById(id)?.value),
+            onOpen: (sheet) => {
+                const form = sheet.querySelector('#passwordForm');
+                const ids = ['pwCurrent', 'pwNext', 'pwRepeat'];
+                const setErr = (id, msg) => {
+                    ids.forEach(x => {
+                        const on = x === id && !!msg;
+                        sheet.querySelector(`[data-err="${x}"]`).textContent = on ? msg : '';
+                        sheet.querySelector('#' + x).closest('.field').classList.toggle('has-error', on);
+                    });
+                    if (id) sheet.querySelector('#' + id).focus();
+                };
+                sheet.querySelector('#pwShow').addEventListener('change', (e) => {
+                    ids.forEach(x => { sheet.querySelector('#' + x).type = e.target.checked ? 'text' : 'password'; });
+                });
+                const save = async () => {
+                    const [current, next, repeat] = ids.map(x => sheet.querySelector('#' + x).value);
+                    const problem = PFAccess.passwordProblem(current, next, repeat);
+                    if (problem) {
+                        setErr(!current ? 'pwCurrent' : next !== repeat && next.length >= 8 && next !== current ? 'pwRepeat' : 'pwNext', problem);
+                        return;
+                    }
+                    setErr(null);
+                    const btn = document.getElementById('pwSave');
+                    UI.setLoading(btn, true);
+                    try {
+                        await AdminAuth.changePassword(current, next);
+                        await UI.closeSheet(true);
+                        UI.toast('Contraseña actualizada. Úsala la próxima vez que entres.');
+                    } catch (e) {
+                        if (e.field) setErr(e.field === 'current' ? 'pwCurrent' : 'pwNext', e.message);
+                        else UI.toast(e.message, 'error');
+                    } finally {
+                        UI.setLoading(btn, false);
+                    }
+                };
+                document.getElementById('pwSave').addEventListener('click', save);
+                form.addEventListener('submit', (e) => { e.preventDefault(); save(); });
+                form.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); save(); } });
+            }
         });
     },
 
