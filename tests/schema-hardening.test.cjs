@@ -66,3 +66,26 @@ test('checkout refuses products manually marked as sold out', () => {
     const fix = fs.readFileSync(path.join(__dirname, '../db/2026-11-23_correcciones.sql'), 'utf8');
     for (const sql of [fix, schema]) assert.match(sql, /v_status\s*=\s*'agotado'/);
 });
+
+test('unsubscribe links need the secret per-subscriber code, not just the email', () => {
+    const mig = fs.readFileSync(path.join(__dirname, '../db/2026-11-24_baja_con_codigo.sql'), 'utf8');
+    for (const sql of [mig, schema]) {
+        assert.match(sql, /unsubscribe_token\s+uuid\s+not\s+null\s+default\s+gen_random_uuid\(\)/i);
+        assert.match(sql, /function\s+public\.unsubscribe_with_token\s*\(\s*p_token\s+uuid\s*\)/i);
+        assert.match(sql, /drop\s+function\s+if\s+exists\s+public\.unsubscribe_newsletter\s*\(\s*text\s*\)/i);
+        assert.match(sql, /revoke\s+insert\s+on\s+table\s+public\.subscribers\s+from\s+anon\s*,\s*authenticated/i);
+    }
+    assert.doesNotMatch(schema, /create\s+policy\s+"subscribers_insert_public"/i);
+    assert.doesNotMatch(schema, /create\s+or\s+replace\s+function\s+public\.unsubscribe_newsletter/i);
+});
+
+test('unsubscribe page and emails use the code link', () => {
+    const baja = fs.readFileSync(path.join(__dirname, '../js/baja.js'), 'utf8');
+    assert.match(baja, /rpc\('unsubscribe_with_token'/);
+    assert.doesNotMatch(baja, /get\('email'\)/);
+    for (const f of ['welcome-email', 'notify-new-product']) {
+        const src = fs.readFileSync(path.join(__dirname, `../supabase/functions/${f}/index.ts`), 'utf8');
+        assert.match(src, /baja\.html\?t=/);
+        assert.doesNotMatch(src, /baja\.html\?email=/);
+    }
+});

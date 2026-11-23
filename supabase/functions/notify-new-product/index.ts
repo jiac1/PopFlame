@@ -31,10 +31,13 @@ function imageUrl(site: string, path: string | null) {
     return /^https?:\/\//i.test(path) ? path : `${site}/${path.replace(/^\/+/, '')}`;
 }
 
-function template(site: string, p: Product, email: string) {
+// Link de baja con el código secreto del suscriptor (subscribers.unsubscribe_token).
+const unsubscribeUrl = (site: string, token: string) => `${site}/pages/baja.html?t=${encodeURIComponent(token)}`;
+
+function template(site: string, p: Product, token: string) {
     const url = `${site}/pages/producto.html?id=${p.id}`;
     const price = '$' + Math.round(Number(p.price || 0)).toLocaleString('es-CL');
-    const unsubscribe = `${site}/pages/baja.html?email=${encodeURIComponent(email)}`;
+    const unsubscribe = unsubscribeUrl(site, token);
     const desc = (p.description || '').slice(0, 220);
     return `<!DOCTYPE html>
 <html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(p.name)}</title></head>
@@ -83,7 +86,7 @@ Deno.serve(async (req: Request) => {
         if (!product) return json({ skipped: 'producto no existe' });
         if (Date.now() - new Date(product.created_at).getTime() > 15 * 60 * 1000) return json({ skipped: 'producto antiguo' });
 
-        const { data: subs, error } = await supabase.from('subscribers').select('email').eq('active', true);
+        const { data: subs, error } = await supabase.from('subscribers').select('email, unsubscribe_token').eq('active', true);
         if (error) throw error;
         if (!subs?.length) return json({ success: true, sent: 0 });
 
@@ -91,12 +94,12 @@ Deno.serve(async (req: Request) => {
         let sent = 0;
         const errors: unknown[] = [];
         for (let i = 0; i < subs.length; i += 100) {
-            const batch = subs.slice(i, i + 100).map((s: { email: string }) => ({
+            const batch = subs.slice(i, i + 100).map((s: { email: string; unsubscribe_token: string }) => ({
                 from: FROM_EMAIL,
                 to: s.email,
                 subject: `Nuevo drop: ${product.name} 🔥`,
-                html: template(SITE, product as Product, s.email),
-                headers: { 'List-Unsubscribe': `<${SITE}/pages/baja.html?email=${encodeURIComponent(s.email)}>` }
+                html: template(SITE, product as Product, s.unsubscribe_token),
+                headers: { 'List-Unsubscribe': `<${unsubscribeUrl(SITE, s.unsubscribe_token)}>` }
             }));
             const res = await fetch('https://api.resend.com/emails/batch', {
                 method: 'POST',

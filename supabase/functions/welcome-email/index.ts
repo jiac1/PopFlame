@@ -1,7 +1,7 @@
 // Supabase Edge Function: welcome-email
 //
-// Envía el correo de bienvenida cuando alguien se suscribe al newsletter
-// (la invoca js/app.js apenas se guarda el correo en la tabla subscribers).
+// Envía el correo de bienvenida a un suscriptor nuevo. La tienda ya no tiene formulario de
+// newsletter (se reemplazó por Instagram): se conserva por si se vuelve a activar con un dominio propio.
 //
 // Seguridad: solo envía si ese correo se acaba de suscribir (últimos 10 minutos) y está activo,
 // así nadie puede usar esta función para mandar correos a direcciones cualquiera.
@@ -25,8 +25,11 @@ const json = (body: unknown, status = 200) =>
 
 const esc = (s: string) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
 
-function template(site: string, email: string) {
-    const unsubscribe = `${site}/pages/baja.html?email=${encodeURIComponent(email)}`;
+// Link de baja con el código secreto del suscriptor (subscribers.unsubscribe_token).
+const unsubscribeUrl = (site: string, token: string) => `${site}/pages/baja.html?t=${encodeURIComponent(token)}`;
+
+function template(site: string, token: string) {
+    const unsubscribe = unsubscribeUrl(site, token);
     return `<!DOCTYPE html>
 <html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Bienvenido a PopFlame</title></head>
 <body style="margin:0;padding:0;background:#F6F4F0;">
@@ -67,7 +70,7 @@ Deno.serve(async (req: Request) => {
         // Solo correos que se suscribieron hace menos de 10 minutos
         const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
         const since = new Date(Date.now() - 10 * 60 * 1000).toISOString();
-        const { data: sub } = await supabase.from('subscribers').select('id')
+        const { data: sub } = await supabase.from('subscribers').select('id, unsubscribe_token')
             .eq('email', address).eq('active', true).gte('subscribed_at', since).maybeSingle();
         if (!sub) return json({ skipped: true });
 
@@ -78,8 +81,8 @@ Deno.serve(async (req: Request) => {
                 from: FROM_EMAIL,
                 to: address,
                 subject: 'Ya eres parte del club PopFlame 🔥',
-                html: template(SITE, address),
-                headers: { 'List-Unsubscribe': `<${SITE}/pages/baja.html?email=${encodeURIComponent(address)}>` }
+                html: template(SITE, sub.unsubscribe_token),
+                headers: { 'List-Unsubscribe': `<${unsubscribeUrl(SITE, sub.unsubscribe_token)}>` }
             })
         });
         const data = await res.json();
