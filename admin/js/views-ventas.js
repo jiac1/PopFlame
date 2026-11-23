@@ -3,6 +3,8 @@
 // ============================================================
 
 const LOW_STOCK = 3;
+const isSoldOut = (p) => p.status !== 'a_pedido' && (p.status === 'agotado' || p.stock <= 0);
+const isLowStock = (p) => p.status !== 'a_pedido' && !isSoldOut(p) && p.stock <= LOW_STOCK;
 
 // ---------------- Resumen ----------------
 Views.resumen = {
@@ -17,7 +19,7 @@ Views.resumen = {
         since.setDate(since.getDate() - 60);
         const [o, p, cfg] = await Promise.all([
             supabaseClient.from('orders').select('id, order_number, customer_name, total, status, created_at, items').gte('created_at', since.toISOString()).order('created_at', { ascending: false }),
-            supabaseClient.from('products').select('id, name, stock, image, category_id').order('stock'),
+            supabaseClient.from('products').select('id, name, stock, status, image, category_id').order('stock'),
             Data.configRow(true).catch(() => ({}))
         ]);
         if (o.error) throw o.error;
@@ -33,8 +35,9 @@ Views.resumen = {
         const lastMonth = paid.filter(x => new Date(x.created_at) >= prevStart && new Date(x.created_at) < monthStart);
         const pending = orders.filter(x => x.status === 'pending');
         const toDeliver = orders.filter(x => ['confirmed', 'processing', 'shipped'].includes(x.status));
-        const out = products.filter(x => x.stock <= 0);
-        const low = products.filter(x => x.stock > 0 && x.stock <= LOW_STOCK);
+        // "A Pedido" no maneja stock (no cuenta como agotado) y "Agotado" manual cuenta aunque tenga stock.
+        const out = products.filter(isSoldOut);
+        const low = products.filter(isLowStock);
         const avg = thisMonth.length ? sum(thisMonth) / thisMonth.length : 0;
 
         const salesNow = sum(thisMonth), salesPrev = sum(lastMonth);
@@ -86,7 +89,7 @@ Views.resumen = {
                         <a class="list-row" href="#inventario">
                             <img class="thumb" src="${U.img(x.image)}" alt="" loading="lazy">
                             <div class="grow"><strong>${U.esc(x.name)}</strong><small>${U.esc(Data.catName(x.category_id))}</small></div>
-                            <span class="pill ${x.stock <= 0 ? 'bad' : 'warn'}">${x.stock <= 0 ? 'Agotado' : `Quedan ${x.stock}`}</span>
+                            <span class="pill ${isSoldOut(x) ? 'bad' : 'warn'}">${isSoldOut(x) ? 'Agotado' : `Quedan ${x.stock}`}</span>
                         </a>`).join('') || U.empty('check', 'Stock en orden', 'Ningún producto está agotado o por agotarse.')}
                 </div>
             </div>
@@ -471,8 +474,8 @@ Views.inventario = {
     renderList() {
         const filters = [
             ['all', 'Todos', () => true],
-            ['low', 'Poco stock', p => p.stock > 0 && p.stock <= LOW_STOCK && p.status !== 'a_pedido' && p.status !== 'pocas'],
-            ['out', 'Agotados', p => p.stock <= 0 && p.status !== 'a_pedido' && p.status !== 'pocas'],
+            ['low', 'Poco stock', p => isLowStock(p) && p.status !== 'pocas'],
+            ['out', 'Agotados', isSoldOut],
             ['pedido', 'A Pedido', p => p.status === 'a_pedido'],
             ['pocas', 'Pocas Unidades', p => p.status === 'pocas']
         ];
@@ -516,41 +519,45 @@ Views.inventario = {
             </table></div>`;
     },
 
-    state(p) {
-        if (p.status === 'a_pedido') return '<span class="pill warn">A Pedido</span>';
-        if (p.status === 'pocas') return '<span class="pill warn">Pocas Unidades</span>';
-        if (p.stock <= 0) return '<span class="pill bad">Agotado</span>';
-        if (p.stock <= LOW_STOCK) return '<span class="pill warn">Poco stock</span>';
-        return '<span class="pill ok">Disponible</span>';
-    },
-
+    // Temporizadores separados para stock y estado: si compartieran la clave, cambiar el estado
+    // y luego el stock del mismo producto en menos de 600 ms descartaba el primer cambio.
     timers: {},
     queueSave(input) {
-        const id = +input.dataset.stock;
-        clearTimeout(this.timers[id]);
-        this.timers[id] = setTimeout(() => this.save(id, input), 600);
+        const key = 'stock-' + input.dataset.stock;
+        clearTimeout(this.timers[key]);
+        this.timers[key] = setTimeout(() => this.save(+input.dataset.stock, input), 600);
     },
 
     async save(id, input) {
         const stock = U.int(input.value);
         const stepper = input.closest('.stepper');
-        if (stock === null || stock < 0) { UI.toast('El stock debe ser un número desde 0', 'error'); return; }
-        stepper.classList.add('is-saving');
-        const { error } = await supabaseClient.from('products').update({ stock }).eq('id', id);
-        stepper.classList.remove('is-saving');
-        if (error) { UI.toast('No se pudo guardar el stock: ' + error.message, 'error'); return; }
         const p = this.products.find(x => x.id === id);
-        if (p) p.stock = stock;
-        const cell = document.querySelector(`[data-state="${id}"]`);
-        if (cell) cell.innerHTML = this.state(p);
+        if (stock === null || stock < 0) { UI.toast('El stock debe ser un número desde 0', 'error'); return; }
+        if (!p || stock === p.stock) return;
+        stepper.classList.add('is-saving');
+        // set_product_stock deja el movimiento en el historial de inventario y rechaza el cambio
+        // si otra persona modificó el stock mientras tanto (en vez de pisarlo en silencio).
+        const { data, error } = await supabaseClient.rpc('set_product_stock', {
+            p_product_id: id, p_stock: stock, p_expected_stock: p.stock, p_reason: 'Ajuste en Inventario'
+        });
+        stepper.classList.remove('is-saving');
+        if (error) {
+            UI.toast('No se pudo guardar el stock: ' + error.message, 'error');
+            if (error.code === '40001') Admin.route();
+            else input.value = p.stock;
+            return;
+        }
+        p.stock = typeof data === 'number' ? data : stock;
+        input.value = p.stock;
         stepper.classList.add('is-saved');
         setTimeout(() => stepper.classList.remove('is-saved'), 1200);
-        UI.toast(`Stock de ${p?.name || 'producto'}: ${stock}`);
+        UI.toast(`Stock de ${p.name}: ${p.stock}`);
     },
 
     queueStatusSave(id, status) {
-        clearTimeout(this.timers[id]);
-        this.timers[id] = setTimeout(() => this.saveStatus(id, status), 600);
+        const key = 'status-' + id;
+        clearTimeout(this.timers[key]);
+        this.timers[key] = setTimeout(() => this.saveStatus(id, status), 600);
     },
 
     async saveStatus(id, status) {
@@ -558,8 +565,9 @@ Views.inventario = {
         if (error) { UI.toast('No se pudo guardar el estado: ' + error.message, 'error'); return; }
         const p = this.products.find(x => x.id === id);
         if (p) p.status = status;
-        const cell = document.querySelector(`[data-state="${id}"]`);
-        if (cell) cell.innerHTML = this.state(p);
-        UI.toast(`Estado de ${p?.name || 'producto'}: ${status}`);
+        // Se vuelve a dibujar la lista: "A Pedido" oculta el stock y los contadores de los filtros cambian.
+        this.renderList();
+        const labels = { disponible: 'Disponible', agotado: 'Agotado', a_pedido: 'A Pedido', pocas: 'Pocas Unidades' };
+        UI.toast(`Estado de ${p?.name || 'producto'}: ${labels[status] || status}`);
     }
 };

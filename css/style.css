@@ -1067,39 +1067,8 @@ video.brand-logo { mix-blend-mode: screen; filter: grayscale(1) contrast(1.9) br
 }
 .footer-news p { color: rgba(255,255,255,0.65); margin-bottom: 28px; max-width: 460px; }
 
-.news-form {
-    display: flex;
-    align-items: center;
-    max-width: 480px;
-    border-bottom: 1px solid rgba(255,255,255,0.5);
-    transition: border-color var(--t);
-}
-.news-form:focus-within { border-color: #fff; }
-.news-form input {
-    flex: 1;
-    min-width: 0;
-    height: 52px;
-    background: transparent;
-    border: 0;
-    outline: none;
-    color: #fff;
-    font-size: 16px;
-}
-.news-form input::placeholder { color: rgba(255,255,255,0.45); text-transform: uppercase; font-size: 12px; letter-spacing: 0.12em; }
-.news-form button {
-    width: 48px; height: 52px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: flex-end;
-    color: #fff;
-    transition: color var(--t), transform var(--t);
-}
-.news-form button:hover { color: var(--red); transform: translateX(4px); }
-.news-form button svg { width: 22px; height: 22px; }
-.news-note { margin-top: 12px; font-size: 12px; color: rgba(255,255,255,0.4); }
-.news-msg { margin-top: 12px; font-size: 13px; min-height: 20px; }
-.news-msg.is-ok { color: #7EE2A8; }
-.news-msg.is-error { color: #FF8A9B; }
+.footer-ig svg { width: 20px; height: 20px; }
+.footer-ig span { text-transform: none; letter-spacing: 0.02em; font-size: 14px; }
 
 .footer-cols {
     display: grid;
@@ -1170,8 +1139,7 @@ video.brand-logo { mix-blend-mode: screen; filter: grayscale(1) contrast(1.9) br
 }
 .footer-bottom a:hover { color: #fff; }
 .footer-legal { display: flex; flex-wrap: wrap; gap: 20px; }
-.news-note a, .co-legal a { text-decoration: underline; text-underline-offset: 3px; }
-.news-note a:hover { color: #fff; }
+.co-legal a { text-decoration: underline; text-underline-offset: 3px; }
 .co-legal { margin-top: 12px; font-size: 12px; line-height: 1.5; color: var(--muted); text-align: center; }
 .co-legal a:hover { color: var(--ink); }
 

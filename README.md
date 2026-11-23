@@ -9,14 +9,17 @@ archivos) con un panel de administración con dos roles: **Super Admin** y **Adm
 2. Pega **todo** [`db/schema.sql`](db/schema.sql) y dale **Run**. Crea tablas, seguridad (RLS), funciones,
    categorías y productos iniciales. Se puede volver a correr sin duplicar nada.
 3. **Authentication → Users → Add user → Create new user** (marca *Auto Confirm User*).
-   - La **primera** cuenta que crees queda como **Super Admin**.
-   - Las siguientes quedan **Pendientes** (sin acceso) hasta que un Super Admin les asigne un rol en el panel
-     (Usuarios). Así nadie puede darse acceso solo registrándose con la clave pública del sitio.
-   - El usuario para entrar al panel es lo que va antes de la @ del correo (ej. `admin@popflame.cl` → `admin`).
+   - Toda cuenta nueva queda con acceso **Pendiente** (sin acceso), incluida la primera. Así nadie puede
+     darse acceso solo registrándose con la clave pública del sitio.
+   - Activa la **primera** cuenta como Super Admin en el SQL Editor:
+     `update public.profiles set role = 'super_admin', status = 'active' where id = (select id from auth.users where lower(email) = lower('tu-correo@popflame.cl'));`
+   - Las siguientes se activan desde el panel (**Usuarios** → Acceso: *Activa* → Guardar).
+   - Para entrar al panel se usa lo que va antes de la @ del correo (ej. `admin@popflame.cl` → `admin`)
+     o el correo completo.
 
-Si la base ya existía, en vez del schema completo corre solo los scripts nuevos de `db/` que falten
-(ej. [`db/2026-09-26_create_order_rpc.sql`](db/2026-09-26_create_order_rpc.sql), que hace que el
-servidor calcule precios y totales de cada pedido).
+Si la base ya existía, en vez del schema completo corre solo los scripts nuevos de `db/` que falten, en
+orden de fecha. El último es [`db/2026-11-23_correcciones.sql`](db/2026-11-23_correcciones.sql)
+(los productos *Agotado* ya no se pueden comprar y el login no revela correos de cuentas pendientes).
 
 La URL del proyecto y la clave pública (`sb_publishable_...`) están en
 [`js/supabaseClient.js`](js/supabaseClient.js): es seguro tenerlas en el frontend, todo el acceso lo
@@ -46,8 +49,14 @@ Abre `http://localhost:8000` (no uses `file://`, Supabase necesita un servidor).
 
 `/admin/` → login con usuario y contraseña → `/admin/panel.html`.
 
-- **Super Admin**: todo (además de lo del Admin: categorías, páginas, configuración y usuarios).
-- **Admin**: resumen de ventas, pedidos, inventario, productos, banners y guía de tallas.
+- **Super Admin**: todo (además de lo del Admin: suscriptores, páginas, configuración y usuarios).
+- **Admin**: resumen de ventas, pedidos, inventario, productos, banners, guía de tallas y categorías.
+
+Cada cuenta tiene un **rol** (Admin / Super Admin) y un **acceso** (Activa / Pendiente): una cuenta
+pendiente no entra al panel ni ve datos, tenga el rol que tenga.
+
+Estados de producto: **Disponible**, **Agotado** (no se puede comprar aunque tenga stock cargado),
+**A Pedido** (se acepta sin límite de stock y no lo descuenta) y **Pocas Unidades** (stock normal, con aviso).
 
 Al marcar un pedido como **pagado** el stock se descuenta solo, y se repone si se cancela.
 Los **datos de transferencia** (Configuración → Pagos) se muestran al cliente al confirmar la compra y
@@ -75,7 +84,7 @@ js/
   supabaseClient.js       Cliente Supabase
   products.js             Datos (con caché local), tarjetas de producto, guía de tallas
   cart.js                 Carrito (localStorage), validación de stock, mensaje de WhatsApp
-  app.js                  Núcleo común (menús, búsqueda, newsletter, animaciones)
+  app.js                  Núcleo común (menús, búsqueda, redes, animaciones)
   home.js / category.js / product.js / checkout.js / info.js   Lógica de cada página
 admin/                    Panel de administración
 db/                       schema.sql + scripts de cambios
@@ -85,17 +94,21 @@ supabase/functions/       Edge Functions de correo (bienvenida y producto nuevo)
 Al cambiar CSS/JS, sube el número `?v=` en los `<link>`/`<script>` de las páginas para que los
 navegadores descarguen la versión nueva.
 
-## 6. Correos automáticos (opcional)
+### Pruebas
 
-El newsletter guarda los correos en `subscribers` (se ven en el panel → Suscriptores). Para enviar el
-correo de bienvenida y el aviso de "nuevo drop":
+```bash
+node --test tests/*.cjs
+```
 
-1. Crea una cuenta en [resend.com](https://resend.com) y una API key.
-2. Supabase → **Edge Functions → Deploy a new function**: crea `welcome-email` y `notify-new-product`
-   pegando los archivos de `supabase/functions/`.
-3. Project Settings → Edge Functions → **Secrets**: `RESEND_API_KEY`, y opcionalmente `FROM_EMAIL`
-   (remitente de un dominio verificado en Resend) y `SITE_URL` (por defecto https://pop-flame.vercel.app).
+Revisan permisos del panel, la lógica de la tienda (stock, estados, mensaje de WhatsApp) y que
+`db/schema.sql` mantenga las protecciones de seguridad de los scripts de `db/`.
 
-No hace falta crear un webhook: la base de datos llama sola a `notify-new-product` al crear un producto.
-Ambos correos incluyen el link **Darme de baja** (`pages/baja.html`), que exige la Ley del Consumidor.
-Mientras no verifiques un dominio en Resend, solo llegan al correo con que te registraste en Resend.
+## 6. Instagram en el pie de página
+
+El pie de página invita a seguir la cuenta de Instagram, con el link de **Configuración → Redes**.
+Si ese campo está vacío, el bloque no se muestra.
+
+Antes había un formulario de newsletter. Se quitó porque sin dominio propio los correos no llegan a
+los clientes. Los correos que ya se habían guardado siguen en el panel (**Suscriptores**), y las
+Edge Functions de correo siguen en `supabase/functions/` por si más adelante se activa con un dominio
+(requieren `RESEND_API_KEY` y un dominio verificado en Resend).

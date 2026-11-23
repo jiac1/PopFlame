@@ -35,7 +35,34 @@ test('Super Admin audit events are read-only to ordinary Admin users', () => {
     assert.match(migration, /create\s+or\s+replace\s+function\s+public\.capture_audit_event/i);
 });
 
-test('username lookup that exposed Auth emails is removed', () => {
-    assert.match(migration, /drop\s+function\s+if\s+exists\s+public\.email_for_username\s*\(\s*text\s*\)/i);
-    assert.doesNotMatch(schema, /create\s+or\s+replace\s+function\s+public\.email_for_username/i);
+test('username lookup only reveals the email of active panel accounts', () => {
+    // El login del panel usa email_for_username; 2026-11-14 la borró y rompió el login, 2026-11-16 la
+    // devolvió abierta para cualquier cuenta. 2026-11-23 la deja solo para cuentas activas.
+    const fix = fs.readFileSync(path.join(__dirname, '../db/2026-11-23_correcciones.sql'), 'utf8');
+    for (const sql of [fix, schema]) {
+        const fn = sql.match(/create\s+or\s+replace\s+function\s+public\.email_for_username[\s\S]*?\$\$;/i);
+        assert.ok(fn, 'email_for_username must be defined');
+        assert.match(fn[0], /p\.status\s*=\s*'active'/i);
+    }
+    assert.equal((schema.match(/create\s+or\s+replace\s+function\s+public\.email_for_username/gi) || []).length, 1,
+        'schema.sql must define email_for_username only once');
+});
+
+test('schema.sql matches the hardened model of the migrations', () => {
+    assert.match(schema, /revoke\s+insert\s+on\s+table\s+public\.orders\s+from\s+public\s*,\s*anon\s*,\s*authenticated/i);
+    assert.match(schema, /create\s+policy\s+"categories_write_admins"/i);
+    assert.match(schema, /create\s+table\s+if\s+not\s+exists\s+public\.inventory_movements/i);
+    assert.doesNotMatch(schema, /role\s+in\s*\([^)]*'pending'/i, 'pending must not be a role');
+    assert.doesNotMatch(schema, /k1llu4@|ariaspopflame@/i, 'no hard-coded account emails');
+    // is_admin / is_super_admin always require an active account
+    for (const name of ['is_admin', 'is_super_admin']) {
+        const fns = schema.match(new RegExp(`function\\s+public\\.${name}\\(\\)[\\s\\S]*?\\$\\$;`, 'gi')) || [];
+        assert.ok(fns.length > 0);
+        for (const fn of fns) assert.match(fn, /status\s*=\s*'active'/i);
+    }
+});
+
+test('checkout refuses products manually marked as sold out', () => {
+    const fix = fs.readFileSync(path.join(__dirname, '../db/2026-11-23_correcciones.sql'), 'utf8');
+    for (const sql of [fix, schema]) assert.match(sql, /v_status\s*=\s*'agotado'/);
 });

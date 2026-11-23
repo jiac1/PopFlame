@@ -57,6 +57,11 @@
                 handle ? `Síguenos en Instagram @${handle}` : 'Streetwear hecho en Chile'
             ];
         },
+        // Solo links http(s): evita que un valor raro en Configuración termine como javascript:...
+        safeExternal(url) {
+            const raw = String(url || '').trim();
+            return /^https?:\/\//i.test(raw) ? raw : '';
+        },
         instagramHandle(url) {
             if (!url) return '';
             const m = String(url).match(/instagram\.com\/([^/?#]+)/i);
@@ -66,6 +71,13 @@
 
     const u = PF.url;
     const cfg = cached;
+
+    // Botón del pie de página a Instagram (link de Configuración > Redes). Sin link, el bloque se oculta.
+    function igButton(url) {
+        const href = PF.safeExternal(url);
+        return `<a class="btn btn-light footer-ig" id="footerIg" href="${PF.escape(href || '#')}" target="_blank" rel="noopener">
+            ${ICONS.instagram}<span>${href ? '@' + PF.escape(PF.instagramHandle(href)) : 'Instagram'}</span></a>`;
+    }
 
     function announceHtml(items) {
         const row = items.map(t => `<span class="announce-item">${PF.escape(t)}</span>`).join('');
@@ -162,16 +174,10 @@
             <footer class="site-footer" id="siteFooter">
                 <div class="container">
                     <div class="footer-top">
-                        <div class="footer-news">
-                            <h2>Únete al club PopFlame</h2>
-                            <p>Drops exclusivos, reposiciones y lanzamientos antes que nadie. Sin spam.</p>
-                            <form class="news-form" id="newsForm" novalidate>
-                                <label for="newsEmail" class="sr-only">Tu correo electrónico</label>
-                                <input type="email" id="newsEmail" placeholder="Tu correo electrónico" autocomplete="email" required>
-                                <button type="submit" aria-label="Suscribirme">${ICONS.arrowRight}</button>
-                            </form>
-                            <p class="news-msg" id="newsMsg" role="status"></p>
-                            <p class="news-note">Al suscribirte aceptas nuestra <a href="${u('pages/info.html?slug=privacidad')}">Política de privacidad</a>. Puedes darte de baja cuando quieras.</p>
+                        <div class="footer-news" id="footerNews"${PF.safeExternal(cfg?.socialLinks?.instagram) ? '' : ' hidden'}>
+                            <h2>Síguenos en Instagram</h2>
+                            <p>Los drops, reposiciones y lanzamientos los anunciamos primero en Instagram.</p>
+                            ${igButton(cfg?.socialLinks?.instagram)}
                         </div>
                         <div class="footer-cols">
                             <div class="footer-col">

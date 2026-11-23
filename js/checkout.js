@@ -195,13 +195,13 @@ const Checkout = {
         try {
             const order = await this.createOrder(customer, items);
 
-            const text = CartManager.generateWhatsAppText(customer, order.order_number, items);
+            const text = CartManager.generateWhatsAppText(customer, order.order_number, items, order.total);
             const link = CartManager.whatsappLink(text);
 
             this.saveProfile(profile);
             CartManager.clearCart();
             this.done = true;
-            this.renderConfirmation(order, customer, link);
+            this.renderConfirmation(order, customer, link, items);
 
             if (win && link) win.location.href = link;
             else if (win) win.close();
@@ -216,47 +216,34 @@ const Checkout = {
     },
 
     // Crea el pedido con la función segura del servidor (recalcula precios y valida stock).
-    // Si esa función todavía no está instalada en Supabase, guarda el pedido con un insert simple.
+    // No hay plan B con un insert directo: la base no permite insertar pedidos desde el navegador.
     async createOrder(customer, items) {
         const { data, error } = await supabaseClient.rpc('create_order', {
             p_customer: customer,
             p_items: items.map(i => ({ productId: i.productId, quantity: i.quantity, size: i.size, color: i.color }))
         });
-        if (!error) return Array.isArray(data) ? data[0] : data;
-
-        const missingFn = error.code === 'PGRST202' || /could not find the function/i.test(error.message || '');
-        if (!missingFn) {
-            const e = new Error(error.message);
-            e.userMessage = /stock|existe|vacío|pedidos|minuto/i.test(error.message) ? error.message : null;
-            throw e;
+        if (!error) {
+            const row = Array.isArray(data) ? data[0] : data;
+            if (!row) throw new Error('El servidor no devolvió el pedido');
+            return row;
         }
 
-        const { error: insertError } = await supabaseClient.from('orders').insert({
-            customer_name: customer.name,
-            customer_email: customer.email,
-            customer_phone: customer.phone,
-            customer_address: customer.meetingPoint || null,
-            note: customer.note || null,
-            items,
-            subtotal: CartManager.getSubtotal(),
-            shipping: CartManager.getShipping(),
-            total: CartManager.getTotal(),
-            status: 'pending',
-            payment_method: 'transfer'
-        });
-        if (insertError) throw insertError;
-        return { order_number: '', total: CartManager.getTotal() };
+        // Los mensajes de validación del servidor están pensados para el cliente (stock, talla, datos...).
+        const e = new Error(error.message);
+        e.userMessage = /stock|agotad|existe|vacío|pedidos|minuto|talla|color|cantidad|inválid|demasiados/i.test(error.message || '')
+            ? error.message : null;
+        throw e;
     },
 
-    renderConfirmation(order, customer, link) {
+    renderConfirmation(order, customer, link, items = []) {
         window.scrollTo({ top: 0 });
         document.querySelector('.page-head')?.remove();
         const first = PF.escape(customer.name.split(' ')[0]);
         const transfer = ProductsManager.config.transferInfo;
         const metro = `Coordinamos la entrega en la estación de Metro${customer.meetingPoint ? ` <strong>${PF.escape(customer.meetingPoint)}</strong>` : ''} o el envío a tu región.`;
 
-        // Detectar si hay productos "A Pedido" (encargo) o "Pocas Unidades" en el pedido
-        const items = order.items || [];
+        // Detectar si hay productos "A Pedido" (encargo) o "Pocas Unidades" en el pedido.
+        // (create_order solo devuelve número y total, por eso se usan los productos del carrito.)
         const hasOrderItems = items.some(i => {
             const p = ProductsManager.getProductById(i.productId);
             return p?.status === 'a_pedido';

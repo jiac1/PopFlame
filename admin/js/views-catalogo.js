@@ -113,7 +113,7 @@ Views.productos = {
 
     productState(p) {
         const st = p.status || 'disponible';
-        const labels = { disponible: '<span class="pill ok">Disponible</span>', agotado: '<span class="pill bad">Agotado</span>', a_pedido: '<span class="pill warn">A Pedido</span>' };
+        const labels = { disponible: '<span class="pill ok">Disponible</span>', agotado: '<span class="pill bad">Agotado</span>', a_pedido: '<span class="pill warn">A Pedido</span>', pocas: '<span class="pill warn">Pocas Unidades</span>' };
         return labels[st] || labels.disponible;
     },
 
@@ -179,7 +179,7 @@ Views.productos = {
         const src = p || copyFrom || {};
         const cats = Data.categories || [];
         if (!cats.length) {
-            UI.toast(Admin.isSuper() ? 'Primero crea una categoría en Categorías' : 'Pide a un Super Admin que cree una categoría primero', 'error');
+            UI.toast('Primero crea una categoría en Categorías', 'error');
             return;
         }
         this.photos = (src.images && src.images.length ? src.images : (src.image ? [src.image] : [])).map(url => ({ url }));
@@ -212,7 +212,7 @@ Views.productos = {
                             <span class="error" data-err="price"></span>
                         </div>
                         <div class="field"><label for="pStock">Stock disponible</label><input id="pStock" name="stock" type="number" inputmode="numeric" min="0" value="${src.stock ?? ''}" placeholder="10"><span class="error" data-err="stock"></span></div>
-                        <div class="field"><label for="pStatus">Estado del producto</label><select id="pStatus" name="status"><option value="disponible" ${src.status === 'disponible' ? 'selected' : ''}>Disponible</option><option value="agotado" ${src.status === 'agotado' ? 'selected' : ''}>Agotado</option><option value="a_pedido" ${src.status === 'a_pedido' ? 'selected' : ''}>A Pedido</option></select><span class="hint">"A Pedido": no muestra stock y se aceptan encargos.</span></div>
+                        <div class="field"><label for="pStatus">Estado del producto</label><select id="pStatus" name="status"><option value="disponible" ${src.status === 'disponible' ? 'selected' : ''}>Disponible</option><option value="agotado" ${src.status === 'agotado' ? 'selected' : ''}>Agotado</option><option value="a_pedido" ${src.status === 'a_pedido' ? 'selected' : ''}>A Pedido</option><option value="pocas" ${src.status === 'pocas' ? 'selected' : ''}>Pocas Unidades</option></select><span class="hint">"A Pedido": no muestra stock y se aceptan encargos. "Agotado": no se puede comprar aunque tenga stock.</span></div>
                         <div class="field"><label for="pBadge">Etiqueta en la foto</label>
                             <select id="pBadge" name="badge">
                                 <option value="">Sin etiqueta</option>

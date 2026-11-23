@@ -1,5 +1,5 @@
 // Núcleo de la tienda: se encarga de todo lo común a las páginas (menús, buscador, carrito,
-// newsletter, redes, animaciones) y le entrega los datos a la página actual.
+// redes, animaciones) y le entrega los datos a la página actual.
 //
 // Cada página llama a Site.start({ render(data, { fresh }) { ... } }).
 // render() se ejecuta al instante con el cache y otra vez si Supabase trae datos nuevos.
@@ -124,7 +124,6 @@ const Site = {
             if (first) window.location.href = first.href;
         });
 
-        this.setupNewsletter();
     },
 
     setupHeaderScroll() {
@@ -183,6 +182,15 @@ const Site = {
             el.innerHTML = socials.map(s => `<a href="${PF.escape(s.url)}" target="_blank" rel="noopener">${s.label}</a>`).join('')
                 || '<a href="#" aria-disabled="true">Pronto</a>';
         });
+        const ig = document.getElementById('footerIg');
+        if (ig) {
+            const href = PF.safeExternal(cfg.socialLinks?.instagram);
+            document.getElementById('footerNews').hidden = !href;
+            if (href) {
+                ig.href = href;
+                ig.querySelector('span').textContent = '@' + PF.instagramHandle(href);
+            }
+        }
         const icons = document.getElementById('footerSocial');
         if (icons) {
             icons.innerHTML = socials.map(s =>
@@ -223,40 +231,6 @@ const Site = {
             footer.innerHTML = cats.map(c => `<a href="${catUrl(c)}">${PF.escape(c.name)}</a>`).join('')
                 + `<a href="${PF.url('pages/categoria.html')}">Ver todo</a>`;
         }
-    },
-
-    // ===== Newsletter =====
-    setupNewsletter() {
-        const form = document.getElementById('newsForm');
-        if (!form) return;
-        const msg = document.getElementById('newsMsg');
-        form.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const input = form.querySelector('input');
-            const email = input.value.trim().toLowerCase();
-            msg.className = 'news-msg';
-            if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
-                msg.textContent = 'Ingresa un correo válido.';
-                msg.classList.add('is-error');
-                input.focus();
-                return;
-            }
-            const btn = form.querySelector('button');
-            btn.disabled = true;
-            try {
-                const { error } = await supabaseClient.from('subscribers').insert({ email });
-                if (error && error.code !== '23505') throw error;
-                if (!error) supabaseClient.functions.invoke('welcome-email', { body: { email } }).catch(() => {});
-                msg.textContent = error ? 'Ya estabas suscrito. ¡Gracias por seguirnos!' : '¡Listo! Ya eres parte del club PopFlame.';
-                msg.classList.add('is-ok');
-                form.reset();
-            } catch (err) {
-                msg.textContent = 'No pudimos guardar tu correo. Intenta de nuevo en unos segundos.';
-                msg.classList.add('is-error');
-            } finally {
-                btn.disabled = false;
-            }
-        });
     },
 
     // ===== Animaciones de entrada =====
