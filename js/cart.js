@@ -217,8 +217,10 @@ const CartManager = {
         return `https://wa.me/${n}${text ? `?text=${encodeURIComponent(text)}` : ''}`;
     },
 
-    generateWhatsAppText(customer, orderNumber, items = this.cart) {
+    // total: el que calculó el servidor (create_order); si no viene, se calcula con el carrito.
+    generateWhatsAppText(customer, orderNumber, items = this.cart, total = null) {
         const subtotal = items.reduce((t, i) => t + i.price * i.quantity, 0);
+        const orderTotal = Number.isFinite(Number(total)) && total !== null ? Number(total) : subtotal + this.getShipping();
         const orderItems = [];
         const normalItems = [];
         items.forEach(i => {
@@ -238,10 +240,8 @@ const CartManager = {
         const parts = [
             `Hola PopFlame! Quiero confirmar mi pedido${orderNumber ? ` *${orderNumber}*` : ''}`,
             '',
-            '*Productos:*',
-            normalLines,
-            '',
-            `*Total:* ${this.formatPrice(subtotal + this.getShipping())}`,
+            ...(normalLines ? ['*Productos:*', normalLines, ''] : []),
+            `*Total:* ${this.formatPrice(orderTotal)}`,
             `*Entrega:* ${customer.meetingPoint ? `Metro ${customer.meetingPoint}` : 'Metro de Santiago (a coordinar)'}`,
             '',
             '*Mis datos:*',

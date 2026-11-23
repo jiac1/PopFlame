@@ -283,13 +283,13 @@ Views.usuarios = {
         const { data, error } = await supabaseClient.from('profiles').select('*').order('created_at');
         if (error) throw error;
         const users = data || [];
-        const pending = users.filter(u => u.role === 'pending');
+        const pending = users.filter(u => u.status !== 'active');
 
         view.innerHTML = `
-            ${pending.length ? `<div class="callout is-warn">${ICON.alert}<div><strong>${pending.length} cuenta${pending.length === 1 ? '' : 's'} esperando aprobación.</strong> Asígnale un rol para que pueda entrar, o déjala pendiente si no la reconoces.</div></div>` : ''}
+            ${pending.length ? `<div class="callout is-warn">${ICON.alert}<div><strong>${pending.length} cuenta${pending.length === 1 ? '' : 's'} esperando aprobación.</strong> Cambia su acceso a <em>Activa</em> y guarda para que pueda entrar, o déjala pendiente si no la reconoces.</div></div>` : ''}
             <div class="card">
                 <div class="table-wrap"><table class="table responsive">
-                    <thead><tr><th>Usuario</th><th>Nombre visible</th><th>Permisos</th><th>Desde</th><th></th></tr></thead>
+                    <thead><tr><th>Usuario</th><th>Nombre visible</th><th>Permisos</th><th>Acceso</th><th>Desde</th><th></th></tr></thead>
                     <tbody>${users.map(u => {
                         const me = u.id === Admin.profile.id;
                         return `<tr data-user="${u.id}">
@@ -299,6 +299,11 @@ Views.usuarios = {
                             <td data-label="Permisos">
                                 <select class="input" data-role style="height:36px;width:auto" ${me ? 'disabled title="No puedes cambiar tu propio rol"' : ''}>
                                     ${Object.entries(ROLE_LABEL).map(([k, v]) => `<option value="${k}" ${u.role === k ? 'selected' : ''}>${v}</option>`).join('')}
+                                </select>
+                            </td>
+                            <td data-label="Acceso">
+                                <select class="input" data-status style="height:36px;width:auto" ${me ? 'disabled title="No puedes quitarte el acceso a ti mismo"' : ''}>
+                                    ${Object.entries(ACCESS_LABEL).map(([k, v]) => `<option value="${k}" ${(u.status || 'pending') === k ? 'selected' : ''}>${v}</option>`).join('')}
                                 </select>
                             </td>
                             <td data-label="Desde" class="muted nowrap">${U.date(u.created_at)}</td>
@@ -314,7 +319,7 @@ Views.usuarios = {
                     <dl class="kv">
                         <dt>Super Admin</dt><dd>Todo: además de lo del Admin, categorías, páginas, configuración y usuarios.</dd>
                         <dt>Admin</dt><dd>Pedidos, inventario, productos, banners y guía de tallas.</dd>
-                        <dt>Pendiente</dt><dd>Sin acceso. Así queda toda cuenta nueva hasta que la apruebes.</dd>
+                        <dt>Acceso pendiente</dt><dd>Sin acceso, tenga el rol que tenga. Así queda toda cuenta nueva hasta que la actives.</dd>
                     </dl>
                 </div>
                 <div class="card card-body">
@@ -322,9 +327,9 @@ Views.usuarios = {
                     <ol class="muted" style="margin-left:18px;line-height:1.8">
                         <li>En Supabase: <strong>Authentication → Users → Add user → Create new user</strong>.</li>
                         <li>Correo: <strong>usuario@popflame.cl</strong> (lo que va antes de la @ será su usuario). Marca <em>Auto Confirm User</em>.</li>
-                        <li>Vuelve aquí: aparecerá como <strong>Pendiente</strong>. Elige su rol y guarda.</li>
+                        <li>Vuelve aquí: aparecerá con acceso <strong>Pendiente</strong>. Elige su rol, cambia el acceso a <strong>Activa</strong> y guarda.</li>
                     </ol>
-                    <p class="muted mt-8">Para quitarle el acceso a alguien, déjalo como Pendiente. Borrar la cuenta se hace desde Supabase.</p>
+                    <p class="muted mt-8">Para quitarle el acceso a alguien, cambia su acceso a Pendiente. Borrar la cuenta se hace desde Supabase.</p>
                 </div>
             </div>`;
 
@@ -336,11 +341,12 @@ Views.usuarios = {
             const u = users.find(x => x.id === id);
             const name = row.querySelector('[data-name]').value.trim();
             const role = row.querySelector('[data-role]').value;
+            const status = row.querySelector('[data-status]').value;
             if (role !== u.role && role === 'super_admin' &&
                 !(await UI.confirm({ title: `¿Dar permisos de Super Admin a ${u.username}?`, text: 'Podrá cambiar la configuración, las páginas y los permisos de todos.', ok: 'Dar permisos', danger: false }))) return;
             UI.setLoading(btn, true);
             const payload = { name: name || u.username };
-            if (id !== Admin.profile.id) payload.role = role;
+            if (id !== Admin.profile.id) { payload.role = role; payload.status = status; }
             const { error } = await supabaseClient.from('profiles').update(payload).eq('id', id);
             UI.setLoading(btn, false);
             if (error) return UI.toast('No se pudo guardar: ' + error.message, 'error');
@@ -350,8 +356,8 @@ Views.usuarios = {
                 document.getElementById('meName').textContent = payload.name;
                 document.getElementById('meAvatar').textContent = U.initials(payload.name);
             }
-            UI.toast(`${u.username}: ${ROLE_LABEL[u.role]}`);
-            if (role !== 'pending' && pending.some(p => p.id === id)) Admin.route();
+            UI.toast(`${u.username}: ${ROLE_LABEL[u.role]} · ${ACCESS_LABEL[u.status] || u.status}`);
+            if (pending.some(p => p.id === id) !== (u.status !== 'active')) Admin.route();
         });
     }
 };

@@ -77,7 +77,9 @@ const ProductsManager = {
             images,
             description: p.description || '',
             featured: !!p.featured,
-            stock: Number(p.stock ?? 0),
+            // "Agotado" es un estado manual: la tienda lo trata como sin stock aunque quede stock cargado
+            // (el servidor tampoco lo deja comprar).
+            stock: p.status === 'agotado' ? 0 : Number(p.stock ?? 0),
             status: p.status || 'disponible',
             badge: p.badge || '',
             createdAt: p.created_at

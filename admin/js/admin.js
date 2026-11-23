@@ -52,7 +52,8 @@ const ORDER_STATUS = {
 };
 const PAID_STATUSES = ['confirmed', 'processing', 'shipped', 'delivered'];
 
-const ROLE_LABEL = { super_admin: 'Super Admin', admin: 'Admin', pending: 'Pendiente' };
+const ROLE_LABEL = { super_admin: 'Super Admin', admin: 'Admin' };
+const ACCESS_LABEL = { active: 'Activa', pending: 'Pendiente (sin acceso)' };
 
 // ============================================================
 // Sesión
@@ -64,7 +65,8 @@ const AdminAuth = {
             if (!session) return null;
             const { data: profile, error } = await supabaseClient
                 .from('profiles').select('*').eq('id', session.user.id).maybeSingle();
-            if (error || !profile || !['admin', 'super_admin'].includes(profile.role)) return null;
+            // Solo cuentas activas con rol admin/super_admin (una cuenta "pendiente" no entra al panel).
+            if (error || !PFAccess.canAccess(profile)) return null;
             return profile;
         } catch (e) {
             return null;
@@ -83,15 +85,20 @@ const AdminAuth = {
     async login(username, password) {
         if (!username || !password) throw new Error('Ingresa tu usuario y contraseña.');
 
-        const { data: email, error: rpcErr } = await supabaseClient.rpc('email_for_username', { p_username: username });
-        if (rpcErr) throw new Error('No pudimos conectar con el servidor. Revisa tu conexión e intenta de nuevo.');
-        if (!email) throw new Error('Usuario o contraseña incorrectos.');
+        // Se puede entrar con el usuario ("admin") o con el correo completo ("admin@popflame.cl").
+        let email = username.includes('@') ? username.trim().toLowerCase() : null;
+        if (!email) {
+            const { data, error: rpcErr } = await supabaseClient.rpc('email_for_username', { p_username: username });
+            if (rpcErr) throw new Error('No pudimos conectar con el servidor. Revisa tu conexión e intenta de nuevo.');
+            if (!data) throw new Error('Usuario o contraseña incorrectos.');
+            email = data;
+        }
 
         const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
         if (error) throw new Error('Usuario o contraseña incorrectos.');
 
-        const { data: profile } = await supabaseClient.from('profiles').select('role').eq('id', data.user.id).maybeSingle();
-        if (!profile || profile.role === 'pending') {
+        const { data: profile } = await supabaseClient.from('profiles').select('role, status').eq('id', data.user.id).maybeSingle();
+        if (!PFAccess.canAccess(profile)) {
             await supabaseClient.auth.signOut();
             throw new Error('Tu cuenta todavía no está aprobada. Pídele a un Super Admin que la active.');
         }
@@ -363,15 +370,15 @@ const Admin = {
         { id: 'productos', label: 'Productos', icon: 'shirt' },
         { id: 'banners', label: 'Banners', icon: 'image' },
         { id: 'tallas', label: 'Guía de tallas', icon: 'ruler' },
+        { id: 'categorias', label: 'Categorías', icon: 'folder' },
         { title: 'Super Admin', superOnly: true },
-        { id: 'categorias', label: 'Categorías', icon: 'folder', superOnly: true },
         { id: 'suscriptores', label: 'Suscriptores', icon: 'mail', superOnly: true },
         { id: 'paginas', label: 'Páginas', icon: 'page', superOnly: true },
         { id: 'configuracion', label: 'Configuración', icon: 'settings', superOnly: true },
         { id: 'usuarios', label: 'Usuarios', icon: 'users', superOnly: true }
     ],
 
-    isSuper() { return this.profile?.role === 'super_admin'; },
+    isSuper() { return PFAccess.isSuper(this.profile); },
 
     async init(profile) {
         this.profile = profile;
