@@ -39,3 +39,10 @@ test('inventory saves stock through the audited RPC and keeps separate timers', 
 test('checkout has no direct insert fallback into orders', () => {
     assert.doesNotMatch(read('js/checkout.js'), /from\('orders'\)\.insert/);
 });
+
+test('panel has a change-password button that checks the current password first', () => {
+    assert.match(read('admin/panel.html'), /id="passwordBtn"/);
+    const fn = admin.slice(admin.indexOf('async changePassword('), admin.indexOf('async logout('));
+    assert.ok(fn.indexOf('signInWithPassword') > -1 && fn.indexOf('signInWithPassword') < fn.indexOf('updateUser'),
+        'must verify the current password before updating it');
+});
