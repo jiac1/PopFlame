@@ -165,10 +165,16 @@ const ProductsManager = {
 
     // Ruta de imagen: URL absoluta (Supabase Storage) se usa tal cual; ruta local se resuelve
     // desde la raíz del sitio, sin importar en qué carpeta esté la página.
+    // Solo acepta http(s), rutas locales e imágenes data: (nunca javascript: ni similares).
+    // El resultado es una URL sin escapar: al ponerla dentro de un atributo HTML usar PF.escape().
     resolveImagePath(path) {
-        if (!path) return PF.url('images/products/poleras/placeholder.svg');
-        if (/^(https?:)?\/\//i.test(path) || path.startsWith('data:')) return path;
-        return PF.url(path);
+        const placeholder = PF.url('images/products/poleras/placeholder.svg');
+        const raw = String(path || '').trim();
+        if (!raw) return placeholder;
+        const safe = PFSafety.safeMediaUrl(raw, { allowDataImage: true });
+        if (!safe) return placeholder;
+        if (/^(https?:)?\/\//i.test(safe) || safe.startsWith('data:')) return safe;
+        return PF.url(safe);
     },
 
     colorMap: {
@@ -310,9 +316,8 @@ const ProductsManager = {
         return `
             <a href="${this.productUrl(product)}" class="product-card${stock === 'out' ? ' product-soldout' : ''}">
                 <div class="product-media${alt ? ' has-alt' : ''}">
-                    <img class="img-main" src="${main}" alt="${name}" loading="${loading}" decoding="async"
-                         onerror="this.onerror=null;this.src='${PF.url('images/products/poleras/placeholder.svg')}'">
-                    ${alt ? `<img class="img-alt" src="${alt}" alt="" loading="lazy" decoding="async" aria-hidden="true">` : ''}
+                    <img class="img-main" src="${PF.escape(main)}" alt="${name}" loading="${loading}" decoding="async" data-fallback>
+                    ${alt ? `<img class="img-alt" src="${PF.escape(alt)}" alt="" loading="lazy" decoding="async" aria-hidden="true">` : ''}
                     ${tags.length ? `<div class="product-tags">${tags.join('')}</div>` : ''}
                     ${quick}
                 </div>
@@ -342,6 +347,17 @@ const ProductsManager = {
         container.innerHTML = products.map((p, i) => this.createProductCard(p, { eager: opts.eagerCount ? i < opts.eagerCount : false })).join('');
     }
 };
+
+// Foto que no carga -> imagen genérica. Reemplaza el antiguo onerror="" en línea (lo bloquearía
+// la Content-Security-Policy). El evento "error" no burbujea, por eso se escucha en captura.
+if (typeof document !== 'undefined') {
+    document.addEventListener('error', (e) => {
+        const img = e.target;
+        if (!(img instanceof HTMLImageElement) || !img.hasAttribute('data-fallback')) return;
+        img.removeAttribute('data-fallback');
+        img.src = PF.url('images/products/poleras/placeholder.svg');
+    }, true);
+}
 
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = ProductsManager;

@@ -88,18 +88,18 @@ const Product = {
         const grid = document.getElementById('pdpGrid');
         grid.classList.toggle('is-single', this.images.length === 1);
         grid.innerHTML = this.images.map((src, i) =>
-            `<button type="button" data-zoom="${i}" aria-label="Ampliar foto ${i + 1}"><img src="${src}" alt="${alt(i)}" ${i < 2 ? 'fetchpriority="high"' : 'loading="lazy"'} decoding="async"></button>`).join('');
+            `<button type="button" data-zoom="${i}" aria-label="Ampliar foto ${i + 1}"><img src="${PF.escape(src)}" alt="${alt(i)}" ${i < 2 ? 'fetchpriority="high"' : 'loading="lazy"'} decoding="async"></button>`).join('');
 
         const track = document.getElementById('pdpTrack');
         track.innerHTML = this.images.map((src, i) =>
-            `<button type="button" data-zoom="${i}" aria-label="Ampliar foto ${i + 1}"><img src="${src}" alt="${alt(i)}" ${i === 0 ? 'fetchpriority="high"' : 'loading="lazy"'} decoding="async"></button>`).join('');
+            `<button type="button" data-zoom="${i}" aria-label="Ampliar foto ${i + 1}"><img src="${PF.escape(src)}" alt="${alt(i)}" ${i === 0 ? 'fetchpriority="high"' : 'loading="lazy"'} decoding="async"></button>`).join('');
         track.scrollLeft = 0;
 
         const dots = document.getElementById('pdpDots');
         dots.innerHTML = this.images.length > 1 ? this.images.map((_, i) => `<span class="${i === 0 ? 'is-active' : ''}"></span>`).join('') : '';
 
         document.getElementById('lightboxTrack').innerHTML = this.images.map((src, i) =>
-            `<figure><img src="${src}" alt="${alt(i)}" decoding="async"></figure>`).join('');
+            `<figure><img src="${PF.escape(src)}" alt="${alt(i)}" decoding="async"></figure>`).join('');
     },
 
     // ===== Opciones =====

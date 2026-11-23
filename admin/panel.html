@@ -12,7 +12,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@110..125,700..900&family=Inter:wght@400;500;600;700&display=swap">
-    <link rel="stylesheet" href="css/admin.css?v=10">
+    <link rel="stylesheet" href="css/admin.css?v=11">
 </head>
 <body>
     <div class="app">
@@ -77,18 +77,14 @@
 
     <div class="toasts" id="toasts" aria-live="polite"></div>
 
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2"></script>
-    <script src="../js/supabaseClient.js?v=9"></script>
-    <script src="js/access-control.js?v=10"></script>
-    <script src="js/admin.js?v=10"></script>
-    <script src="js/views-ventas.js?v=9"></script>
-    <script src="js/views-catalogo.js?v=9"></script>
-    <script src="js/views-sitio.js?v=10"></script>
-    <script>
-        (async () => {
-            const profile = await AdminAuth.requireAuth();
-            if (profile) AdminPanel.init(profile);
-        })();
-    </script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js" integrity="sha384-Rj26LVGvoeRVR6+mwQmFfcR3QOBEwT+ZmuCWpuiqeTzJpCs0ER4ITAWGb4Hiy3Ok" crossorigin="anonymous"></script>
+    <script src="../js/supabaseClient.js?v=11"></script>
+    <script src="../js/safety.js?v=15"></script>
+    <script src="js/access-control.js?v=11"></script>
+    <script src="js/admin.js?v=11"></script>
+    <script src="js/views-ventas.js?v=11"></script>
+    <script src="js/views-catalogo.js?v=11"></script>
+    <script src="js/views-sitio.js?v=11"></script>
+    <script src="js/panel-boot.js?v=11"></script>
 </body>
 </html>

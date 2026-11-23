@@ -35,17 +35,16 @@ test('Super Admin audit events are read-only to ordinary Admin users', () => {
     assert.match(migration, /create\s+or\s+replace\s+function\s+public\.capture_audit_event/i);
 });
 
-test('username lookup only reveals the email of active panel accounts', () => {
-    // El login del panel usa email_for_username; 2026-11-14 la borró y rompió el login, 2026-11-16 la
-    // devolvió abierta para cualquier cuenta. 2026-11-23 la deja solo para cuentas activas.
-    const fix = fs.readFileSync(path.join(__dirname, '../db/2026-11-23_correcciones.sql'), 'utf8');
-    for (const sql of [fix, schema]) {
-        const fn = sql.match(/create\s+or\s+replace\s+function\s+public\.email_for_username[\s\S]*?\$\$;/i);
-        assert.ok(fn, 'email_for_username must be defined');
-        assert.match(fn[0], /p\.status\s*=\s*'active'/i);
+test('username lookup no longer exists: the panel logs in with the full email', () => {
+    // Historia: 2026-11-14 borró email_for_username y rompió el login (el panel aún la usaba),
+    // 2026-11-23 la limitó a cuentas activas y 2026-11-25 la elimina junto con su uso en el panel,
+    // porque igual le revelaba a cualquier visitante el correo de cada cuenta activa.
+    const audit = fs.readFileSync(path.join(__dirname, '../db/2026-11-25_auditoria.sql'), 'utf8');
+    for (const sql of [audit, schema]) {
+        assert.doesNotMatch(sql, /create\s+or\s+replace\s+function\s+public\.email_for_username/i);
+        assert.match(sql, /drop\s+function\s+if\s+exists\s+public\.email_for_username\(text\)/i);
     }
-    assert.equal((schema.match(/create\s+or\s+replace\s+function\s+public\.email_for_username/gi) || []).length, 1,
-        'schema.sql must define email_for_username only once');
+    assert.doesNotMatch(fs.readFileSync(path.join(__dirname, '../admin/js/admin.js'), 'utf8'), /email_for_username/);
 });
 
 test('schema.sql matches the hardened model of the migrations', () => {

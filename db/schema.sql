@@ -45,12 +45,11 @@ create table if not exists public.products (
     --   'pocas'      = quedan pocas unidades (sí descuenta stock)
     status        text not null default 'disponible' check (status in ('disponible', 'agotado', 'a_pedido', 'pocas')),
     badge        text,
+    -- Cuándo se anunció por correo a los suscriptores (la Edge Function lo marca una sola vez).
+    newsletter_sent_at timestamptz,
     created_at   timestamptz not null default now(),
     updated_at   timestamptz not null default now()
 );
-
--- Los productos que ya existían quedan con su estado inicial coherente.
-update public.products set status = 'agotado' where stock <= 0 and status = 'disponible';
 
 create sequence if not exists public.order_number_seq start 1;
 
@@ -165,6 +164,11 @@ alter table public.products drop constraint if exists products_status_check;
 alter table public.products add constraint products_status_check
     check (status in ('disponible', 'agotado', 'a_pedido', 'pocas'));
 
+-- Marca de "producto ya anunciado por correo". Los que ya existían no se vuelven a anunciar.
+alter table public.products add column if not exists newsletter_sent_at timestamptz;
+update public.products set newsletter_sent_at = created_at
+ where newsletter_sent_at is null and created_at < now() - interval '15 minutes';
+
 -- Marca de stock aplicado en los pedidos (la usa el trigger de stock).
 alter table public.orders add column if not exists stock_applied boolean not null default false;
 
@@ -237,13 +241,21 @@ language sql stable security definer set search_path = public, pg_temp as $$
 $$;
 
 -- Toda cuenta nueva queda pendiente hasta que un Super Admin la apruebe.
+-- El usuario es lo que va antes de la @; si ya existe se agrega un número (juan, juan2, ...).
 create or replace function public.handle_new_user()
 returns trigger
 language plpgsql security definer set search_path = public, pg_temp as $$
 declare
-    v_username text := lower(split_part(coalesce(new.email, ''), '@', 1));
+    v_base text := lower(split_part(coalesce(new.email, ''), '@', 1));
+    v_username text;
+    v_n integer := 1;
 begin
-    if v_username = '' then raise exception 'El usuario necesita un correo válido'; end if;
+    if v_base = '' then raise exception 'El usuario necesita un correo válido'; end if;
+    v_username := v_base;
+    while exists (select 1 from public.profiles where lower(username) = v_username) loop
+        v_n := v_n + 1;
+        v_username := v_base || v_n;
+    end loop;
     insert into public.profiles (id, username, role, status, name)
     values (new.id, v_username, 'admin', 'pending', v_username)
     on conflict (id) do nothing;
@@ -256,20 +268,9 @@ create trigger on_auth_user_created
     after insert on auth.users
     for each row execute procedure public.handle_new_user();
 
--- Login del panel con nombre de usuario: devuelve el correo solo de cuentas ACTIVAS.
-create or replace function public.email_for_username(p_username text)
-returns text
-language sql stable security definer set search_path = public, pg_temp as $$
-    select u.email::text
-      from auth.users u
-      join public.profiles p on p.id = u.id
-     where lower(p.username) = lower(trim(p_username))
-       and p.status = 'active'
-     limit 1;
-$$;
-
-revoke all on function public.email_for_username(text) from public;
-grant execute on function public.email_for_username(text) to anon, authenticated;
+-- El panel se entra con el correo completo. La antigua búsqueda pública "usuario -> correo"
+-- (email_for_username) revelaba el correo de cada cuenta activa a cualquier visitante.
+drop function if exists public.email_for_username(text);
 
 -- Solo un Super Admin activo puede cambiar roles, estados o nombres de usuario,
 -- y siempre debe quedar al menos un Super Admin activo.
@@ -565,15 +566,16 @@ create policy "size_guide_write_admins" on public.size_guide
 
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values ('product-images', 'product-images', true, 10485760,
-        array['image/png','image/jpeg','image/webp','image/svg+xml','image/gif'])
+        array['image/png','image/jpeg','image/webp','image/gif'])
 on conflict (id) do update set
     file_size_limit = excluded.file_size_limit,
     allowed_mime_types = excluded.allowed_mime_types;
 
 -- site-assets acepta imágenes Y video/gif (logo o banner animado/en movimiento), hasta 50MB.
+-- Sin SVG en ningún bucket: un SVG puede llevar scripts.
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values ('site-assets', 'site-assets', true, 52428800,
-        array['image/png','image/jpeg','image/webp','image/svg+xml','image/gif','video/mp4','video/webm','video/quicktime'])
+        array['image/png','image/jpeg','image/webp','image/gif','video/mp4','video/webm','video/quicktime'])
 on conflict (id) do update set
     file_size_limit = excluded.file_size_limit,
     allowed_mime_types = excluded.allowed_mime_types;
@@ -967,23 +969,45 @@ begin
         end loop;
         new.stock_applied := true;
     elsif not v_is_paid and old.stock_applied then
-        for v_product_id, v_quantity in
-            select (item->>'productId')::bigint, sum((item->>'quantity')::integer)::integer
-              from jsonb_array_elements(new.items) as line(item)
-             group by 1 order by 1
-        loop
-            if v_quantity is null or v_quantity <= 0 then
-                raise exception 'Cantidad inválida en el pedido %', new.order_number;
-            end if;
-            perform set_config('popflame.stock_reason', 'Reversa del pedido ' || new.order_number, true);
-            perform set_config('popflame.stock_order_id', new.id::text, true);
-            update public.products
-               set stock = stock + v_quantity
-             where id = v_product_id
-               and (status is null or status <> 'a_pedido');
-            perform set_config('popflame.stock_reason', '', true);
-            perform set_config('popflame.stock_order_id', '', true);
-        end loop;
+        if exists (select 1 from public.inventory_movements where order_id = new.id) then
+            -- Se repone exactamente lo que este pedido descontó (neto de reversas anteriores).
+            -- Así no importa si el producto cambió de estado (ej. "A Pedido" <-> "Disponible")
+            -- entre el pago y la cancelación.
+            for v_product_id, v_quantity in
+                select product_id, (-sum(delta))::integer
+                  from public.inventory_movements
+                 where order_id = new.id and product_id is not null
+                 group by 1
+                having sum(delta) < 0
+                 order by 1
+            loop
+                perform set_config('popflame.stock_reason', 'Reversa del pedido ' || new.order_number, true);
+                perform set_config('popflame.stock_order_id', new.id::text, true);
+                update public.products set stock = stock + v_quantity where id = v_product_id;
+                perform set_config('popflame.stock_reason', '', true);
+                perform set_config('popflame.stock_order_id', '', true);
+            end loop;
+        else
+            -- Pedidos pagados antes de que existiera el historial de inventario: se repone
+            -- según los productos del pedido, como antes.
+            for v_product_id, v_quantity in
+                select (item->>'productId')::bigint, sum((item->>'quantity')::integer)::integer
+                  from jsonb_array_elements(new.items) as line(item)
+                 group by 1 order by 1
+            loop
+                if v_quantity is null or v_quantity <= 0 then
+                    raise exception 'Cantidad inválida en el pedido %', new.order_number;
+                end if;
+                perform set_config('popflame.stock_reason', 'Reversa del pedido ' || new.order_number, true);
+                perform set_config('popflame.stock_order_id', new.id::text, true);
+                update public.products
+                   set stock = stock + v_quantity
+                 where id = v_product_id
+                   and (status is null or status <> 'a_pedido');
+                perform set_config('popflame.stock_reason', '', true);
+                perform set_config('popflame.stock_order_id', '', true);
+            end loop;
+        end if;
         new.stock_applied := false;
     end if;
     return new;
@@ -994,6 +1018,23 @@ drop trigger if exists trg_orders_z_apply_stock on public.orders;
 create trigger trg_orders_z_apply_stock
     before update on public.orders
     for each row execute procedure public.orders_apply_stock();
+
+-- Un pedido que ya descontó stock no se elimina: primero se cancela (así el stock vuelve).
+create or replace function public.orders_block_delete_applied()
+returns trigger
+language plpgsql set search_path = public, pg_temp as $$
+begin
+    if old.stock_applied then
+        raise exception 'Este pedido ya descontó stock. Cancélalo primero (así el stock vuelve) y después elimínalo.';
+    end if;
+    return old;
+end;
+$$;
+
+drop trigger if exists trg_orders_block_delete_applied on public.orders;
+create trigger trg_orders_block_delete_applied
+    before delete on public.orders
+    for each row execute procedure public.orders_block_delete_applied();
 
 -- Checkout: el servidor calcula los precios y valida el stock.
 create or replace function public.create_order(p_customer jsonb, p_items jsonb)

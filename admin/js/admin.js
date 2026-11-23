@@ -82,20 +82,15 @@ const AdminAuth = {
         return profile;
     },
 
-    async login(username, password) {
-        if (!username || !password) throw new Error('Ingresa tu usuario y contraseña.');
-
-        // Se puede entrar con el usuario ("admin") o con el correo completo ("admin@popflame.cl").
-        let email = username.includes('@') ? username.trim().toLowerCase() : null;
-        if (!email) {
-            const { data, error: rpcErr } = await supabaseClient.rpc('email_for_username', { p_username: username });
-            if (rpcErr) throw new Error('No pudimos conectar con el servidor. Revisa tu conexión e intenta de nuevo.');
-            if (!data) throw new Error('Usuario o contraseña incorrectos.');
-            email = data;
-        }
+    // Se entra con el correo completo ("admin@popflame.cl"). Antes también se podía con el usuario,
+    // pero eso necesitaba una función pública que le revelaba a cualquiera el correo de cada cuenta.
+    async login(emailInput, password) {
+        const email = String(emailInput || '').trim().toLowerCase();
+        if (!email || !password) throw new Error('Ingresa tu correo y contraseña.');
+        if (!email.includes('@')) throw new Error('Ingresa tu correo completo (ej. admin@popflame.cl).');
 
         const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
-        if (error) throw new Error('Usuario o contraseña incorrectos.');
+        if (error) throw new Error('Correo o contraseña incorrectos.');
 
         const { data: profile } = await supabaseClient.from('profiles').select('role, status').eq('id', data.user.id).maybeSingle();
         if (!PFAccess.canAccess(profile)) {
@@ -154,13 +149,29 @@ const U = {
         if (s < 86400 * 7) { const n = Math.floor(s / 86400); return `hace ${n} día${n === 1 ? '' : 's'}`; }
         return U.date(d);
     },
+    // Ruta de imagen lista para ponerla dentro de src="..." (validada y escapada).
     img(path) {
-        if (!path) return '../images/products/poleras/placeholder.svg';
-        if (/^(https?:)?\/\//i.test(path) || path.startsWith('blob:') || path.startsWith('data:')) return path;
-        return '../' + path.replace(/^\/+/, '');
+        const placeholder = '../images/products/poleras/placeholder.svg';
+        const raw = String(path || '').trim();
+        if (!raw) return placeholder;
+        const safe = PFSafety.safeMediaUrl(raw, { allowBlob: true, allowDataImage: true });
+        if (!safe) return placeholder;
+        if (/^(https?:)?\/\//i.test(safe) || safe.startsWith('blob:') || safe.startsWith('data:')) return U.esc(safe);
+        return U.esc('../' + safe.replace(/^\/+/, ''));
     },
     isVideo: (url) => /\.(mp4|webm|mov)(\?.*)?$/i.test(url || ''),
     int(v) { const n = parseInt(String(v).replace(/[^\d-]/g, ''), 10); return isNaN(n) ? null : n; },
+    // Trae TODAS las filas de una consulta en tandas de 1000 (Supabase devuelve como máximo
+    // 1000 por consulta y cortaba la lista sin avisar). build() arma la consulta ya ordenada.
+    async fetchAll(build, pageSize = 1000) {
+        const all = [];
+        for (let from = 0; ; from += pageSize) {
+            const { data, error } = await build().range(from, from + pageSize - 1);
+            if (error) throw error;
+            all.push(...(data || []));
+            if (!data || data.length < pageSize) return all;
+        }
+    },
     debounce(fn, ms) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; },
     slug(s) {
         return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
@@ -190,7 +201,7 @@ const U = {
     },
     errorBox(err) {
         return `<div class="card">${U.empty('alert', 'No pudimos cargar esta sección', U.esc(err?.message || 'Revisa tu conexión e intenta de nuevo.'),
-            '<button class="btn btn-ghost" onclick="Admin.route()">Reintentar</button>')}</div>`;
+            '<button class="btn btn-ghost" data-retry>Reintentar</button>')}</div>`;
     },
 
     colorMap: {
@@ -442,7 +453,11 @@ const Admin = {
         document.getElementById('nav').addEventListener('click', () => toggle(false));
 
         document.getElementById('sheetOverlay').addEventListener('click', () => UI.closeSheet());
-        document.addEventListener('click', (e) => { if (e.target.closest('[data-sheet-close]')) UI.closeSheet(); });
+        document.addEventListener('click', (e) => {
+            if (e.target.closest('[data-sheet-close]')) UI.closeSheet();
+            // Botón "Reintentar" de U.errorBox (sin onclick en línea, por la Content-Security-Policy)
+            if (e.target.closest('[data-retry]')) this.route();
+        });
         document.addEventListener('keydown', (e) => {
             if (e.key !== 'Escape') return;
             if (document.getElementById('dialog').classList.contains('is-open')) return;

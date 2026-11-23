@@ -81,6 +81,9 @@ Views.productos = {
         document.getElementById('prodCat').addEventListener('change', e => { this.cat = e.target.value; this.renderList(); });
         const card = document.getElementById('prodCard');
         card.addEventListener('click', (e) => {
+            // (Sin onclick en línea, por la Content-Security-Policy)
+            if (e.target.closest('[data-new-product]')) return this.edit();
+            if (e.target.closest('[data-external]')) return; // link "Ver en la tienda": no abre el editor
             const act = e.target.closest('[data-act]');
             if (act) {
                 e.stopPropagation();
@@ -124,7 +127,7 @@ Views.productos = {
         if (!list.length) {
             card.innerHTML = this.products.length
                 ? U.empty('search', 'Sin resultados', 'Ningún producto coincide con la búsqueda.')
-                : U.empty('shirt', 'Aún no hay productos', 'Crea el primero y aparecerá en la tienda al instante.', `<button class="btn btn-dark" onclick="Views.productos.edit()">${ICON.plus}Nuevo producto</button>`);
+                : U.empty('shirt', 'Aún no hay productos', 'Crea el primero y aparecerá en la tienda al instante.', `<button class="btn btn-dark" data-new-product>${ICON.plus}Nuevo producto</button>`);
             return;
         }
         const allOn = list.every(p => this.selected.has(p.id));
@@ -147,7 +150,7 @@ Views.productos = {
                         <td data-label="Estado" class="num strong">${this.productState(p)}</td>
                         <td data-label="Tallas"><span class="muted">${U.esc((p.sizes || []).join(', ') || '—')}</span></td>
                         <td class="actions">
-                            <a class="icon-btn" href="../pages/producto.html?id=${p.id}" target="_blank" rel="noopener" title="Ver en la tienda" onclick="event.stopPropagation()">${ICON.external}</a>
+                            <a class="icon-btn" href="../pages/producto.html?id=${p.id}" target="_blank" rel="noopener" title="Ver en la tienda" data-external>${ICON.external}</a>
                             <button class="icon-btn" data-act="dup" data-id="${p.id}" title="Duplicar">${ICON.copy}</button>
                             <button class="icon-btn is-danger" data-act="del" data-id="${p.id}" title="Eliminar">${ICON.trash}</button>
                         </td>
@@ -375,7 +378,6 @@ Views.productos = {
                 name,
                 category_id: document.getElementById('pCat').value,
                 price,
-                stock,
                 status,
                 sizes,
                 colors: ChipPicker.values(document.getElementById('pColors')),
@@ -385,12 +387,28 @@ Views.productos = {
                 description: document.getElementById('pDesc').value.trim(),
                 featured: document.getElementById('pFeatured').checked
             };
+            // El stock NO va en el update de la ficha: si mientras editabas se pagó un pedido, el
+            // formulario traía un stock viejo y lo pisaba. Se guarda aparte con set_product_stock,
+            // que solo lo cambia si sigue siendo el que viste al abrir (y deja el movimiento auditado).
             const { error } = existing
                 ? await supabaseClient.from('products').update(payload).eq('id', existing.id)
-                : await supabaseClient.from('products').insert(payload);
+                : await supabaseClient.from('products').insert({ ...payload, stock });
             if (error) {
                 if (error.code === '23505') { err('name', 'Ya existe un producto con ese nombre.'); throw new Error('Ya existe un producto con ese nombre'); }
                 throw error;
+            }
+            if (existing && stock !== existing.stock) {
+                const { error: stockError } = await supabaseClient.rpc('set_product_stock', {
+                    p_product_id: existing.id, p_stock: stock, p_expected_stock: existing.stock, p_reason: 'Edición del producto'
+                });
+                if (stockError) {
+                    await UI.closeSheet(true);
+                    UI.toast(stockError.code === '40001'
+                        ? 'Se guardó la ficha, pero el stock cambió mientras editabas (por ejemplo, se pagó un pedido). Revisa el stock actual y ajústalo de nuevo.'
+                        : 'Se guardó la ficha, pero no el stock: ' + stockError.message, 'error');
+                    Admin.route();
+                    return;
+                }
             }
             await UI.closeSheet(true);
             UI.toast(existing ? 'Cambios guardados' : 'Producto creado — ya está en la tienda');
@@ -442,13 +460,36 @@ Views.productos = {
                 const priceRaw = document.getElementById('bPrice').value.trim();
                 if (cat) payload.category_id = cat;
                 if (feat) payload.featured = feat === '1';
-                if (stockRaw) { const s = U.int(stockRaw); if (s === null || s < 0) return UI.toast('Stock inválido', 'error'); payload.stock = s; }
+                let newStock = null;
+                if (stockRaw) { newStock = U.int(stockRaw); if (newStock === null || newStock < 0) return UI.toast('Stock inválido', 'error'); }
                 if (priceRaw) { const pr = U.int(priceRaw); if (!pr || pr <= 0) return UI.toast('Precio inválido', 'error'); payload.price = pr; }
-                if (!Object.keys(payload).length) return UI.toast('No cambiaste ningún campo', 'error');
-                UI.setLoading(e.currentTarget, true);
-                const { error } = await supabaseClient.from('products').update(payload).in('id', ids);
-                UI.setLoading(e.currentTarget, false);
-                if (error) return UI.toast('No se pudo aplicar: ' + error.message, 'error');
+                if (!Object.keys(payload).length && newStock === null) return UI.toast('No cambiaste ningún campo', 'error');
+                const btn = e.currentTarget;
+                UI.setLoading(btn, true);
+                if (Object.keys(payload).length) {
+                    const { error } = await supabaseClient.from('products').update(payload).in('id', ids);
+                    if (error) { UI.setLoading(btn, false); return UI.toast('No se pudo aplicar: ' + error.message, 'error'); }
+                }
+                // El stock va producto por producto por la función auditada (rechaza si cambió en otra sesión).
+                if (newStock !== null) {
+                    const failed = [];
+                    for (const id of ids) {
+                        const p = this.products.find(x => x.id === id);
+                        if (!p || p.stock === newStock) continue;
+                        const { error } = await supabaseClient.rpc('set_product_stock', {
+                            p_product_id: id, p_stock: newStock, p_expected_stock: p.stock, p_reason: 'Edición en lote'
+                        });
+                        if (error) failed.push(p.name);
+                    }
+                    if (failed.length) {
+                        UI.setLoading(btn, false);
+                        await UI.closeSheet(true);
+                        UI.toast(`No se pudo cambiar el stock de: ${failed.join(', ')}. Puede que haya cambiado en otra sesión; revísalo.`, 'error');
+                        Admin.route();
+                        return;
+                    }
+                }
+                UI.setLoading(btn, false);
                 await UI.closeSheet(true);
                 UI.toast(`${ids.length} producto${ids.length === 1 ? '' : 's'} actualizado${ids.length === 1 ? '' : 's'}`);
                 Admin.route();
@@ -605,7 +646,8 @@ Views.banners = {
 
         if (!this.banners.length) {
             view.innerHTML = `<div class="card">${U.empty('image', 'Sin banners', 'Mientras no haya banners, el inicio muestra la imagen de Configuración.',
-                `<button class="btn btn-dark" onclick="Views.banners.edit()">${ICON.plus}Crear banner</button>`)}</div>`;
+                `<button class="btn btn-dark" id="firstBanner">${ICON.plus}Crear banner</button>`)}</div>`;
+            document.getElementById('firstBanner').addEventListener('click', () => this.edit());
             return;
         }
         view.innerHTML = `<div class="banner-grid" id="bannerGrid">${this.banners.map((b, i) => `
@@ -649,7 +691,7 @@ Views.banners = {
         const contain = /\.png(\?.*)?$/i.test(url) && !url.startsWith('blob:');
         const media = U.isVideo(url)
             ? `<video src="${U.esc(url)}" autoplay loop muted playsinline></video>`
-            : `<img src="${U.esc(U.img(url))}" alt="" loading="lazy">`;
+            : `<img src="${U.img(url)}" alt="" loading="lazy">`;
         return `<div class="media-preview${contain ? ' is-contain' : ''}">${media}
             ${title || subtitle ? `<div class="overlay-text">${title ? `<strong>${U.esc(title)}</strong>` : ''}${subtitle ? `<span>${U.esc(subtitle)}</span>` : ''}</div>` : ''}</div>`;
     },

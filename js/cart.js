@@ -47,15 +47,18 @@ const CartManager = {
     addToCart(product, size, color, quantity = 1) {
         // Solo los productos "A Pedido" se hacen por encargo y no tienen límite de stock.
         // "Pocas Unidades" sí tiene stock real y lo respeta como cualquier otro producto.
+        // Igual "A Pedido" tiene un tope: el servidor acepta hasta 99 unidades por producto.
         const isOrder = product.status === 'a_pedido';
-        const available = isOrder ? quantity : product.stock - this.quantityOf(product.id);
+        const available = isOrder
+            ? this.maxFor(product.id) - this.quantityOf(product.id)
+            : product.stock - this.quantityOf(product.id);
 
-        if (!isOrder && available <= 0) {
-            UI.toast('Ya tienes en el carrito todo el stock disponible', 'error');
+        if (available <= 0) {
+            UI.toast(isOrder ? 'Puedes encargar hasta 99 unidades de este producto' : 'Ya tienes en el carrito todo el stock disponible', 'error');
             return false;
         }
 
-        const qty = isOrder ? quantity : Math.min(quantity, available);
+        const qty = Math.min(quantity, available);
 
         const existing = this.cart.find(i => i.productId === product.id && i.size === size && i.color === color);
         if (existing) {
@@ -178,7 +181,7 @@ const CartManager = {
             const url = PF.url(`pages/producto.html?id=${item.productId}`);
             return `
                 <div class="cart-line">
-                    <a href="${url}"><img class="cart-line-img" src="${ProductsManager.resolveImagePath(item.image)}" alt="${PF.escape(item.name)}" loading="lazy"></a>
+                    <a href="${url}"><img class="cart-line-img" src="${PF.escape(ProductsManager.resolveImagePath(item.image))}" alt="${PF.escape(item.name)}" loading="lazy"></a>
                     <div>
                         <div class="cart-line-top">
                             <a href="${url}" class="cart-line-name">${PF.escape(item.name)}</a>

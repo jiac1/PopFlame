@@ -132,7 +132,7 @@ const Home = {
             const products = ProductsManager.getProductsByCategory(c.id);
             const img = c.image || products[0]?.image;
             const media = img
-                ? `<img src="${ProductsManager.resolveImagePath(img)}" alt="" loading="lazy" decoding="async">`
+                ? `<img src="${PF.escape(ProductsManager.resolveImagePath(img))}" alt="" loading="lazy" decoding="async">`
                 : `<div class="cat-tile-empty"><span>${PF.escape(c.name.charAt(0))}</span></div>`;
             return `
                 <a class="cat-tile reveal" style="transition-delay:${i * 60}ms" href="${PF.url('pages/categoria.html?cat=' + encodeURIComponent(c.id))}">

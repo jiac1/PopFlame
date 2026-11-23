@@ -30,7 +30,8 @@
     // Config guardada de la visita anterior: permite pintar logo/redes al instante
     // mientras llega la versión fresca desde Supabase.
     let cached = {};
-    try { cached = JSON.parse(localStorage.getItem('pf_store_cache') || '{}').config || {}; } catch (e) { /* sin cache */ }
+    // Misma clave que ProductsManager.cacheKey (products.js).
+    try { cached = JSON.parse(localStorage.getItem('pf_store_cache_v2') || '{}').config || {}; } catch (e) { /* sin cache */ }
 
     const PF = window.PF = {
         root: ROOT,

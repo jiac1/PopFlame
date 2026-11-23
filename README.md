@@ -14,14 +14,21 @@ archivos) con un panel de administración con dos roles: **Super Admin** y **Adm
    - Activa la **primera** cuenta como Super Admin en el SQL Editor:
      `update public.profiles set role = 'super_admin', status = 'active' where id = (select id from auth.users where lower(email) = lower('tu-correo@popflame.cl'));`
    - Las siguientes se activan desde el panel (**Usuarios** → Acceso: *Activa* → Guardar).
-   - Para entrar al panel se usa lo que va antes de la @ del correo (ej. `admin@popflame.cl` → `admin`)
-     o el correo completo.
+   - Para entrar al panel se usa el **correo completo** (ej. `admin@popflame.cl`) y la contraseña.
+     (Antes también servía solo el usuario, pero eso exigía una función pública que revelaba el correo
+     de cada cuenta a cualquier visitante.)
 
 Si la base ya existía, en vez del schema completo corre solo los scripts nuevos de `db/` que falten, en
 orden de fecha. El último es [`db/2026-11-23_correcciones.sql`](db/2026-11-23_correcciones.sql)
 (los productos *Agotado* ya no se pueden comprar y el login no revela correos de cuentas pendientes)
 y luego [`db/2026-11-24_baja_con_codigo.sql`](db/2026-11-24_baja_con_codigo.sql) (link de baja del
-newsletter con código secreto).
+newsletter con código secreto) y [`db/2026-11-25_auditoria.sql`](db/2026-11-25_auditoria.sql)
+(newsletter de un solo envío por producto, reposición exacta de stock al cancelar, pedidos pagados que
+no se pueden borrar sin cancelarlos, login solo con correo, usuarios repetidos y buckets sin SVG).
+Después de correr ese último, vuelve a desplegar la Edge Function `notify-new-product`.
+
+> En **Authentication → Sign In / Providers** conviene desactivar *Allow new users to sign up*: las
+> cuentas se crean desde el dashboard y así nadie puede crear cuentas pendientes con la clave pública.
 
 La URL del proyecto y la clave pública (`sb_publishable_...`) están en
 [`js/supabaseClient.js`](js/supabaseClient.js): es seguro tenerlas en el frontend, todo el acceso lo
@@ -32,12 +39,18 @@ controla RLS.
 
 ## 2. Publicación (Vercel)
 
-La tienda está publicada en **https://pop-flame.vercel.app**, conectada a este repositorio privado:
+La tienda está publicada en **https://pop-flame.vercel.app**, conectada a este repositorio (público: no subas claves secretas):
 cada `git push` a `main` la actualiza sola en ~1 minuto (panel en vercel.com → proyecto *pop-flame*).
 No necesita build: Vercel sirve los archivos tal cual (preset *Other*).
 
 Si más adelante usas un dominio propio (ej. `popflame.cl`, se agrega en Vercel → Settings → Domains),
 cambia la URL de `og:image` en los `<head>` de las páginas (es la imagen que aparece al compartir el link).
+
+[`vercel.json`](vercel.json) envía una **Content-Security-Policy**: el sitio solo ejecuta scripts propios
+y `supabase-js` desde jsDelivr (fijado con hash SRI), y solo se conecta a este proyecto de Supabase.
+Por eso **no se pueden usar `<script>` ni `onclick=""` dentro del HTML** (todo va en archivos `.js`). Si
+cambias de proyecto de Supabase, actualiza su URL en `connect-src`; si subes la versión de `supabase-js`,
+actualiza también su `integrity` (`openssl dgst -sha384 -binary supabase.js | openssl base64 -A`).
 
 ## 3. Ejecutar localmente
 
@@ -49,7 +62,7 @@ Abre `http://localhost:8000` (no uses `file://`, Supabase necesita un servidor).
 
 ## 4. Panel de administración
 
-`/admin/` → login con usuario y contraseña → `/admin/panel.html`.
+`/admin/` → login con correo y contraseña → `/admin/panel.html`.
 
 - **Super Admin**: todo (además de lo del Admin: suscriptores, páginas, configuración y usuarios).
 - **Admin**: resumen de ventas, pedidos, inventario, productos, banners, guía de tallas y categorías.
@@ -87,6 +100,7 @@ css/style.css             Todo el diseño (variables de marca al inicio)
 js/
   layout.js               Header, menú, buscador, carrito y footer compartidos (se carga sin defer)
   supabaseClient.js       Cliente Supabase
+  safety.js               Limpieza de HTML y validación de links/imágenes (tienda y panel)
   products.js             Datos (con caché local), tarjetas de producto, guía de tallas
   cart.js                 Carrito (localStorage), validación de stock, mensaje de WhatsApp
   app.js                  Núcleo común (menús, búsqueda, redes, animaciones)
@@ -105,8 +119,9 @@ navegadores descarguen la versión nueva.
 node --test tests/*.cjs
 ```
 
-Revisan permisos del panel, la lógica de la tienda (stock, estados, mensaje de WhatsApp) y que
-`db/schema.sql` mantenga las protecciones de seguridad de los scripts de `db/`.
+Revisan permisos del panel, la lógica de la tienda (stock, estados, mensaje de WhatsApp), que
+`db/schema.sql` mantenga las protecciones de seguridad de los scripts de `db/` y que no haya scripts
+en línea que la Content-Security-Policy bloquearía.
 
 ## 6. Instagram en el pie de página
 
