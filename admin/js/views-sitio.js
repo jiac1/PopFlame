@@ -421,7 +421,7 @@ Views.suscriptores = {
 
     exportCsv() {
         const rows = [['Correo', 'Estado', 'Fecha']].concat(this.subs.map(s => [s.email, s.active ? 'Activo' : 'De baja', new Date(s.subscribed_at).toLocaleDateString('es-CL')]));
-        const csv = '\uFEFF' + rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(';')).join('\n');
+        const csv = '\uFEFF' + rows.map(r => r.map(U.csvCell).join(';')).join('\n');
         const a = document.createElement('a');
         a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
         a.download = `suscriptores-popflame-${new Date().toISOString().slice(0, 10)}.csv`;

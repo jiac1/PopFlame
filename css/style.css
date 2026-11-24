@@ -1537,6 +1537,8 @@ video.brand-logo { mix-blend-mode: screen; filter: grayscale(1) contrast(1.9) br
     background: repeating-linear-gradient(135deg, transparent 0 6px, rgba(0,0,0,0.04) 6px 7px);
     cursor: not-allowed;
 }
+/* Talla sin stock propio (las demás tallas del producto sí tienen) */
+.size.is-out { text-decoration: line-through; }
 .size-measure { margin-top: 10px; font-size: 12px; color: var(--text-2); min-height: 18px; }
 
 .field-error {

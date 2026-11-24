@@ -774,6 +774,22 @@ table.table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .stepper.is-saving { opacity: 0.6; }
 .stepper.is-saved { border-color: var(--green); }
 
+/* Stock por talla: steppers chicos bajo el total (Inventario) */
+.stepper-sm { height: 28px; }
+.stepper-sm button { width: 26px; font-size: 14px; }
+.stepper-sm input { width: 40px; font-size: 13px; }
+.size-steppers { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px 10px; margin-top: 8px; }
+.size-steppers.is-saving { opacity: 0.6; }
+.size-stepper { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; }
+.size-steppers-sum { flex-basis: 100%; text-align: right; font-size: 11px; }
+.size-stock-summary { display: block; margin-top: 2px; font-size: 11px; color: var(--muted); font-weight: 500; white-space: nowrap; }
+
+/* Stock por talla: campos del editor de producto */
+.size-stock-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 8px; margin-top: 12px; }
+.size-stock-item { display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 600; }
+.size-stock-item input { height: 38px; border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 0 10px; font-size: 15px; font-weight: 600; background: var(--card); }
+.size-stock-item input:focus { outline: 2px solid var(--red); outline-offset: 1px; }
+
 /* ===== Hoja lateral (editor) ===== */
 .sheet {
     position: fixed;

@@ -10,13 +10,17 @@ const Product = {
     init() {
         this.id = parseInt(new URLSearchParams(location.search).get('id'), 10);
         this.bindStatic();
-        Site.start({ render: () => this.render() });
+        Site.start({ render: (store, meta) => this.render(meta) });
     },
 
-    render() {
+    render(meta = {}) {
         const p = ProductsManager.getProductById(this.id);
         if (!p) {
-            if (ProductsManager.products.length) this.renderNotFound();
+            // Con la copia guardada (meta.fresh = false) se espera la respuesta de Supabase. Con datos
+            // frescos se distingue: falló la carga, el catálogo está vacío o el producto no existe.
+            // Antes, con el catálogo vacío o sin conexión, quedaba el esqueleto de carga para siempre.
+            if (meta.failed) this.renderNotFound(true);
+            else if (meta.fresh || ProductsManager.products.length) this.renderNotFound();
             return;
         }
         // No volver a pintar si los datos del producto no cambiaron (mantiene talla/color elegidos).
@@ -54,15 +58,20 @@ const Product = {
         this.renderJsonLd(p, cat);
     },
 
-    renderNotFound() {
-        document.getElementById('pdpRoot').innerHTML = `
+    renderNotFound(loadFailed = false) {
+        document.getElementById('pdpRoot').innerHTML = loadFailed ? `
+            <div class="empty-state">
+                <h3>No pudimos cargar el producto</h3>
+                <p>Revisa tu conexión a internet e inténtalo de nuevo.</p>
+                <a class="btn btn-dark" href="${PF.escape(location.href)}">Reintentar</a>
+            </div>` : `
             <div class="empty-state">
                 <h3>Producto no disponible</h3>
                 <p>Es posible que este producto ya no esté a la venta o que el link esté incompleto.</p>
                 <a class="btn btn-dark" href="${PF.url('pages/categoria.html')}">Ver catálogo</a>
             </div>`;
         document.getElementById('stickyBuy')?.remove();
-        document.title = 'Producto no disponible | PopFlame';
+        document.title = (loadFailed ? 'No se pudo cargar' : 'Producto no disponible') + ' | PopFlame';
     },
 
     renderStock() {
@@ -108,10 +117,14 @@ const Product = {
         const colors = p.colors || [];
         const sizes = p.sizes || [];
 
+        // Una talla con stock propio en 0 se muestra tachada y no se puede elegir.
+        const isOrder = p.status === 'a_pedido';
+        const sizeOut = (s) => !isOrder && ProductsManager.availableFor(p, s) <= 0;
+
         if (colors.length === 1) this.color = colors[0];
         if (sizes.length === 1) this.size = sizes[0];
         if (this.color && !colors.includes(this.color)) this.color = null;
-        if (this.size && !sizes.includes(this.size)) this.size = null;
+        if (this.size && (!sizes.includes(this.size) || (sizes.length > 1 && sizeOut(this.size)))) this.size = null;
 
         const colorBlock = document.getElementById('colorBlock');
         colorBlock.hidden = colors.length === 0;
@@ -126,9 +139,12 @@ const Product = {
         const sizeBlock = document.getElementById('sizeBlock');
         sizeBlock.hidden = sizes.length === 0 || onlyOneSize;
         const soldOut = p.stock <= 0 && p.status !== 'a_pedido';
-        document.getElementById('sizeOptions').innerHTML = sizes.map(s => `
-            <button type="button" class="size${s === this.size ? ' is-active' : ''}" role="radio" aria-checked="${s === this.size}"
-                    data-size="${PF.escape(s)}" ${soldOut ? 'disabled' : ''}>${PF.escape(s)}</button>`).join('');
+        document.getElementById('sizeOptions').innerHTML = sizes.map(s => {
+            const out = soldOut || sizeOut(s);
+            return `
+            <button type="button" class="size${s === this.size ? ' is-active' : ''}${out ? ' is-out' : ''}" role="radio" aria-checked="${s === this.size}"
+                    data-size="${PF.escape(s)}" ${out ? 'disabled' : ''} ${out && !soldOut ? `title="Talla ${PF.escape(s)} agotada" aria-label="${PF.escape(s)} (agotada)"` : ''}>${PF.escape(s)}</button>`;
+        }).join('');
 
         const hasGuide = ProductsManager.getSizeGuideTable(p.category).rows.length > 0;
         document.getElementById('sizeGuideOpen').hidden = !hasGuide;
@@ -140,8 +156,15 @@ const Product = {
     updateLabels() {
         document.getElementById('colorValue').textContent = this.color || '';
         document.getElementById('sizeValue').textContent = this.size || '';
-        const m = this.size ? ProductsManager.getSizeMeasurement(this.product.category, this.size) : '';
-        document.getElementById('sizeMeasure').textContent = m ? `Talla ${this.size}: ${m} de ancho aprox.` : '';
+        const p = this.product;
+        const m = this.size ? ProductsManager.getSizeMeasurement(p.category, this.size) : '';
+        // Si la talla elegida lleva stock propio y quedan pocas, se avisa.
+        const left = this.size && p.status !== 'a_pedido' && ProductsManager.tracksSize(p, this.size)
+            ? ProductsManager.availableFor(p, this.size) : null;
+        const parts = [];
+        if (m) parts.push(`Talla ${this.size}: ${m} de ancho aprox.`);
+        if (left !== null && left > 0 && left <= 3) parts.push(`¡Quedan ${left} en talla ${this.size}!`);
+        document.getElementById('sizeMeasure').textContent = parts.join(' ');
     },
 
     renderWhatsapp() {
@@ -199,7 +222,10 @@ const Product = {
         const p = this.product;
         const isOrder = p.status === 'a_pedido';
         const soldOut = p.stock <= 0 && !isOrder;
-        const available = isOrder ? 99 : Math.max(0, p.stock - CartManager.quantityOf(p.id));
+        // Con talla elegida se respeta también el stock de esa talla.
+        const available = this.size
+            ? CartManager.remainingFor(p, this.size)
+            : (isOrder ? 99 : Math.max(0, p.stock - CartManager.quantityOf(p.id)));
         if (this.qty > Math.max(1, available)) this.qty = Math.max(1, available);
 
         document.getElementById('qtyValue').textContent = this.qty;
@@ -290,6 +316,7 @@ const Product = {
             });
             document.getElementById('pdpError').hidden = true;
             this.updateLabels();
+            this.updateBuyState();
         });
 
         document.getElementById('sizeGuideOpen').addEventListener('click', () => UI.open('sizeModal'));

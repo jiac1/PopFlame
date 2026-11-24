@@ -7,7 +7,7 @@ const ProductsManager = {
     config: {},
     sizeGuide: [],
     loaded: false,
-    cacheKey: 'pf_store_cache_v2',
+    cacheKey: 'pf_store_cache_v3',
     cacheMaxAgeMs: 1000 * 60 * 60 * 24,
 
     // Llama a onData(data, { fresh }) una vez con el cache (si existe) y otra con los datos
@@ -50,6 +50,9 @@ const ProductsManager = {
             ]);
             if (p.error) throw p.error;
             if (c.error) throw c.error;
+            // Sin configuración no hay WhatsApp ni costo de envío: no se guarda una tienda a medias
+            // (se sigue usando la copia anterior, si existe).
+            if (cfg.error) throw cfg.error;
             if (sg.error) console.warn('No se pudo cargar size_guide:', sg.error.message);
 
             return {
@@ -66,20 +69,28 @@ const ProductsManager = {
 
     mapProduct(p) {
         const images = (p.images && p.images.length) ? p.images : (p.image ? [p.image] : []);
+        const sizes = p.sizes || [];
+        // Stock por talla ({"S": 5, "M": 10}): solo las tallas que siguen en el producto.
+        const sizeStock = {};
+        const raw = p.size_stock && typeof p.size_stock === 'object' ? p.size_stock : {};
+        sizes.forEach(s => { if (Object.prototype.hasOwnProperty.call(raw, s)) sizeStock[s] = Math.max(0, Number(raw[s]) || 0); });
         return {
             id: p.id,
             name: p.name,
             category: p.category_id,
             price: Number(p.price),
-            sizes: p.sizes || [],
+            sizes,
             colors: p.colors || [],
             image: p.image || images[0] || '',
             images,
             description: p.description || '',
             featured: !!p.featured,
-            // "Agotado" es un estado manual: la tienda lo trata como sin stock aunque quede stock cargado
-            // (el servidor tampoco lo deja comprar).
-            stock: p.status === 'agotado' ? 0 : Number(p.stock ?? 0),
+            sizeStock,
+            // Unidades que realmente se pueden vender:
+            //  - "Agotado" es un estado manual: sin stock aunque quede stock cargado (el servidor
+            //    tampoco lo deja comprar).
+            //  - Si TODAS las tallas llevan stock propio, no se puede vender más que la suma de ellas.
+            stock: this.sellableStock(p.status, Number(p.stock ?? 0), sizes, sizeStock),
             status: p.status || 'disponible',
             badge: p.badge || '',
             createdAt: p.created_at
@@ -136,6 +147,30 @@ const ProductsManager = {
     getAllProducts() { return this.products; },
     getProductsByCategory(category) { return this.products.filter(p => p.category === category); },
     getProductById(id) { return this.products.find(p => p.id === parseInt(id, 10)); },
+
+    // ===== Stock por talla =====
+    // Una talla "lleva stock" solo si tiene su propio número en sizeStock. Si no, esa talla no tiene
+    // límite propio y solo cuenta el stock total del producto (así funcionan los productos de antes).
+    sellableStock(status, total, sizes, sizeStock) {
+        if (status === 'agotado') return 0;
+        const t = Math.max(0, total || 0);
+        if (status === 'a_pedido' || !sizes.length) return t;
+        if (!sizes.every(s => Object.prototype.hasOwnProperty.call(sizeStock, s))) return t;
+        return Math.min(t, sizes.reduce((sum, s) => sum + sizeStock[s], 0));
+    },
+
+    tracksSize(product, size) {
+        return !!size && !!product?.sizeStock && Object.prototype.hasOwnProperty.call(product.sizeStock, size);
+    },
+
+    // Unidades que se pueden comprar de una talla (sin descontar lo que ya está en el carrito).
+    // "A Pedido" no tiene límite de stock: el servidor acepta hasta 99 por producto.
+    availableFor(product, size) {
+        if (!product) return 0;
+        if (product.status === 'a_pedido') return 99;
+        const total = Math.max(0, product.stock);
+        return this.tracksSize(product, size) ? Math.min(total, product.sizeStock[size]) : total;
+    },
     getFeaturedProducts() { return this.products.filter(p => p.featured); },
     getCategoryById(id) { return this.categories.find(c => c.id === id); },
 

@@ -1,0 +1,43 @@
+# Pruebas automáticas.
+#  - "unitarias": las pruebas del repositorio (node --test) en cada push y pull request.
+#  - "produccion": revisa la base REAL de Supabase con la clave pública (lo mismo que podría hacer
+#    cualquier visitante): que nadie pueda crear pedidos directo, leer tablas privadas, etc.
+#    Corre en main y una vez al día, así se detecta si alguien vuelve a abrir un permiso.
+name: Pruebas
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: '41 12 * * *'   # todos los días a las 12:41 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  unitarias:
+    if: github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Pruebas del repositorio
+        run: node --test tests/*.test.cjs
+
+  produccion:
+    # Solo desde main (no desde pull requests ni otras ramas).
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Seguridad de la base de producción
+        run: node tests/produccion.check.mjs

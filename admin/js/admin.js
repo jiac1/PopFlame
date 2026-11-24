@@ -136,6 +136,27 @@ const U = {
     esc(str) {
         return String(str ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
     },
+    // Celda de CSV. El nombre y la nota los escribe el cliente en el checkout: un texto como
+    // =HYPERLINK(...) se ejecutaría como fórmula al abrir el archivo en Excel o Sheets. Si empieza con
+    // = + - @ (o tabulación/retorno) se le antepone ' para que quede como texto. Los teléfonos
+    // (+56 9 1234 5678) y números se dejan tal cual: no son fórmulas.
+    // Stock por talla del producto ({"S": 5, "M": 10}), solo de las tallas que siguen en el producto.
+    // Una talla sin número no lleva stock propio: para ella solo cuenta el stock total.
+    sizeStockOf(p) {
+        const raw = p && p.size_stock && typeof p.size_stock === 'object' ? p.size_stock : {};
+        const out = {};
+        (p?.sizes || []).forEach(s => { if (Object.prototype.hasOwnProperty.call(raw, s)) out[s] = Number(raw[s]) || 0; });
+        return out;
+    },
+    sameSizeStock(a = {}, b = {}) {
+        const ka = Object.keys(a), kb = Object.keys(b);
+        return ka.length === kb.length && ka.every(k => Object.prototype.hasOwnProperty.call(b, k) && Number(a[k]) === Number(b[k]));
+    },
+    csvCell(v) {
+        let s = String(v ?? '');
+        if (/^[=+\-@\t\r]/.test(s) && !/^[+-]?[\d\s().,-]+$/.test(s)) s = "'" + s;
+        return `"${s.replace(/"/g, '""')}"`;
+    },
     money(n) { return '$' + Math.round(Number(n || 0)).toLocaleString('es-CL'); },
     date(d) { return new Date(d).toLocaleDateString('es-CL', { day: 'numeric', month: 'short', year: 'numeric' }); },
     dateTime(d) {
@@ -432,7 +453,8 @@ const Admin = {
         this.bind();
         this.loadBrand();
         this.refreshBadge();
-        setInterval(() => this.refreshBadge(), 60000);
+        setInterval(() => { this.refreshBadge(); this.revalidate(); }, 60000);
+        document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') this.revalidate(); });
         this.route();
     },
 
@@ -573,7 +595,34 @@ const Admin = {
         if (count) document.title = `(${count}) ${document.title}`;
     },
 
+    // Vuelve a leer el perfil: si un Super Admin le quitó el acceso a esta cuenta (Pendiente) o le
+    // cambió el rol, la pestaña abierta se entera al navegar, al volver a la pestaña o cada minuto,
+    // en vez de seguir mostrando el menú anterior. La protección real igual está en la base (RLS).
+    // Idea rescatada de la rama feature/phase1-rbac.
+    async revalidate() {
+        if (this.revalidating) return;
+        this.revalidating = true;
+        try {
+            const { data: { session } } = await supabaseClient.auth.getSession();
+            if (!session) { location.replace('index.html'); return; }
+            const { data: profile, error } = await supabaseClient
+                .from('profiles').select('role, status').eq('id', session.user.id).maybeSingle();
+            if (error) return; // sin conexión: se vuelve a revisar en la próxima ocasión
+            if (!PFAccess.canAccess(profile)) {
+                await supabaseClient.auth.signOut().catch(() => {});
+                location.replace('index.html');
+                return;
+            }
+            if (profile.role !== this.profile.role) location.reload();
+        } catch (e) {
+            /* sin conexión: se vuelve a revisar en la próxima ocasión */
+        } finally {
+            this.revalidating = false;
+        }
+    },
+
     async route() {
+        this.revalidate();
         let id = (location.hash || '#resumen').slice(1).split('?')[0];
         const item = this.nav.find(n => n.id === id);
         if (!item || (item.superOnly && !this.isSuper()) || !Views[id]) id = 'resumen';

@@ -409,7 +409,7 @@ Views.pedidos = {
     exportCsv() {
         const list = this.visible();
         if (!list.length) { UI.toast('No hay pedidos para exportar', 'error'); return; }
-        const cell = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+        const cell = U.csvCell;
         const rows = [['Pedido', 'Fecha', 'Estado', 'Cliente', 'Teléfono', 'Correo', 'Estación', 'Productos', 'Subtotal', 'Entrega', 'Total', 'Nota']];
         list.forEach(o => rows.push([
             o.order_number, new Date(o.created_at).toLocaleString('es-CL'), ORDER_STATUS[o.status]?.label || o.status,
@@ -436,14 +436,14 @@ Views.inventario = {
     async render(view) {
         Admin.header('Inventario', 'Ajusta el stock rápido. Los cambios se guardan solos.');
         const [{ data, error }] = await Promise.all([
-            supabaseClient.from('products').select('id, name, price, stock, status, image, category_id, sizes').order('name'),
+            supabaseClient.from('products').select('*').order('name'),
             Data.categoriesList()
         ]);
         if (error) throw error;
         this.products = data || [];
 
         view.innerHTML = `
-            <div class="callout">${ICON.info}<div>El stock baja solo cuando marcas un pedido como <strong>pagado</strong>, y vuelve si lo cancelas. Aquí puedes corregir el stock a mano y también cambiar el estado del producto (Disponible / Agotado / A Pedido / Pocas Unidades) desde esta misma tabla.</div></div>
+            <div class="callout">${ICON.info}<div>El stock baja solo cuando marcas un pedido como <strong>pagado</strong>, y vuelve si lo cancelas. Aquí puedes corregir el stock a mano y también cambiar el estado del producto (Disponible / Agotado / A Pedido / Pocas Unidades) desde esta misma tabla. Si el producto lleva stock por talla, debajo del total aparece cada talla: se ajustan por separado y una venta descuenta de los dos.</div></div>
             <div class="toolbar">
                 <div class="chips" id="invChips"></div>
                 <div class="spacer"></div>
@@ -462,13 +462,16 @@ Views.inventario = {
             if (!b) return;
             const input = b.parentElement.querySelector('input');
             input.value = Math.max(0, (U.int(input.value) || 0) + Number(b.dataset.step));
-            this.queueSave(input);
+            if (input.dataset.sizeOf) this.queueSizeSave(+input.dataset.sizeOf);
+            else this.queueSave(input);
         });
         card.addEventListener('change', (e) => {
             if (e.target.matches('[data-status]')) {
                 const id = +e.target.dataset.status;
                 const status = e.target.value;
                 this.queueStatusSave(id, status);
+            } else if (e.target.matches('[data-size-of]')) {
+                this.queueSizeSave(+e.target.dataset.sizeOf);
             } else if (e.target.matches('[data-stock]')) {
                 this.queueSave(e.target);
             }
@@ -481,6 +484,7 @@ Views.inventario = {
             ['all', 'Todos', () => true],
             ['low', 'Poco stock', p => isLowStock(p) && p.status !== 'pocas'],
             ['out', 'Agotados', isSoldOut],
+            ['tallas', 'Tallas agotadas', p => p.status !== 'a_pedido' && Object.values(U.sizeStockOf(p)).some(n => n <= 0)],
             ['pedido', 'A Pedido', p => p.status === 'a_pedido'],
             ['pocas', 'Pocas Unidades', p => p.status === 'pocas']
         ];
@@ -516,9 +520,9 @@ Views.inventario = {
                                 ? '<span class="muted">—</span>'
                                 : `<div class="stepper" data-stepper="${p.id}">
                                     <button type="button" data-step="-1" aria-label="Restar uno">−</button>
-                                    <input type="number" inputmode="numeric" min="0" value="${p.stock}" data-stock="${p.id}" aria-label="Stock de ${U.esc(p.name)}">
+                                    <input type="number" inputmode="numeric" min="0" value="${p.stock}" data-stock="${p.id}" aria-label="Stock total de ${U.esc(p.name)}">
                                     <button type="button" data-step="1" aria-label="Sumar uno">+</button>
-                                </div>`}
+                                </div>${this.sizeSteppers(p)}`}
                         </td>
                     </tr>`).join('')}</tbody>
             </table></div>`;
@@ -557,6 +561,62 @@ Views.inventario = {
         stepper.classList.add('is-saved');
         setTimeout(() => stepper.classList.remove('is-saved'), 1200);
         UI.toast(`Stock de ${p.name}: ${p.stock}`);
+    },
+
+    // Un stepper chico por cada talla que lleva stock propio.
+    sizeSteppers(p) {
+        const ss = U.sizeStockOf(p);
+        const keys = Object.keys(ss);
+        if (!keys.length) return '';
+        const sum = keys.reduce((t, k) => t + ss[k], 0);
+        return `<div class="size-steppers" data-size-steppers="${p.id}">
+            ${keys.map(k => `<div class="size-stepper"><span class="${ss[k] <= 0 ? 'red strong' : ''}">${U.esc(k)}</span>
+                <div class="stepper stepper-sm">
+                    <button type="button" data-step="-1" aria-label="Restar uno a la talla ${U.esc(k)}">−</button>
+                    <input type="number" inputmode="numeric" min="0" value="${ss[k]}" data-size-of="${p.id}" data-size="${U.esc(k)}" aria-label="Stock de la talla ${U.esc(k)} de ${U.esc(p.name)}">
+                    <button type="button" data-step="1" aria-label="Sumar uno a la talla ${U.esc(k)}">+</button>
+                </div></div>`).join('')}
+            <small class="muted size-steppers-sum">${sum === p.stock ? `Tallas: ${sum}` : `Tallas: ${sum} · Total: ${p.stock}`}</small>
+        </div>`;
+    },
+
+    queueSizeSave(id) {
+        const key = 'sizes-' + id;
+        clearTimeout(this.timers[key]);
+        this.timers[key] = setTimeout(() => this.saveSizes(id), 600);
+    },
+
+    // Guarda el stock de las tallas del producto (el total no cambia). Igual que el total, pasa por
+    // set_product_stock: queda en el historial y se rechaza si otra persona lo cambió mientras tanto.
+    async saveSizes(id) {
+        const p = this.products.find(x => x.id === id);
+        const box = document.querySelector(`[data-size-steppers="${id}"]`);
+        if (!p || !box) return;
+        const next = {};
+        for (const input of box.querySelectorAll('[data-size-of]')) {
+            const n = U.int(input.value);
+            if (n === null || n < 0 || n > 999999) { UI.toast(`El stock de la talla ${input.dataset.size} debe ser un número desde 0`, 'error'); return; }
+            next[input.dataset.size] = n;
+        }
+        const prev = p.size_stock && typeof p.size_stock === 'object' ? p.size_stock : {};
+        // Solo las tallas actuales del producto (una talla que ya no está se limpia al guardar).
+        const merged = next;
+        if (U.sameSizeStock(merged, prev)) return;
+        box.classList.add('is-saving');
+        const { error } = await supabaseClient.rpc('set_product_stock', {
+            p_product_id: id, p_stock: p.stock, p_expected_stock: p.stock, p_reason: 'Ajuste en Inventario',
+            p_size_stock: merged, p_expected_size_stock: prev
+        });
+        box.classList.remove('is-saving');
+        if (error) {
+            UI.toast('No se pudo guardar el stock por talla: ' + error.message, 'error');
+            if (error.code === '40001') Admin.route();
+            else this.renderList();
+            return;
+        }
+        p.size_stock = merged;
+        this.renderList();
+        UI.toast(`Stock por talla de ${p.name}: ${Object.entries(U.sizeStockOf(p)).map(([k, n]) => `${k} ${n}`).join(' · ')}`);
     },
 
     queueStatusSave(id, status) {
