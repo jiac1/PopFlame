@@ -12,7 +12,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@110..125,700..900&family=Inter:wght@400;500;600;700&display=swap">
-    <link rel="stylesheet" href="css/admin.css?v=10">
+    <link rel="stylesheet" href="css/admin.css?v=11">
 </head>
 <body>
     <div class="login">
@@ -28,12 +28,12 @@
         <main class="login-main">
             <div class="login-card">
                 <h1 class="display">Ingresar</h1>
-                <p>Usa tu usuario y contraseña del panel.</p>
+                <p>Usa el correo y la contraseña de tu cuenta del panel.</p>
 
                 <form id="loginForm" novalidate>
                     <div class="field">
-                        <label for="username">Usuario</label>
-                        <input type="text" id="username" autocomplete="username" autocapitalize="none" spellcheck="false" required>
+                        <label for="username">Correo</label>
+                        <input type="email" id="username" autocomplete="username" autocapitalize="none" spellcheck="false" inputmode="email" placeholder="admin@popflame.cl" required>
                     </div>
                     <div class="field">
                         <label for="password">Contraseña</label>
@@ -58,50 +58,11 @@
         </main>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2"></script>
-    <script src="../js/supabaseClient.js?v=9"></script>
-    <script src="js/access-control.js?v=10"></script>
-    <script src="js/admin.js?v=10"></script>
-    <script>
-        (async () => {
-            // Si ya hay una sesión válida, directo al panel
-            const profile = await AdminAuth.getActiveProfile();
-            if (profile) { location.replace('panel.html'); return; }
-
-            const form = document.getElementById('loginForm');
-            const btn = document.getElementById('loginBtn');
-            const err = document.getElementById('errorMsg');
-            const user = document.getElementById('username');
-            const pass = document.getElementById('password');
-
-            try { user.value = localStorage.getItem('pf_admin_user') || ''; } catch (e) { /* sin storage */ }
-            (user.value ? pass : user).focus();
-
-            document.getElementById('togglePass').addEventListener('click', (e) => {
-                const show = pass.type === 'password';
-                pass.type = show ? 'text' : 'password';
-                e.currentTarget.setAttribute('aria-label', show ? 'Ocultar contraseña' : 'Mostrar contraseña');
-            });
-            document.getElementById('forgotBtn').addEventListener('click', () => {
-                document.getElementById('forgotHelp').hidden = false;
-            });
-
-            form.addEventListener('submit', async (e) => {
-                e.preventDefault();
-                err.hidden = true;
-                btn.classList.add('is-loading');
-                try {
-                    await AdminAuth.login(user.value.trim(), pass.value);
-                    try { localStorage.setItem('pf_admin_user', user.value.trim()); } catch (e2) { /* ignorado */ }
-                    location.replace('panel.html');
-                } catch (error) {
-                    err.textContent = error.message || 'No se pudo iniciar sesión';
-                    err.hidden = false;
-                    btn.classList.remove('is-loading');
-                    pass.select();
-                }
-            });
-        })();
-    </script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js" integrity="sha384-Rj26LVGvoeRVR6+mwQmFfcR3QOBEwT+ZmuCWpuiqeTzJpCs0ER4ITAWGb4Hiy3Ok" crossorigin="anonymous"></script>
+    <script src="../js/supabaseClient.js?v=11"></script>
+    <script src="../js/safety.js?v=15"></script>
+    <script src="js/access-control.js?v=11"></script>
+    <script src="js/admin.js?v=11"></script>
+    <script src="js/login.js?v=11"></script>
 </body>
 </html>

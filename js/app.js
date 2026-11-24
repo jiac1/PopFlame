@@ -201,9 +201,11 @@ const Site = {
     socialLinks(cfg = {}) {
         const out = [];
         const s = cfg.socialLinks || {};
-        if (s.instagram) out.push({ label: 'Instagram', url: s.instagram, icon: 'instagram' });
-        if (s.tiktok) out.push({ label: 'TikTok', url: s.tiktok, icon: 'tiktok' });
-        if (s.twitter) out.push({ label: 'X / Twitter', url: s.twitter, icon: 'twitter' });
+        // Solo links http(s): un valor como "javascript:..." en Configuración nunca llega a un href.
+        const ig = PF.safeExternal(s.instagram), tt = PF.safeExternal(s.tiktok), tw = PF.safeExternal(s.twitter);
+        if (ig) out.push({ label: 'Instagram', url: ig, icon: 'instagram' });
+        if (tt) out.push({ label: 'TikTok', url: tt, icon: 'tiktok' });
+        if (tw) out.push({ label: 'X / Twitter', url: tw, icon: 'twitter' });
         const wa = CartManager.whatsappLink();
         if (wa) out.push({ label: 'WhatsApp', url: wa, icon: 'whatsapp' });
         return out;

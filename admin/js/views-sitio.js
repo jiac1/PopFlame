@@ -74,9 +74,9 @@ Views.paginas = {
         const ta = document.getElementById('pgContent');
         const title = document.getElementById('pgTitle');
         const preview = () => {
-            // Vista previa sin scripts ni atributos de eventos
-            const clean = ta.value.replace(/<script[\s\S]*?<\/script>/gi, '').replace(/\son\w+="[^"]*"/gi, '');
-            document.getElementById('pgPreview').innerHTML = clean;
+            // Vista previa con la misma limpieza que usa la tienda (js/safety.js): lo que se ve aquí
+            // es exactamente lo que verá el cliente, sin scripts ni atributos peligrosos.
+            document.getElementById('pgPreview').innerHTML = PFSafety.sanitizeRichHtml(ta.value);
         };
         ta.addEventListener('input', U.debounce(preview, 150));
         preview();
@@ -261,7 +261,7 @@ Views.configuracion = {
     previewHtml(url, isLogo) {
         const media = !url ? '<div class="empty-media">Sin archivo</div>'
             : U.isVideo(url) ? `<video src="${U.esc(url)}" autoplay loop muted playsinline></video>`
-            : `<img src="${U.esc(U.img(url))}" alt="">`;
+            : `<img src="${U.img(url)}" alt="">`;
         return `<div class="media-preview${isLogo ? ' is-contain' : ''}" style="aspect-ratio:${isLogo ? '3/1' : '16/9'}">${media}</div>`;
     },
 

@@ -4,8 +4,9 @@
 // La llama la base de datos sola (trigger trg_notify_new_product con pg_net en db/schema.sql).
 //
 // Seguridad: no confía en los datos que le llegan. Busca el producto por su id en la base de datos
-// y solo envía si se creó hace menos de 15 minutos, así nadie puede mandar correos falsos a tus
-// suscriptores llamando a esta función con un producto inventado.
+// y solo envía si se creó hace menos de 15 minutos y todavía no se anunció (products.newsletter_sent_at),
+// así nadie puede mandar correos falsos ni repetir el mismo correo llamando a la función varias veces.
+// Requiere db/2026-11-25_auditoria.sql.
 //
 // CÓMO DESPLEGARLA (sin usar la CLI de Supabase):
 //   1. supabase.com > tu proyecto > Edge Functions > "Deploy a new function".
@@ -80,11 +81,19 @@ Deno.serve(async (req: Request) => {
 
         const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
 
-        // El producto tiene que existir de verdad y ser recién creado
-        const { data: product } = await supabase.from('products')
-            .select('id, name, price, description, image, created_at').eq('id', id).maybeSingle();
-        if (!product) return json({ skipped: 'producto no existe' });
-        if (Date.now() - new Date(product.created_at).getTime() > 15 * 60 * 1000) return json({ skipped: 'producto antiguo' });
+        // El producto tiene que existir de verdad, ser recién creado y NO haberse anunciado antes.
+        // La marca newsletter_sent_at se "reclama" con un único UPDATE condicional: si dos llamadas
+        // llegan a la vez (o alguien repite la llamada), solo una consigue la fila y envía.
+        const since = new Date(Date.now() - 15 * 60 * 1000).toISOString();
+        const { data: product, error: claimError } = await supabase.from('products')
+            .update({ newsletter_sent_at: new Date().toISOString() })
+            .eq('id', id)
+            .is('newsletter_sent_at', null)
+            .gte('created_at', since)
+            .select('id, name, price, description, image, created_at')
+            .maybeSingle();
+        if (claimError) throw claimError;
+        if (!product) return json({ skipped: 'producto inexistente, antiguo o ya anunciado' });
 
         const { data: subs, error } = await supabase.from('subscribers').select('email, unsubscribe_token').eq('active', true);
         if (error) throw error;
@@ -108,6 +117,10 @@ Deno.serve(async (req: Request) => {
             });
             if (res.ok) sent += batch.length;
             else errors.push(await res.json());
+        }
+        // Si no salió ningún correo (ej. Resend caído), se libera la marca para poder reintentar.
+        if (sent === 0 && errors.length) {
+            await supabase.from('products').update({ newsletter_sent_at: null }).eq('id', product.id);
         }
         return json({ success: true, sent, errors });
     } catch (err) {

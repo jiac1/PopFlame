@@ -73,7 +73,7 @@ const Checkout = {
         document.getElementById('summaryLines').innerHTML = items.map(i => `
             <div class="summary-line">
                 <div class="summary-thumb">
-                    <img src="${ProductsManager.resolveImagePath(i.image)}" alt="" loading="lazy">
+                    <img src="${PF.escape(ProductsManager.resolveImagePath(i.image))}" alt="" loading="lazy">
                     <b>${i.quantity}</b>
                 </div>
                 <div>

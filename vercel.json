@@ -1,5 +1,27 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "redirects": [
+    {
+      "source": "/pages/poleras.html",
+      "destination": "/pages/categoria.html?cat=poleras",
+      "permanent": true
+    },
+    {
+      "source": "/pages/polerones.html",
+      "destination": "/pages/categoria.html?cat=polerones",
+      "permanent": true
+    },
+    {
+      "source": "/pages/pantalones.html",
+      "destination": "/pages/categoria.html?cat=pantalones",
+      "permanent": true
+    },
+    {
+      "source": "/pages/accesorios.html",
+      "destination": "/pages/categoria.html?cat=accesorios",
+      "permanent": true
+    }
+  ],
   "headers": [
     {
       "source": "/(.*)",
@@ -23,6 +45,10 @@
         {
           "key": "X-Frame-Options",
           "value": "SAMEORIGIN"
+        },
+        {
+          "key": "Content-Security-Policy",
+          "value": "default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; media-src 'self' blob: https:; connect-src 'self' https://ysxinhpymvhdnfbdanvn.supabase.co wss://ysxinhpymvhdnfbdanvn.supabase.co; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'; upgrade-insecure-requests"
         }
       ]
     },

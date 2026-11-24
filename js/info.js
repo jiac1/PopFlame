@@ -38,8 +38,9 @@ const Info = {
             this.page = data;
             document.getElementById('infoTitle').textContent = data.title;
             document.getElementById('crumbPage').textContent = data.title;
-            // Contenido escrito por el super_admin desde el panel (HTML simple).
-            content.innerHTML = data.content || '';
+            // Contenido escrito por el super_admin desde el panel. Se limpia antes de mostrarlo:
+            // solo pasan etiquetas simples (párrafos, negritas, listas, links http/https).
+            content.innerHTML = PFSafety.sanitizeRichHtml(data.content || '');
             Site.setMeta(`${data.title} | PopFlame`, content.textContent.trim().slice(0, 155));
         } catch (e) {
             content.innerHTML = '<p>No pudimos cargar esta página. Revisa tu conexión e intenta de nuevo.</p>';
@@ -60,7 +61,7 @@ const Info = {
             const cards = [];
             const wa = CartManager.whatsappLink('Hola PopFlame! Tengo una consulta.');
             if (wa) cards.push(`<a class="contact-card" href="${PF.escape(wa)}" target="_blank" rel="noopener">${PF.icons.whatsapp}<div><strong>WhatsApp</strong><span>Respuesta rápida, todos los días</span></div></a>`);
-            const ig = ProductsManager.config.socialLinks?.instagram;
+            const ig = PF.safeExternal(ProductsManager.config.socialLinks?.instagram);
             if (ig) cards.push(`<a class="contact-card" href="${PF.escape(ig)}" target="_blank" rel="noopener">${PF.icons.instagram}<div><strong>Instagram</strong><span>@${PF.escape(PF.instagramHandle(ig))}</span></div></a>`);
             extra.innerHTML = cards.length ? `<div class="contact-cards">${cards.join('')}</div>` : '';
         }

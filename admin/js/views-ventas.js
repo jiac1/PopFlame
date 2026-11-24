@@ -17,14 +17,16 @@ Views.resumen = {
 
         const since = new Date();
         since.setDate(since.getDate() - 60);
-        const [o, p, cfg] = await Promise.all([
-            supabaseClient.from('orders').select('id, order_number, customer_name, total, status, created_at, items').gte('created_at', since.toISOString()).order('created_at', { ascending: false }),
+        // Las categorías se cargan antes de pintar: si no, "Stock por reponer" mostraba el id
+        // de la categoría en vez de su nombre la primera vez.
+        const [orders, p, cfg] = await Promise.all([
+            U.fetchAll(() => supabaseClient.from('orders').select('id, order_number, customer_name, total, status, created_at, items')
+                .gte('created_at', since.toISOString()).order('created_at', { ascending: false }).order('id', { ascending: false })),
             supabaseClient.from('products').select('id, name, stock, status, image, category_id').order('stock'),
-            Data.configRow(true).catch(() => ({}))
+            Data.configRow(true).catch(() => ({})),
+            Data.categoriesList().catch(() => {})
         ]);
-        if (o.error) throw o.error;
         if (p.error) throw p.error;
-        const orders = o.data || [];
         const products = p.data || [];
 
         const monthStart = new Date(); monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0);
@@ -104,7 +106,6 @@ Views.resumen = {
                     </a>`).join('') || U.empty('orders', 'Aún no hay pedidos', 'Cuando alguien compre en la tienda, el pedido aparecerá aquí.')}
             </div>`;
 
-        await Data.categoriesList().catch(() => {});
         this.chart(document.getElementById('salesChart'), paid);
     },
 
@@ -212,9 +213,8 @@ Views.pedidos = {
         Admin.header('Pedidos', 'Confirma pagos, coordina entregas y habla con tus clientes.',
             `<button class="btn btn-ghost" id="exportCsv">${ICON.download}<span>Exportar CSV</span></button>`);
 
-        const { data, error } = await supabaseClient.from('orders').select('*').order('created_at', { ascending: false });
-        if (error) throw error;
-        this.orders = data || [];
+        this.orders = await U.fetchAll(() => supabaseClient.from('orders').select('*')
+            .order('created_at', { ascending: false }).order('id', { ascending: false }));
 
         view.innerHTML = `
             <div class="toolbar">
@@ -390,6 +390,11 @@ Views.pedidos = {
     },
 
     async remove(o) {
+        // La base no deja eliminar un pedido que ya descontó stock (se perdería ese stock).
+        if (o.stock_applied) {
+            UI.toast('Este pedido ya descontó stock. Cancélalo primero (así el stock vuelve) y después elimínalo.', 'error');
+            return;
+        }
         const ok = await UI.confirm({ title: `¿Eliminar ${o.order_number}?`, text: 'Se borra para siempre. Si solo no se concretó, mejor márcalo como cancelado.', ok: 'Eliminar pedido' });
         if (!ok) return;
         const { error } = await supabaseClient.from('orders').delete().eq('id', o.id);

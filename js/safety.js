@@ -65,7 +65,9 @@
 
                 const element = document.createElement(tag);
                 if (tag === 'a') {
-                    const href = safeHref(child.getAttribute('href'));
+                    // En el contenido de las páginas también sirven los links de correo y teléfono.
+                    const rawHref = String(child.getAttribute('href') || '').trim();
+                    const href = safeHref(rawHref) || (/^(mailto|tel):[^\s<>"'\\]+$/i.test(rawHref) ? rawHref : '');
                     if (href) {
                         element.setAttribute('href', href);
                         element.setAttribute('rel', 'noopener noreferrer');
