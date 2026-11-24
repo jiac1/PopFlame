@@ -19,13 +19,19 @@ archivos) con un panel de administración con dos roles: **Super Admin** y **Adm
      de cada cuenta a cualquier visitante.)
 
 Si la base ya existía, en vez del schema completo corre solo los scripts nuevos de `db/` que falten, en
-orden de fecha. El último es [`db/2026-11-23_correcciones.sql`](db/2026-11-23_correcciones.sql)
-(los productos *Agotado* ya no se pueden comprar y el login no revela correos de cuentas pendientes)
-y luego [`db/2026-11-24_baja_con_codigo.sql`](db/2026-11-24_baja_con_codigo.sql) (link de baja del
-newsletter con código secreto) y [`db/2026-11-25_auditoria.sql`](db/2026-11-25_auditoria.sql)
-(newsletter de un solo envío por producto, reposición exacta de stock al cancelar, pedidos pagados que
-no se pueden borrar sin cancelarlos, login solo con correo, usuarios repetidos y buckets sin SVG).
-Después de correr ese último, vuelve a desplegar la Edge Function `notify-new-product`.
+orden de fecha. Los últimos son:
+
+| Script | Qué hace |
+| --- | --- |
+| [`2026-11-23_correcciones.sql`](db/2026-11-23_correcciones.sql) | Los productos *Agotado* no se pueden comprar; el login no revela correos de cuentas pendientes |
+| [`2026-11-24_baja_con_codigo.sql`](db/2026-11-24_baja_con_codigo.sql) | Link de baja del newsletter con código secreto |
+| [`2026-11-25_auditoria.sql`](db/2026-11-25_auditoria.sql) | Newsletter de un solo envío por producto, reposición exacta de stock al cancelar, pedidos pagados que no se borran sin cancelarlos, login solo con correo, buckets sin SVG (después, volver a desplegar la Edge Function `notify-new-product`) |
+| [`2026-11-26_permisos_produccion.sql`](db/2026-11-26_permisos_produccion.sql) | Nadie crea pedidos directo por la API; del pedido solo se edita el estado; Admin gestiona categorías y fotos; guardas restrictivas |
+| [`2026-11-27_stock_por_talla.sql`](db/2026-11-27_stock_por_talla.sql) | Stock por talla (ver sección 4) |
+
+**No vuelvas a correr scripts antiguos de `db/` sobre una base que ya tiene los nuevos:** algunos
+reemplazan funciones por versiones anteriores. Para revisar que la base publicada esté bien:
+`node tests/produccion.check.mjs` (también corre solo en GitHub Actions todos los días).
 
 > En **Authentication → Sign In / Providers** conviene desactivar *Allow new users to sign up*: las
 > cuentas se crean desde el dashboard y así nadie puede crear cuentas pendientes con la clave pública.
@@ -74,6 +80,14 @@ Estados de producto: **Disponible**, **Agotado** (no se puede comprar aunque ten
 **A Pedido** (se acepta sin límite de stock y no lo descuenta) y **Pocas Unidades** (stock normal, con aviso).
 
 Al marcar un pedido como **pagado** el stock se descuenta solo, y se repone si se cancela.
+
+**Stock por talla.** Además del stock total, cada producto puede llevar cuántas unidades hay de cada
+talla (editor del producto → *Stock por talla*, o los contadores pequeños en **Inventario**). Ejemplo:
+30 polerones en total = 5 S + 10 M + 10 L + 5 XL. Al pagar un pedido de 1 polerón M se descuenta 1 del
+total **y** 1 de la talla M; al cancelarlo se reponen los dos. El total y las tallas se ajustan por
+separado (el panel avisa si no cuadran). Las tallas sin número propio solo dependen del total, así que
+los productos antiguos funcionan igual. En la tienda, una talla en 0 aparece tachada; si todas las
+tallas están en 0, el producto se ve agotado. Los productos *A Pedido* no usan stock.
 Los **datos de transferencia** (Configuración → Pagos) se muestran al cliente al confirmar la compra y
 se le envían por WhatsApp desde el pedido con un clic.
 
@@ -82,8 +96,11 @@ Las fotos que subas desde el panel se **comprimen automáticamente** (máx. 2000
 Cada persona puede cambiar su propia contraseña desde el panel: botón **Cambiar contraseña** en el
 menú lateral (pide la contraseña actual).
 
-Para recuperar una contraseña olvidada: SQL Editor →
-`update auth.users set encrypted_password = extensions.crypt('NUEVA', extensions.gen_salt('bf')) where email = '...';`
+Para recuperar una contraseña olvidada: en el login, escribir el correo y tocar **¿Olvidaste tu
+contraseña?**. Llega un correo con un link a `/admin/restablecer.html` para crear una nueva. Requiere que
+en Supabase → Authentication → URL Configuration estén `https://pop-flame.vercel.app` como *Site URL* y
+`https://pop-flame.vercel.app/admin/restablecer.html` en *Redirect URLs*. El correo que usa Supabase por
+defecto tiene un límite de pocos envíos por hora; para más, configurar un SMTP propio (ej. Resend).
 
 ## 5. Estructura
 
@@ -116,8 +133,12 @@ navegadores descarguen la versión nueva.
 ### Pruebas
 
 ```bash
-node --test tests/*.cjs
+node --test tests/*.test.cjs        # pruebas del repositorio
+node tests/produccion.check.mjs     # revisa los permisos de la base REAL de producción
 ```
+
+GitHub Actions ([`pruebas.yml`](.github/workflows/pruebas.yml)) corre las primeras en cada push y pull
+request, y la revisión de producción en `main` y una vez al día.
 
 Revisan permisos del panel, la lógica de la tienda (stock, estados, mensaje de WhatsApp), que
 `db/schema.sql` mantenga las protecciones de seguridad de los scripts de `db/` y que no haya scripts

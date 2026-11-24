@@ -11,6 +11,8 @@ on:
 
 jobs:
   ping:
+    # Solo desde main: un "Run workflow" lanzado en otra rama no consulta producción.
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

@@ -146,7 +146,7 @@ Views.productos = {
                             <small>${U.esc(Data.catName(p.category_id))}${p.badge ? ` · ${U.esc(p.badge)}` : ''}</small></div>
                         </div></td>
                         <td data-label="Precio" class="num strong">${U.money(p.price)}</td>
-                        <td data-label="Stock" class="num"><span class="${p.stock <= 0 ? 'red strong' : p.stock <= LOW_STOCK ? 'strong' : ''}">${p.stock <= 0 ? 'Agotado' : p.stock}</span></td>
+                        <td data-label="Stock" class="num"><span class="${p.stock <= 0 ? 'red strong' : p.stock <= LOW_STOCK ? 'strong' : ''}">${p.stock <= 0 ? 'Agotado' : p.stock}</span>${this.sizeStockSummary(p)}</td>
                         <td data-label="Estado" class="num strong">${this.productState(p)}</td>
                         <td data-label="Tallas"><span class="muted">${U.esc((p.sizes || []).join(', ') || '—')}</span></td>
                         <td class="actions">
@@ -187,6 +187,9 @@ Views.productos = {
         }
         this.photos = (src.images && src.images.length ? src.images : (src.image ? [src.image] : [])).map(url => ({ url }));
         const sizes = src.sizes || [];
+        // Borrador del stock por talla: se conserva el número de una talla aunque la desmarques y la
+        // vuelvas a marcar mientras editas.
+        this.sizeStockDraft = U.sizeStockOf(src);
         const colors = src.colors || [];
         const badgeCustom = src.badge && !BADGE_PRESETS.includes(src.badge);
 
@@ -237,6 +240,13 @@ Views.productos = {
                     <p class="muted mt-8">Para accesorios usa solo "Única".</p>
                 </div>
                 <div class="sheet-section">
+                    <h3>Stock por talla</h3>
+                    <label class="switch"><input type="checkbox" id="pSizeStockOn" name="sizeStockOn" ${Object.keys(this.sizeStockDraft).length ? 'checked' : ''}><span class="track"></span>Llevar stock separado por talla</label>
+                    <p class="muted mt-8">El stock total y el de cada talla se ven y se ajustan por separado. Cuando marcas un pedido como pagado se descuenta de los dos (ej. 1 polerón M: baja 1 del total y 1 de la talla M). Una talla en 0 aparece agotada en la tienda.</p>
+                    <div class="size-stock-grid" id="pSizeStock"></div>
+                    <p class="hint mt-8" id="pSizeStockSum"></p>
+                </div>
+                <div class="sheet-section">
                     <h3>Colores</h3>
                     ${ChipPicker.render('pColors', COLOR_PRESETS, colors, { swatch: true })}
                 </div>
@@ -265,8 +275,29 @@ Views.productos = {
             isDirty: () => snapshot() !== initial,
             onOpen: () => {
                 this.renderPhotos();
-                ChipPicker.bind(document.getElementById('pSizes'));
+                ChipPicker.bind(document.getElementById('pSizes'), { onChange: () => this.renderSizeStock() });
                 ChipPicker.bind(document.getElementById('pColors'), { swatch: true });
+                this.renderSizeStock();
+                document.getElementById('pSizeStockOn').addEventListener('change', (e) => {
+                    // Al activarlo, cada talla parte en 0 (o con su número anterior, si tenía).
+                    if (e.target.checked) ChipPicker.values(document.getElementById('pSizes')).forEach(sz => {
+                        if (!(sz in this.sizeStockDraft)) this.sizeStockDraft[sz] = 0;
+                    });
+                    this.renderSizeStock();
+                });
+                document.getElementById('pSizeStock').addEventListener('input', (e) => {
+                    const input = e.target.closest('[data-size-stock]');
+                    if (!input) return;
+                    const n = U.int(input.value);
+                    this.sizeStockDraft[input.dataset.sizeStock] = n === null ? 0 : n;
+                    this.updateSizeStockSum();
+                });
+                document.getElementById('pSizeStockSum').addEventListener('click', (e) => {
+                    if (!e.target.closest('[data-size-sum-to-total]')) return;
+                    document.getElementById('pStock').value = this.sizeStockTotal();
+                    this.updateSizeStockSum();
+                });
+                document.getElementById('pStock').addEventListener('input', () => this.updateSizeStockSum());
 
                 const desc = document.getElementById('pDesc');
                 const count = () => { document.getElementById('descCount').textContent = `${desc.value.length} / 1200`; };
@@ -359,6 +390,19 @@ Views.productos = {
         if (stock === null || stock < 0) { err('stock', 'Ingresa el stock (0 si está agotado).'); bad = true; }
         const sizes = ChipPicker.values(document.getElementById('pSizes'));
         if (!sizes.length) { UI.toast('Elige al menos una talla (o "Única")', 'error'); bad = true; }
+        // Stock por talla (solo de las tallas marcadas). Apagado = {} (ninguna talla lleva stock propio).
+        const sizeStock = {};
+        if (document.getElementById('pSizeStockOn').checked) {
+            for (const input of document.querySelectorAll('#pSizeStock [data-size-stock]')) {
+                const n = U.int(input.value);
+                if (n === null || n < 0 || n > 999999) {
+                    UI.toast(`Ingresa el stock de la talla ${input.dataset.sizeStock} (0 si no hay)`, 'error');
+                    input.focus();
+                    return;
+                }
+                sizeStock[input.dataset.sizeStock] = n;
+            }
+        }
         if (bad) { f.querySelector('.has-error input')?.focus(); return; }
 
         const badgeSel = document.getElementById('pBadge').value;
@@ -392,14 +436,19 @@ Views.productos = {
             // que solo lo cambia si sigue siendo el que viste al abrir (y deja el movimiento auditado).
             const { error } = existing
                 ? await supabaseClient.from('products').update(payload).eq('id', existing.id)
-                : await supabaseClient.from('products').insert({ ...payload, stock });
+                : await supabaseClient.from('products').insert({ ...payload, stock, size_stock: sizeStock });
             if (error) {
                 if (error.code === '23505') { err('name', 'Ya existe un producto con ese nombre.'); throw new Error('Ya existe un producto con ese nombre'); }
                 throw error;
             }
-            if (existing && stock !== existing.stock) {
+            // El stock por talla va en la misma llamada auditada. Se compara con lo que había en la
+            // base (size_stock tal cual), así una talla quitada del producto también se limpia.
+            const prevSizeStock = existing?.size_stock && typeof existing.size_stock === 'object' ? existing.size_stock : {};
+            const sizeStockChanged = !!existing && !U.sameSizeStock(sizeStock, prevSizeStock);
+            if (existing && (stock !== existing.stock || sizeStockChanged)) {
                 const { error: stockError } = await supabaseClient.rpc('set_product_stock', {
-                    p_product_id: existing.id, p_stock: stock, p_expected_stock: existing.stock, p_reason: 'Edición del producto'
+                    p_product_id: existing.id, p_stock: stock, p_expected_stock: existing.stock, p_reason: 'Edición del producto',
+                    ...(sizeStockChanged ? { p_size_stock: sizeStock, p_expected_size_stock: prevSizeStock } : {})
                 });
                 if (stockError) {
                     await UI.closeSheet(true);
@@ -421,8 +470,52 @@ Views.productos = {
     },
 
     duplicate(p) {
-        const copy = { ...p, id: null, stock: 0 };
+        // La copia parte sin stock: las tallas que llevaban stock propio quedan en 0.
+        const sizeStock = Object.fromEntries(Object.keys(U.sizeStockOf(p)).map(k => [k, 0]));
+        const copy = { ...p, id: null, stock: 0, size_stock: sizeStock };
         this.edit(null, copy);
+    },
+
+    // "S 5 · M 0 · L 3" bajo el stock total en la lista de productos.
+    sizeStockSummary(p) {
+        const ss = U.sizeStockOf(p);
+        const keys = Object.keys(ss);
+        if (!keys.length || p.status === 'a_pedido') return '';
+        return `<small class="size-stock-summary">${keys.map(k => `<span class="${ss[k] <= 0 ? 'red' : ''}">${U.esc(k)} ${ss[k]}</span>`).join(' · ')}</small>`;
+    },
+
+    sizeStockTotal() {
+        return [...document.querySelectorAll('#pSizeStock [data-size-stock]')]
+            .reduce((t, input) => t + Math.max(0, U.int(input.value) || 0), 0);
+    },
+
+    // Un campo por cada talla marcada (si "Llevar stock separado por talla" está activo).
+    renderSizeStock() {
+        const on = document.getElementById('pSizeStockOn').checked;
+        const grid = document.getElementById('pSizeStock');
+        const sizes = ChipPicker.values(document.getElementById('pSizes'));
+        grid.hidden = !on;
+        grid.innerHTML = on ? (sizes.length ? sizes.map(sz => `
+            <label class="size-stock-item">
+                <span>${U.esc(sz)}</span>
+                <input type="number" min="0" max="999999" inputmode="numeric" name="sizeStock:${U.esc(sz)}"
+                       data-size-stock="${U.esc(sz)}" value="${this.sizeStockDraft[sz] ?? 0}" aria-label="Stock de la talla ${U.esc(sz)}">
+            </label>`).join('') : '<p class="muted">Primero marca las tallas del producto.</p>') : '';
+        this.updateSizeStockSum();
+    },
+
+    updateSizeStockSum() {
+        const el = document.getElementById('pSizeStockSum');
+        if (!el) return;
+        if (!document.getElementById('pSizeStockOn').checked) { el.innerHTML = ''; return; }
+        const sum = this.sizeStockTotal();
+        const total = U.int(document.getElementById('pStock').value) || 0;
+        const fix = sum !== total ? ` <button type="button" class="btn btn-ghost btn-sm" data-size-sum-to-total>Usar ${sum} como stock total</button>` : '';
+        el.innerHTML = sum === total
+            ? `Suma de las tallas: <strong>${sum}</strong>, igual al stock total.`
+            : sum > total
+                ? `Suma de las tallas: <strong>${sum}</strong>, mayor que el stock total (<strong>${total}</strong>). En la tienda se venderán como máximo ${total}.${fix}`
+                : `Suma de las tallas: <strong>${sum}</strong>, menor que el stock total (<strong>${total}</strong>). En la tienda se venderán como máximo ${sum}.${fix}`;
     },
 
     async remove(list, fromSheet = false) {

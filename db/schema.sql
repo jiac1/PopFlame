@@ -164,6 +164,24 @@ alter table public.products drop constraint if exists products_status_check;
 alter table public.products add constraint products_status_check
     check (status in ('disponible', 'agotado', 'a_pedido', 'pocas'));
 
+-- Stock por talla: {"S": 5, "M": 10}. Una talla sin clave no tiene límite propio (solo cuenta el total).
+create or replace function public.valid_size_stock(p jsonb)
+returns boolean
+language sql immutable set search_path = public, pg_temp as $$
+    select p is not null and jsonb_typeof(p) = 'object' and not exists (
+        select 1 from jsonb_each(p) as e(key, value)
+         where length(trim(e.key)) = 0 or length(e.key) > 20
+            or jsonb_typeof(e.value) <> 'number'
+            or e.value::text !~ '^[0-9]{1,6}$'
+    );
+$$;
+
+alter table public.products add column if not exists size_stock jsonb not null default '{}'::jsonb;
+alter table public.products drop constraint if exists products_size_stock_check;
+alter table public.products add constraint products_size_stock_check
+    check (public.valid_size_stock(size_stock));
+create index if not exists products_category_id_idx on public.products (category_id);
+
 -- Marca de "producto ya anunciado por correo". Los que ya existían no se vuelven a anunciar.
 alter table public.products add column if not exists newsletter_sent_at timestamptz;
 update public.products set newsletter_sent_at = created_at
@@ -343,7 +361,7 @@ drop function if exists public.products_restrict_admin_update();
 
 -- updated_at genérico para orders/config
 create or replace function public.set_updated_at()
-returns trigger language plpgsql as $$
+returns trigger language plpgsql set search_path = public, pg_temp as $$
 begin
     new.updated_at := now();
     return new;
@@ -375,7 +393,7 @@ create trigger trg_products_updated_at
 -- siguen siendo 100% manuales porque dependen de una acción real (despachar, etc.).
 create or replace function public.orders_auto_processing()
 returns trigger
-language plpgsql as $$
+language plpgsql set search_path = public, pg_temp as $$
 begin
     if new.status = 'confirmed' and old.status is distinct from 'confirmed' then
         new.status := 'processing';
@@ -400,7 +418,7 @@ create or replace function public.notify_new_product()
 returns trigger
 language plpgsql
 security definer
-set search_path = public
+set search_path = public, pg_temp
 as $$
 begin
     perform net.http_post(
@@ -441,12 +459,17 @@ alter table public.size_guide enable row level security;
 -- profiles
 drop policy if exists "profiles_select_own_or_super" on public.profiles;
 create policy "profiles_select_own_or_super" on public.profiles
-    for select using (id = auth.uid() or public.is_super_admin());
+    for select using (id = (select auth.uid()) or (select public.is_super_admin()));
 
 drop policy if exists "profiles_update_own_or_super" on public.profiles;
 create policy "profiles_update_own_or_super" on public.profiles
-    for update using (id = auth.uid() or public.is_super_admin())
-    with check (id = auth.uid() or public.is_super_admin());
+    for update using (id = (select auth.uid()) or (select public.is_super_admin()))
+    with check (id = (select auth.uid()) or (select public.is_super_admin()));
+
+-- Nadie crea perfiles por la API: los crea handle_new_user al registrar la cuenta.
+drop policy if exists "profiles_guard_insert" on public.profiles;
+create policy "profiles_guard_insert" on public.profiles
+    as restrictive for insert to anon, authenticated with check (false);
 
 -- categories: lectura pública, escritura admin y super_admin
 drop policy if exists "categories_select_public" on public.categories;
@@ -497,6 +520,27 @@ drop policy if exists "orders_delete_super_admin" on public.orders;
 create policy "orders_delete_super_admin" on public.orders
     for delete using (public.is_super_admin());
 
+-- Desde el panel solo se cambia el estado. Totales, productos y datos del cliente no se editan
+-- por la API (los triggers de stock sí los manejan internamente).
+revoke update on table public.orders from public, anon, authenticated;
+grant update (status) on table public.orders to authenticated;
+
+-- Guardas restrictivas: se suman a cualquier otra política. Aunque alguien vuelva a crear una
+-- política antigua (ej. "orders_insert_public"), la guarda la anula.
+drop policy if exists "orders_guard_insert" on public.orders;
+create policy "orders_guard_insert" on public.orders
+    as restrictive for insert to anon, authenticated with check (false);
+drop policy if exists "orders_guard_select" on public.orders;
+create policy "orders_guard_select" on public.orders
+    as restrictive for select to anon, authenticated using ((select public.is_admin()));
+drop policy if exists "orders_guard_update" on public.orders;
+create policy "orders_guard_update" on public.orders
+    as restrictive for update to anon, authenticated
+    using ((select public.is_admin())) with check ((select public.is_admin()));
+drop policy if exists "orders_guard_delete" on public.orders;
+create policy "orders_guard_delete" on public.orders
+    as restrictive for delete to anon, authenticated using ((select public.is_super_admin()));
+
 -- config: lectura pública (el sitio necesita whatsapp/envío), escritura solo super_admin
 drop policy if exists "config_select_public" on public.config;
 create policy "config_select_public" on public.config
@@ -530,6 +574,9 @@ create policy "pages_write_super_admin" on public.pages
 -- puede ver/editar/borrar la lista. Las Edge Functions usan la service_role key (no RLS).
 drop policy if exists "subscribers_insert_public" on public.subscribers;
 revoke insert on table public.subscribers from anon, authenticated;
+drop policy if exists "subscribers_guard_insert" on public.subscribers;
+create policy "subscribers_guard_insert" on public.subscribers
+    as restrictive for insert to anon, authenticated with check (false);
 
 drop policy if exists "subscribers_manage_super_admin" on public.subscribers;
 create policy "subscribers_manage_super_admin" on public.subscribers
@@ -733,6 +780,7 @@ create table if not exists public.inventory_movements (
     id           bigint generated always as identity primary key,
     product_id   bigint references public.products(id) on delete set null,
     product_name text not null,
+    size         text,  -- null = stock total; 'M' = stock de la talla M
     stock_before integer not null check (stock_before >= 0),
     stock_after  integer not null check (stock_after >= 0),
     delta        integer not null check (delta <> 0),
@@ -746,6 +794,9 @@ create index if not exists inventory_movements_created_at_idx
     on public.inventory_movements (created_at desc);
 create index if not exists inventory_movements_product_id_idx
     on public.inventory_movements (product_id, created_at desc);
+create index if not exists inventory_movements_order_id_idx on public.inventory_movements (order_id);
+create index if not exists inventory_movements_actor_id_idx on public.inventory_movements (actor_id);
+alter table public.inventory_movements add column if not exists size text;
 
 create table if not exists public.audit_events (
     id          bigint generated always as identity primary key,
@@ -761,6 +812,7 @@ create table if not exists public.audit_events (
 );
 create index if not exists audit_events_created_at_idx
     on public.audit_events (created_at desc);
+create index if not exists audit_events_actor_id_idx on public.audit_events (actor_id);
 
 alter table public.inventory_movements enable row level security;
 alter table public.audit_events enable row level security;
@@ -784,22 +836,47 @@ declare
     v_reason text;
     v_order_id bigint;
     v_actor_name text;
+    v_size text;
+    v_before integer;
+    v_after integer;
 begin
+    if new.stock is not distinct from old.stock and new.size_stock is not distinct from old.size_stock then
+        return new;
+    end if;
+
+    v_reason := coalesce(nullif(current_setting('popflame.stock_reason', true), ''), 'Ajuste directo');
+    begin
+        v_order_id := nullif(current_setting('popflame.stock_order_id', true), '')::bigint;
+    exception when invalid_text_representation then
+        v_order_id := null;
+    end;
+    select coalesce(name, username) into v_actor_name from public.profiles where id = auth.uid();
+
     if new.stock is distinct from old.stock then
-        v_reason := nullif(current_setting('popflame.stock_reason', true), '');
-        if v_reason is null then v_reason := 'Ajuste directo'; end if;
-        begin
-            v_order_id := nullif(current_setting('popflame.stock_order_id', true), '')::bigint;
-        exception when invalid_text_representation then
-            v_order_id := null;
-        end;
-        select coalesce(name, username) into v_actor_name
-          from public.profiles where id = auth.uid();
         insert into public.inventory_movements
-            (product_id, product_name, stock_before, stock_after, delta, reason, order_id, actor_id, actor_name)
+            (product_id, product_name, size, stock_before, stock_after, delta, reason, order_id, actor_id, actor_name)
         values
-            (new.id, new.name, old.stock, new.stock, new.stock - old.stock, left(v_reason, 120),
+            (new.id, new.name, null, old.stock, new.stock, new.stock - old.stock, left(v_reason, 120),
              v_order_id, auth.uid(), coalesce(v_actor_name, 'Sistema'));
+    end if;
+
+    if new.size_stock is distinct from old.size_stock then
+        for v_size in
+            select k from jsonb_object_keys(coalesce(old.size_stock, '{}'::jsonb)) as a(k)
+            union
+            select k from jsonb_object_keys(coalesce(new.size_stock, '{}'::jsonb)) as b(k)
+            order by 1
+        loop
+            v_before := coalesce((old.size_stock->>v_size)::integer, 0);
+            v_after := coalesce((new.size_stock->>v_size)::integer, 0);
+            if v_before <> v_after then
+                insert into public.inventory_movements
+                    (product_id, product_name, size, stock_before, stock_after, delta, reason, order_id, actor_id, actor_name)
+                values
+                    (new.id, new.name, v_size, v_before, v_after, v_after - v_before, left(v_reason, 120),
+                     v_order_id, auth.uid(), coalesce(v_actor_name, 'Sistema'));
+            end if;
+        end loop;
     end if;
     return new;
 end;
@@ -807,47 +884,73 @@ $$;
 
 drop trigger if exists trg_products_stock_audit on public.products;
 create trigger trg_products_stock_audit
-    after update of stock on public.products
+    after update of stock, size_stock on public.products
     for each row execute procedure public.track_product_stock_change();
 
--- Ajuste de stock con control de concurrencia (dos admins a la vez).
+-- Ajuste de stock (total y/o por talla) con control de concurrencia (dos admins a la vez).
+-- Los dos últimos parámetros son opcionales.
+drop function if exists public.set_product_stock(bigint, integer, integer, text);
+
 create or replace function public.set_product_stock(
     p_product_id bigint,
     p_stock integer,
     p_expected_stock integer,
-    p_reason text default 'Ajuste manual'
+    p_reason text default 'Ajuste manual',
+    p_size_stock jsonb default null,
+    p_expected_size_stock jsonb default null
 )
 returns integer
 language plpgsql security definer set search_path = public, pg_temp as $$
 declare
     v_current_stock integer;
+    v_current_sizes jsonb;
+    v_sizes text[];
     v_saved_stock integer;
     v_reason text;
+    v_key text;
 begin
     if not public.is_admin() then raise exception 'No autorizado para ajustar inventario'; end if;
     if p_stock is null or p_stock < 0 then raise exception 'El stock debe ser un entero desde cero'; end if;
     if p_expected_stock is null or p_expected_stock < 0 then raise exception 'Falta el stock esperado'; end if;
+    if p_size_stock is not null and not public.valid_size_stock(p_size_stock) then
+        raise exception 'El stock de cada talla debe ser un número entero desde cero';
+    end if;
 
-    select stock into v_current_stock
+    select stock, size_stock, sizes into v_current_stock, v_current_sizes, v_sizes
       from public.products where id = p_product_id for update;
     if not found then raise exception 'El producto ya no existe'; end if;
     if v_current_stock <> p_expected_stock then
         raise exception using errcode = '40001', message = 'El stock cambió en otra sesión; actualiza la vista e inténtalo de nuevo';
     end if;
-    if p_stock = v_current_stock then return v_current_stock; end if;
+    if p_size_stock is not null then
+        if p_expected_size_stock is distinct from v_current_sizes then
+            raise exception using errcode = '40001', message = 'El stock por talla cambió en otra sesión; actualiza la vista e inténtalo de nuevo';
+        end if;
+        for v_key in select jsonb_object_keys(p_size_stock) loop
+            if not (v_key = any(v_sizes)) then
+                raise exception 'La talla % no está entre las tallas del producto', v_key;
+            end if;
+        end loop;
+    end if;
+    if p_stock = v_current_stock and (p_size_stock is null or p_size_stock = v_current_sizes) then
+        return v_current_stock;
+    end if;
 
     v_reason := left(coalesce(nullif(trim(p_reason), ''), 'Ajuste manual'), 120);
     perform set_config('popflame.stock_reason', v_reason, true);
     perform set_config('popflame.stock_order_id', '', true);
-    update public.products set stock = p_stock where id = p_product_id returning stock into v_saved_stock;
+    update public.products
+       set stock = p_stock, size_stock = coalesce(p_size_stock, size_stock)
+     where id = p_product_id
+    returning stock into v_saved_stock;
     perform set_config('popflame.stock_reason', '', true);
     perform set_config('popflame.stock_order_id', '', true);
     return v_saved_stock;
 end;
 $$;
 
-revoke all on function public.set_product_stock(bigint, integer, integer, text) from public, anon;
-grant execute on function public.set_product_stock(bigint, integer, integer, text) to authenticated;
+revoke all on function public.set_product_stock(bigint, integer, integer, text, jsonb, jsonb) from public, anon;
+grant execute on function public.set_product_stock(bigint, integer, integer, text, jsonb, jsonb) to authenticated;
 
 -- Auditoría: registra cambios operativos, sin credenciales ni datos de pago privados.
 create or replace function public.capture_audit_event()
@@ -932,15 +1035,21 @@ returns trigger
 language plpgsql security definer set search_path = public, pg_temp as $$
 declare
     v_product_id bigint;
+    v_size text;
     v_quantity integer;
     v_is_paid boolean := new.status in ('confirmed', 'processing', 'shipped', 'delivered');
     v_stock integer;
+    v_size_stock jsonb;
+    v_status text;
+    v_name text;
+    v_left integer;
 begin
     if old.stock_applied and new.items is distinct from old.items then
         raise exception 'No se pueden cambiar los productos de un pedido con stock aplicado';
     end if;
 
     if v_is_paid and not old.stock_applied then
+        -- Total del producto
         for v_product_id, v_quantity in
             select (item->>'productId')::bigint, sum((item->>'quantity')::integer)::integer
               from jsonb_array_elements(new.items) as line(item)
@@ -960,36 +1069,66 @@ begin
                 select 1 from public.products
                  where id = v_product_id and (status is null or status <> 'a_pedido')
             ) then
-                perform set_config('popflame.stock_reason', '', true);
-                perform set_config('popflame.stock_order_id', '', true);
                 raise exception 'Stock insuficiente para completar el pedido %', new.order_number;
             end if;
             perform set_config('popflame.stock_reason', '', true);
             perform set_config('popflame.stock_order_id', '', true);
         end loop;
+
+        -- Talla vendida (solo si esa talla lleva stock propio)
+        for v_product_id, v_size, v_quantity in
+            select (item->>'productId')::bigint, item->>'size', sum((item->>'quantity')::integer)::integer
+              from jsonb_array_elements(new.items) as line(item)
+             where coalesce(item->>'size', '') <> ''
+             group by 1, 2 order by 1, 2
+        loop
+            select size_stock, status, name into v_size_stock, v_status, v_name
+              from public.products where id = v_product_id for update;
+            continue when not found or v_status = 'a_pedido' or not (v_size_stock ? v_size);
+            v_left := (v_size_stock->>v_size)::integer - v_quantity;
+            if v_left < 0 then
+                raise exception 'No queda stock suficiente de la talla % de "%" para el pedido %', v_size, v_name, new.order_number;
+            end if;
+            perform set_config('popflame.stock_reason', 'Pedido ' || new.order_number || ' pagado', true);
+            perform set_config('popflame.stock_order_id', new.id::text, true);
+            update public.products
+               set size_stock = jsonb_set(size_stock, array[v_size], to_jsonb(v_left))
+             where id = v_product_id;
+            perform set_config('popflame.stock_reason', '', true);
+            perform set_config('popflame.stock_order_id', '', true);
+        end loop;
         new.stock_applied := true;
+
     elsif not v_is_paid and old.stock_applied then
         if exists (select 1 from public.inventory_movements where order_id = new.id) then
-            -- Se repone exactamente lo que este pedido descontó (neto de reversas anteriores).
-            -- Así no importa si el producto cambió de estado (ej. "A Pedido" <-> "Disponible")
-            -- entre el pago y la cancelación.
-            for v_product_id, v_quantity in
-                select product_id, (-sum(delta))::integer
+            -- Se repone exactamente lo que este pedido descontó (neto de reversas anteriores),
+            -- en el total (size null) y en cada talla. No importa si el producto cambió de
+            -- estado entre el pago y la cancelación.
+            for v_product_id, v_size, v_quantity in
+                select product_id, size, (-sum(delta))::integer
                   from public.inventory_movements
                  where order_id = new.id and product_id is not null
-                 group by 1
+                 group by 1, 2
                 having sum(delta) < 0
-                 order by 1
+                 order by 1, 2 nulls first
             loop
                 perform set_config('popflame.stock_reason', 'Reversa del pedido ' || new.order_number, true);
                 perform set_config('popflame.stock_order_id', new.id::text, true);
-                update public.products set stock = stock + v_quantity where id = v_product_id;
+                if v_size is null then
+                    update public.products set stock = stock + v_quantity where id = v_product_id;
+                else
+                    -- Si la talla dejó de llevar stock propio después del pago, no se vuelve a crear.
+                    update public.products
+                       set size_stock = jsonb_set(size_stock, array[v_size],
+                                                  to_jsonb(coalesce((size_stock->>v_size)::integer, 0) + v_quantity))
+                     where id = v_product_id and size_stock ? v_size;
+                end if;
                 perform set_config('popflame.stock_reason', '', true);
                 perform set_config('popflame.stock_order_id', '', true);
             end loop;
         else
             -- Pedidos pagados antes de que existiera el historial de inventario: se repone
-            -- según los productos del pedido, como antes.
+            -- el total según los productos del pedido, como antes.
             for v_product_id, v_quantity in
                 select (item->>'productId')::bigint, sum((item->>'quantity')::integer)::integer
                   from jsonb_array_elements(new.items) as line(item)
@@ -1052,6 +1191,9 @@ declare
     v_total_qty integer;
     v_available integer;
     v_status text;
+    v_size text;
+    v_size_stock jsonb;
+    v_pname text;
     v_items jsonb := '[]'::jsonb;
     v_subtotal numeric := 0;
     v_shipping numeric := 0;
@@ -1091,7 +1233,7 @@ begin
         raise exception 'Hay muchos pedidos en este momento. Intenta de nuevo en un minuto.';
     end if;
 
-    -- Stock: los productos 'a_pedido' se aceptan siempre (se hacen por encargo).
+    -- Stock total: los productos 'a_pedido' se aceptan siempre (se hacen por encargo).
     for v_product_id, v_total_qty in
         select (item->>'productId')::bigint, sum((item->>'quantity')::integer)::integer
           from jsonb_array_elements(p_items) as entry(item)
@@ -1106,6 +1248,20 @@ begin
         end if;
         if v_total_qty > v_available and (v_status is null or v_status <> 'a_pedido') then
             raise exception 'Uno de los productos del carrito ya no tiene stock suficiente';
+        end if;
+    end loop;
+
+    -- Stock por talla: solo las tallas que llevan stock propio.
+    for v_product_id, v_size, v_total_qty in
+        select (item->>'productId')::bigint, coalesce(item->>'size', ''), sum((item->>'quantity')::integer)::integer
+          from jsonb_array_elements(p_items) as entry(item)
+         group by 1, 2 order by 1, 2
+    loop
+        select size_stock, status, name into v_size_stock, v_status, v_pname
+          from public.products where id = v_product_id;
+        if v_size <> '' and (v_status is null or v_status <> 'a_pedido') and v_size_stock ? v_size
+           and v_total_qty > (v_size_stock->>v_size)::integer then
+            raise exception 'La talla % de "%" ya no tiene stock suficiente', v_size, v_pname;
         end if;
     end loop;
 
@@ -1203,6 +1359,23 @@ create trigger trg_subscribers_reactivate
     before insert on public.subscribers
     for each row execute procedure public.subscribers_reactivate();
 
+-- ---------------------------------------------------------
+-- 10. Las funciones de trigger no se llaman por la API (/rest/v1/rpc/...).
+--     Al dispararse como trigger no se revisa este permiso.
+-- ---------------------------------------------------------
+do $$
+declare r record;
+begin
+    for r in
+        select p.oid::regprocedure as fn
+          from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+         where n.nspname = 'public' and p.prorettype = 'trigger'::regtype
+    loop
+        execute format('revoke execute on function %s from public, anon, authenticated', r.fn);
+    end loop;
+end $$;
+
+notify pgrst, 'reload schema';
 
 -- =========================================================
 -- Fin del schema. Siguiente paso:

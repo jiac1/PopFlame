@@ -15,19 +15,33 @@ const CartManager = {
 
     // Con los productos ya cargados, actualiza precio/nombre/foto de lo que hay en el carrito
     // y quita lo que ya no existe o se agotó (así el total nunca queda desactualizado).
+    // El límite se revisa contra la SUMA de todas las líneas del producto (S + M + L…) y contra el
+    // stock de cada talla. Antes se comparaba cada línea por separado: con stock 5, un carrito con
+    // 3 S y 3 M quedaba con 6 y recién el servidor lo rechazaba al pagar.
     sync() {
         if (!ProductsManager.loaded || !ProductsManager.products.length) return;
         let changed = false;
-        this.cart = this.cart.filter(item => {
+        const usedTotal = {};
+        const usedSize = {};
+        const kept = [];
+        for (const item of this.cart) {
             const p = ProductsManager.getProductById(item.productId);
-            if (!p || (p.stock <= 0 && p.status !== 'a_pedido')) { changed = true; return false; }
+            if (!p || (p.stock <= 0 && p.status !== 'a_pedido')) { changed = true; continue; }
             if (item.price !== p.price || item.name !== p.name || item.image !== p.image) {
                 item.price = p.price; item.name = p.name; item.image = p.image;
                 changed = true;
             }
-            if (p.status !== 'a_pedido' && item.quantity > p.stock) { item.quantity = p.stock; changed = true; }
-            return true;
-        });
+            const sizeKey = `${p.id}|${item.size}`;
+            const leftTotal = this.maxFor(p.id) - (usedTotal[p.id] || 0);
+            const leftSize = ProductsManager.availableFor(p, item.size) - (usedSize[sizeKey] || 0);
+            const allowed = Math.max(0, Math.min(leftTotal, leftSize));
+            if (item.quantity > allowed) { item.quantity = allowed; changed = true; }
+            if (item.quantity <= 0) { changed = true; continue; }
+            usedTotal[p.id] = (usedTotal[p.id] || 0) + item.quantity;
+            usedSize[sizeKey] = (usedSize[sizeKey] || 0) + item.quantity;
+            kept.push(item);
+        }
+        this.cart = kept;
         if (changed) this.save();
         this.updateUI();
     },
@@ -43,18 +57,33 @@ const CartManager = {
         return this.cart.filter(i => i.productId === productId).reduce((t, i) => t + i.quantity, 0);
     },
 
-    // Devuelve true si se agregó. Respeta el stock total del producto (entre todas sus variantes).
+    quantityOfSize(productId, size) {
+        return this.cart.filter(i => i.productId === productId && i.size === size).reduce((t, i) => t + i.quantity, 0);
+    },
+
+    // Unidades que todavía se pueden agregar de esa talla: respeta el total del producto (entre todas
+    // sus tallas) y el stock propio de la talla, si lo tiene.
+    remainingFor(product, size) {
+        const isOrder = product.status === 'a_pedido';
+        const leftTotal = (isOrder ? this.maxFor(product.id) : product.stock) - this.quantityOf(product.id);
+        const leftSize = ProductsManager.availableFor(product, size) - this.quantityOfSize(product.id, size);
+        return Math.max(0, Math.min(leftTotal, leftSize));
+    },
+
+    // Devuelve true si se agregó.
     addToCart(product, size, color, quantity = 1) {
         // Solo los productos "A Pedido" se hacen por encargo y no tienen límite de stock.
         // "Pocas Unidades" sí tiene stock real y lo respeta como cualquier otro producto.
         // Igual "A Pedido" tiene un tope: el servidor acepta hasta 99 unidades por producto.
         const isOrder = product.status === 'a_pedido';
-        const available = isOrder
-            ? this.maxFor(product.id) - this.quantityOf(product.id)
-            : product.stock - this.quantityOf(product.id);
+        const available = this.remainingFor(product, size);
 
         if (available <= 0) {
-            UI.toast(isOrder ? 'Puedes encargar hasta 99 unidades de este producto' : 'Ya tienes en el carrito todo el stock disponible', 'error');
+            const sizeFull = !isOrder && ProductsManager.tracksSize(product, size)
+                && product.stock - this.quantityOf(product.id) > 0;
+            UI.toast(isOrder ? 'Puedes encargar hasta 99 unidades de este producto'
+                : sizeFull ? `Ya tienes en el carrito todo el stock de la talla ${size}`
+                : 'Ya tienes en el carrito todo el stock disponible', 'error');
             return false;
         }
 
@@ -95,6 +124,11 @@ const CartManager = {
         if (next <= 0) return this.removeFromCart(index);
         if (change > 0 && this.quantityOf(item.productId) + change > this.maxFor(item.productId)) {
             UI.toast('No hay más stock disponible de este producto', 'error');
+            return;
+        }
+        const p = ProductsManager.getProductById(item.productId);
+        if (change > 0 && p && this.quantityOfSize(item.productId, item.size) + change > ProductsManager.availableFor(p, item.size)) {
+            UI.toast(`No hay más stock de la talla ${item.size}`, 'error');
             return;
         }
         item.quantity = next;

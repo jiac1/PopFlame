@@ -31,7 +31,7 @@
     // mientras llega la versión fresca desde Supabase.
     let cached = {};
     // Misma clave que ProductsManager.cacheKey (products.js).
-    try { cached = JSON.parse(localStorage.getItem('pf_store_cache_v2') || '{}').config || {}; } catch (e) { /* sin cache */ }
+    try { cached = JSON.parse(localStorage.getItem('pf_store_cache_v3') || '{}').config || {}; } catch (e) { /* sin cache */ }
 
     const PF = window.PF = {
         root: ROOT,

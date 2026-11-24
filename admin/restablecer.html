@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="es-CL">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>Nueva contraseña | Panel PopFlame</title>
+    <meta name="robots" content="noindex, nofollow">
+    <meta name="referrer" content="no-referrer">
+    <meta name="theme-color" content="#0B0B0B">
+    <link rel="icon" href="../images/favicon-32.png" sizes="32x32" type="image/png">
+    <link rel="apple-touch-icon" href="../images/apple-touch-icon.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@110..125,700..900&family=Inter:wght@400;500;600;700&display=swap">
+    <link rel="stylesheet" href="css/admin.css?v=12">
+</head>
+<body>
+    <div class="login">
+        <aside class="login-art" aria-hidden="true">
+            <img src="../images/products/chaquetas/chaqueta-3.jpg" alt="">
+            <div class="display" style="font-size:14px;letter-spacing:.12em">Panel de administración</div>
+            <div>
+                <div class="display wordmark">Pop<span>Flame</span></div>
+                <p>Pedidos, productos, stock y contenido de la tienda en un solo lugar.</p>
+            </div>
+        </aside>
+
+        <main class="login-main">
+            <div class="login-card">
+                <h1 class="display">Nueva contraseña</h1>
+                <p id="resetIntro">Revisando el link…</p>
+
+                <form id="resetForm" novalidate hidden>
+                    <div class="field">
+                        <label for="newPass">Contraseña nueva</label>
+                        <input type="password" id="newPass" autocomplete="new-password" minlength="8" maxlength="72" required>
+                        <span class="hint">Al menos 8 caracteres, mezclando letras y números.</span>
+                    </div>
+                    <div class="field">
+                        <label for="newPass2">Repite la contraseña</label>
+                        <input type="password" id="newPass2" autocomplete="new-password" minlength="8" maxlength="72" required>
+                    </div>
+                    <p class="field error" id="resetError" role="alert" hidden></p>
+                    <button type="submit" class="btn btn-dark btn-lg btn-block" id="resetBtn">Guardar contraseña</button>
+                </form>
+
+                <p class="login-foot"><a href="index.html">← Volver a Ingresar</a></p>
+            </div>
+        </main>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.2/dist/umd/supabase.js" integrity="sha384-Rj26LVGvoeRVR6+mwQmFfcR3QOBEwT+ZmuCWpuiqeTzJpCs0ER4ITAWGb4Hiy3Ok" crossorigin="anonymous"></script>
+    <script src="../js/supabaseClient.js?v=12"></script>
+    <script src="js/restablecer.js?v=12"></script>
+</body>
+</html>
