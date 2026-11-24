@@ -23,8 +23,28 @@
         pass.type = show ? 'text' : 'password';
         e.currentTarget.setAttribute('aria-label', show ? 'Ocultar contraseña' : 'Mostrar contraseña');
     });
-    document.getElementById('forgotBtn').addEventListener('click', () => {
-        document.getElementById('forgotHelp').hidden = false;
+    // Recuperar contraseña: Supabase manda un link a restablecer.html para crear una nueva.
+    // El mensaje es el mismo exista o no la cuenta (no revela qué correos tienen cuenta).
+    const forgotBtn = document.getElementById('forgotBtn');
+    const forgotHelp = document.getElementById('forgotHelp');
+    const showHelp = (html) => { forgotHelp.innerHTML = html; forgotHelp.hidden = false; };
+    forgotBtn.addEventListener('click', async () => {
+        const email = user.value.trim().toLowerCase();
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
+            showHelp('Escribe tu <strong>correo</strong> arriba y vuelve a tocar "¿Olvidaste tu contraseña?". Te enviaremos un link para crear una nueva.');
+            user.focus();
+            return;
+        }
+        forgotBtn.disabled = true;
+        const { error } = await supabaseClient.auth.resetPasswordForEmail(email, {
+            redirectTo: new URL('restablecer.html', location.href).href
+        });
+        forgotBtn.disabled = false;
+        if (error && (error.status === 429 || /rate|seconds/i.test(error.message || ''))) {
+            showHelp('Ya pediste un link hace poco. Espera unos minutos y vuelve a intentarlo.');
+            return;
+        }
+        showHelp(`Si <strong>${U.esc(email)}</strong> tiene una cuenta del panel, te llegará un correo con un link para crear una contraseña nueva (revisa también Spam). Si no llega en unos minutos, pídele a un <strong>Super Admin</strong> que te ayude.`);
     });
 
     form.addEventListener('submit', async (e) => {
